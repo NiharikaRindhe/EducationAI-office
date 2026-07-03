@@ -14,6 +14,23 @@ import {
 } from '../controllers/liveSession.controller.js';
 import { createAnnouncementController, deleteAnnouncementController } from '../controllers/announcement.controller.js';
 import { createTaskController, listTasksForTeacherController } from '../controllers/task.controller.js';
+import { addToBankController, listBankController } from '../controllers/questionBank.controller.js';
+import {
+  createExamController,
+  listExamsController,
+  getExamController,
+  addQuestionController,
+  addQuestionsFromBankController,
+  removeQuestionController,
+  publishExamController,
+  closeExamController,
+} from '../controllers/exam.controller.js';
+import {
+  listSubmissionsController,
+  getSubmissionDetailController,
+  finalizeAnswerScoreController,
+  getMeritListController,
+} from '../controllers/examReview.controller.js';
 
 export const teacherRouter = Router();
 
@@ -34,3 +51,20 @@ teacherRouter.delete('/announcements/:id', deleteAnnouncementController);
 
 teacherRouter.post('/tasks', createTaskController);
 teacherRouter.get('/tasks', listTasksForTeacherController);
+
+teacherRouter.post('/question-bank', addToBankController);
+teacherRouter.get('/question-bank', listBankController);
+
+teacherRouter.post('/exams', createExamController);
+teacherRouter.get('/exams', listExamsController);
+teacherRouter.get('/exams/:id', getExamController);
+teacherRouter.post('/exams/:id/questions', addQuestionController);
+teacherRouter.post('/exams/:id/questions/from-bank', addQuestionsFromBankController);
+teacherRouter.delete('/exams/:examId/questions/:questionId', removeQuestionController);
+teacherRouter.post('/exams/:id/publish', publishExamController);
+teacherRouter.post('/exams/:id/close', closeExamController);
+
+teacherRouter.get('/exams/:examId/submissions', listSubmissionsController);
+teacherRouter.get('/exams/:examId/submissions/:submissionId', getSubmissionDetailController);
+teacherRouter.put('/exams/:examId/answers/:answerId/score', finalizeAnswerScoreController);
+teacherRouter.get('/exams/:examId/merit-list', getMeritListController);
