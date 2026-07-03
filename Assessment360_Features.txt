@@ -1,0 +1,1104 @@
+================================================================================
+                        ASSESSMENT360.AI - COMPLETE FEATURE ANALYSIS
+                    Deep Dive into All Platform Modules & Capabilities
+================================================================================
+Platform URL: https://assessment360.ai
+Company: RVR Innovations LLP
+Address: Pocket C1, 1232 Vasant Kunj, New Delhi 110070, India
+Email: info@assessment360.ai
+Trusted By: 1000+ corporates | 600+ universities/colleges | 200+ schools | 20+ awarding bodies
+
+================================================================================
+                              TABLE OF CONTENTS
+================================================================================
+
+  1. PLATFORM OVERVIEW
+  2. MODULE 1: CORPORATE (corp.assessment360.ai)
+  3. MODULE 2: SCHOOLS/ACADEMY (academy.assessment360.ai)
+  4. MODULE 3: CAMPUS HUB (campushub.assessment360.ai)
+  5. MODULE 4: VOCATIONAL (vocational.assessment360.ai)
+  6. MODULE 5: JOB GUARANTEE PROGRAM (naukripromise.com)
+  7. MODULE 6: APPRENTICESHIP (mytat.org/naps/)
+  8. MODULE 7: HIGH-STAKE EXAMS (entrance.assessment360.ai)
+  9. MODULE 8: FREE ATS (corp.assessment360.ai/about-ats.html)
+  10. MODULE 9: LMS (learning.assessment360.ai)
+  11. MODULE 10: HRMS
+  12. MODULE 11: MISS BRIGANZA (AI Assistant)
+  13. CROSS-PLATFORM AI CAPABILITIES
+  14. PROCTORING & SECURITY FEATURES
+  15. INTEGRATIONS & APIs
+  16. MOBILE APPS (Android & iOS)
+
+================================================================================
+1. PLATFORM OVERVIEW
+================================================================================
+
+Assessment360.ai is a comprehensive, AI-powered assessment and learning ecosystem 
+that serves multiple stakeholders across education, corporate hiring, vocational 
+training, and certification. The platform consists of 11 specialized modules 
+accessed through a unified portal system.
+
+CORE VALUE PROPOSITION:
+  - One platform for assessments, learning, hiring & apprenticeships
+  - AI-driven from day one — create, schedule, and launch in days, not months
+  - End-to-end automation from preparation to certification
+  - Supports enterprises, schools, campuses, awarding bodies, and job-guarantee programs
+
+MAIN PORTAL MODULES:
+  [1] Corporate       — AI-driven corporate assessments for hiring, upskilling & performance
+  [2] Schools         — Smart assessments for K-12 learning & career guidance
+  [3] Campus          — End-to-end campus hiring with AI preparation
+  [4] Vocational      — Skill-based assessments for vocational training & certification
+  [5] Job Guarantee   — Outcome-linked courses with assured jobs
+  [6] Apprenticeship  — Structured apprenticeship assessments (NAPS support)
+  [7] High-Stake Exams— Secure, proctored entrance & semester exams
+  [8] Free ATS        — Always-free applicant tracking system
+  [9] LMS             — AI-powered learning management system
+  [10] HRMS           — Unified HR management system
+  [11] Miss Briganza  — AI chatbot assistant for schools & events
+
+================================================================================
+2. MODULE 1: CORPORATE (corp.assessment360.ai)
+      "AssessPro 360 — Enterprise Assessment Platform"
+================================================================================
+
+OVERVIEW:
+AI-driven corporate assessments for hiring, upskilling, and performance insights.
+Trusted by 1,000+ companies & recruiters in 100+ countries. Covers 2,000+ skills 
+with role-based libraries across industries.
+
+SUB-MODULES:
+  - ATS (Applicant Tracking System)
+  - Assessments / ADC (Assessment Development Centre)
+  - LMS (Learning Management System)
+  - Staffing
+
+2.1 ASSESSMENT PORTFOLIO
+--------------------------------------------------------------------------------
+
+  [A] Assessment Development Centre (ADC)
+      - Role plays, group discussions, in-tray tasks, presentations
+      - Scored via calibrated rubrics
+      - Multi-exercise evaluation workflows
+
+  [B] BEI (Behavioural Event Interview)
+      - Structured prompts with competency banks
+      - Anchored examples to reduce bias and boost signal
+      - Standardized scoring framework
+
+  [C] Case Studies
+      - Industry scenarios with exhibits & data
+      - Individual or panel scoring with rubrics
+      - Multi-file stems and branched questioning
+
+  [D] Personality — Big Five (OCEAN)
+      - Five-Factor Model with validity checks
+      - Job-fit narratives generated automatically
+
+  [E] Personality — MVTI-style
+      - Preference indicators with social desirability controls
+      - Automated narrative generation
+
+  [F] In-tray (Intry) Simulations
+      - Simulated inbox with prioritization tasks
+      - Drafting and delegation exercises
+      - Time-boxed scenarios
+
+  [G] SJT (Situational Judgement Tests)
+      - Role-realistic scenarios
+      - Rank/order responses with rationale capture
+      - Machine-scored rationales
+
+  [H] DiSC Assessments
+      - Behavior profiles for communication & teamwork
+      - Role-based insights and recommendations
+
+  [I] 360° Feedback
+      - Manager, peer, report & self input
+      - Rater calibration and confidentiality options
+      - Comprehensive feedback reports
+
+2.2 AI AUTHORING & QUESTION GENERATION
+--------------------------------------------------------------------------------
+
+  - On-the-fly assessment creation from JDs, role profiles, or competency maps
+  - AI proposes blueprints, questions, and rubric matrices
+  - Auto-blueprint by competencies & difficulty with coverage checks
+  - Rubric suggestions with anchored descriptors
+  - Bias-aware prompt engineering
+  - PDF/Doc conversion into structured items
+  - Bulk import capability
+  - Localization and variant generation (A/B versions)
+
+2.3 QUESTION TYPES SUPPORTED
+--------------------------------------------------------------------------------
+
+  [1] Coding
+      - Multi-language IDE with test cases
+      - Hidden tests, stdout/stderr capture
+      - Plagiarism & similarity checks
+      - Complexity and style metrics
+
+  [2] MCQ & MAQ
+      - Single/multiple correct options
+      - Negative marking, shuffling, anchored options
+
+  [3] SJT (Situational Judgement)
+      - Role-realistic scenarios
+      - Rank/order responses with rationale capture
+
+  [4] Audio
+      - Speaking/listening tasks
+      - Mic checks, auto-transcription and scoring
+
+  [5] Video
+      - Timed responses, question randomization
+      - AI-assisted summaries for reviewer speed
+
+  [6] Reading & Reading Comprehension
+      - Passages with sub-items and timers
+      - Highlight-based questions
+
+  [7] Case Items
+      - Uploads, multi-file exhibits, data tables
+      - File-based answers
+
+  [8] Fill in the Blanks (FITB)
+      - Exact/regex/keyword matches
+      - Tolerance settings, synonyms mapping
+
+  [9] Match the Following
+      - Matrix & pair styles with distractors
+      - Drag-drop interactions
+
+2.4 EVALUATION & SCORING
+--------------------------------------------------------------------------------
+
+  - Rubric Matrix: Anchored levels per competency
+  - Auto-suggest rubric levels from evidence
+  - Calibrate & override at any time
+  - Double-blind evaluation option
+  - Short/Long Answers: Semantic similarity & keyword alignment
+  - Bias-aware prompts for evaluators
+  - Video/Audio: Panel review & comments, transcripts, topics, sentiment, speaking time
+  - Coding: Unit tests, complexity, style metrics, plagiarism flagging
+  - Manual, AI-assisted, and hybrid evaluation modes
+
+2.5 ANALYTICS & REPORTS
+--------------------------------------------------------------------------------
+
+  - Individual dashboards: strengths, development areas, percentile & norm groups
+  - Cohort views: heatmaps by competency, team, location & level
+  - Fairness & drift checks
+  - Reviewer calibration metrics
+  - Auto-scoring for coding/MCQ/FITB/match
+  - AI pre-scoring for long answers
+  - Exports to CSV/Excel/PDF
+  - Webhook feeds to BI systems
+
+2.6 PRICING TIERS
+--------------------------------------------------------------------------------
+
+  [A] Professional Plan
+      - All core assessments & question types
+      - Live + AI proctoring
+      - Rubrics, AI summaries & exports
+      - Standard integrations
+      - Email support
+
+  [B] Enterprise Plan
+      - Advanced proctoring & policies
+      - Custom authoring & industry libraries
+      - Reviewer calibration & audit trails
+      - SSO/SCIM, data residency & VPC options
+      - Premium SLA & success manager
+
+================================================================================
+3. MODULE 2: SCHOOLS / ACADEMY (academy.assessment360.ai)
+      "Helping You Learn About the World"
+================================================================================
+
+OVERVIEW:
+Smart assessments for schools to personalize learning and boost student success.
+Prepares students for competitive entrance exams (JEE, NEET, CUET, etc.) with 
+career guidance assessments.
+
+SUB-MODULES:
+  - K-12 Learning
+  - Career Guidance Assessments
+  - Assessments
+  - LMS
+
+3.1 COMPREHENSIVE ENTRANCE EXAM PREPARATION
+--------------------------------------------------------------------------------
+
+  - Extensive Question Bank: 50,000+ questions spanning Math, Science, Social 
+    Studies, English, and more
+  - Realistic Test Environments: Replicates NTA (National Testing Agency) exam 
+    pattern with MCQs, numerical, and descriptive questions
+  - Desktop Application: Real-world test simulation with time management, 
+    section navigation, and official exam functionalities
+  - Performance Analytics: Track strengths, focus areas, and progress with 
+    detailed interactive reports
+
+3.2 CAREER GUIDANCE ASSESSMENTS
+--------------------------------------------------------------------------------
+
+  [A] Psychometric Assessments
+      - Scientifically designed tests to identify strengths, interests, aptitudes
+
+  [B] Career Exploration
+      - Personalized reports with academic and professional pathway insights
+
+  [C] Expert Resources
+      - Videos, guides, articles for informed decision-making
+
+  [D] Skill Development
+      - Actionable recommendations to bridge gaps and build essential aptitudes
+
+3.3 CUSTOM ASSESSMENTS FOR SCHOOLS
+--------------------------------------------------------------------------------
+
+  - Create and manage exams tailored to curriculum with varied difficulty levels
+  - Real exam simulations including negative marking and time management
+  - Desktop app for immersive exam-center-like preparation
+  - Dashboard analytics with individual and batch performance analysis
+  - Topic-wise analysis and benchmarks
+  - Automated grading with instant feedback
+  - Printable reports
+
+3.4 EXAMS SUPPORTED
+--------------------------------------------------------------------------------
+
+  - JEE (Joint Entrance Examination)
+  - NEET (National Eligibility cum Entrance Test)
+  - CUET (Common University Entrance Test)
+  - And other national-level competitive exams
+
+3.5 WHY CHOOSE ASSESSMENT360 FOR SCHOOLS
+--------------------------------------------------------------------------------
+
+  - Realistic Exam Simulation for national-level exams
+  - Expert Content designed by experienced educators
+  - Personalized Learning with tailored insights
+  - User-Friendly Design (desktop and mobile)
+  - Affordable Plans for individuals, schools, coaching institutes
+  - 500+ Online Students | 80+ Online Courses
+
+================================================================================
+4. MODULE 3: CAMPUS HUB (campushub.assessment360.ai)
+      "Early-Talent OS — Prepare. Assess. Hire."
+================================================================================
+
+OVERVIEW:
+End-to-end campus hiring platform that connects companies, colleges, and 
+candidates with AI-powered preparation, secure proctored assessments, events & 
+hackathons, placement automation, and built-in ATS with virtual interviews.
+
+STATS:
+  - 169+ Companies | 1,690+ Jobs | 169+ Colleges | 4,226+ Candidates
+
+STAKEHOLDERS:
+  - Companies (Employers)
+  - Colleges (Educational Institutions)
+  - Candidates (Students)
+
+4.1 FOR COMPANIES
+--------------------------------------------------------------------------------
+
+  - Access pre-qualified talent across colleges
+  - Run coding tests & hackathons
+  - Manage pipelines in built-in ATS
+  - Host virtual interviews
+  - Roll out offers end-to-end
+  - Single gateway to reach young talent
+  - Online assessments and virtual interviews built-in
+  - Offers, onboarding, and analytics
+
+4.2 FOR COLLEGES
+--------------------------------------------------------------------------------
+
+  - Centralized placement dashboard
+  - Manage student data, jobs, application status & interview schedules
+  - Dynamic job postings with real-time updates
+  - Eligibility and shortlisting workflows
+  - Slotting & schedule management
+  - High-integrity assessments at scale
+  - AI proctoring and live analytics
+  - Host events with recruiters
+  - Track placement outcomes end-to-end
+
+4.3 FOR CANDIDATES (STUDENTS)
+--------------------------------------------------------------------------------
+
+  [A] Practice Coding
+      - Role-mapped problems with progress tracking
+
+  [B] Practice Interview (AI)
+      - Mock interviews with feedback on answers and delivery
+      - Real-time feedback on structure
+      - Practice sessions you can replay
+
+  [C] Practice Aptitude
+      - Logical, quantitative & verbal practice
+      - Aligned to placement tests
+
+  [D] Fit Check
+      - Discover roles matching profile and strengths
+
+  [E] Jobs
+      - Apply to campus & off-campus opportunities
+      - Track interviews & offers
+
+  [F] Create CV
+      - Generate clean resumes with verified academics & projects
+
+  [G] Hackathons & Events
+      - Stand out through challenges and recruiter events
+
+  [H] Courses
+      - Short courses to polish fundamentals and interview skills
+
+  [I] Real-time Updates
+      - Stay in loop on eligibilities, schedules, and results
+
+4.4 PLACEMENT AUTOMATION
+--------------------------------------------------------------------------------
+
+  - Digitize entire campus placement cycle
+  - Centralized dashboards for all stakeholders
+  - Dynamic job postings
+  - Eligibility & shortlisting workflows
+  - Real-time status tracking
+  - Interview/test scheduling
+  - Integrated assessments & virtual interviews
+  - Offer rollouts
+  - Built-in scheduling, proctoring, and communication tools
+  - Connect faculty, alumni, and recruiters
+
+4.5 CAPABILITIES SUMMARY
+--------------------------------------------------------------------------------
+
+  [1] AI Interview Prep
+      - Real-time feedback on answers, delivery, and structure
+      - Replayable practice sessions
+
+  [2] Coding Practice
+      - Interactive problems mapped to roles and difficulty
+      - Performance tracking
+
+  [3] Aptitude & Verbal
+      - Logical, quantitative, language assessments
+      - Aligned with common placement tests
+
+  [4] Secure Proctoring
+      - AI-backed monitoring and integrity signals
+      - For entrance exams and internal assessments
+
+  [5] ATS & Workflows
+      - Automate screening and shortlisting
+      - Move candidates through to offers
+
+  [6] Jobs & Hackathons
+      - Discover roles and challenges
+      - Build recruiter pipelines
+
+4.6 HOW IT WORKS (4-STEP PROCESS)
+--------------------------------------------------------------------------------
+
+  Step 1: Create — Set up profile or institution/company workspace in minutes
+  Step 2: Practice/Assess — Use AI prep and secure assessments
+  Step 3: Engage — Join hackathons, post roles, invite cohorts
+  Step 4: Track & Hire — Use ATS and analytics from shortlist to offer
+
+================================================================================
+5. MODULE 4: VOCATIONAL (vocational.assessment360.ai)
+      "End-to-End Vocational Assessment Suite"
+================================================================================
+
+OVERVIEW:
+Practical, Viva & Theory assessments at scale — built for speed, security, 
+and compliance. Handles 50,000+ assessments per month across 20+ Awarding Bodies.
+Supports online & offline modes with real-time observation and AI-assisted checks.
+
+STATS:
+  - 20+ Awarding Bodies / AAs
+  - 50,000+ assessments/month
+  - Ultra-fast blob-based video uploads
+
+5.1 TYPES OF ASSESSMENTS
+--------------------------------------------------------------------------------
+
+  [A] Practical Assessments
+      - Evidence capture with photos/videos
+      - Checklists and scoring rubrics
+      - Offline capture capability
+      - Evaluator notes
+      - Geo-tagging & timestamping
+
+  [B] Viva / Oral Assessments
+      - Structured question banks with randomization
+      - Audio/video capture
+      - Auto-transcripts
+      - Multi-language prompts
+
+  [C] Theory Assessments
+      - MCQ/SBA, caselets, adaptive forms
+      - Negative marking and proctoring
+      - Item analysis and instant scoring
+
+  [D] Group Viva & Practical
+      - Panel/group interactions
+      - Synchronized timers
+      - Shared evidence
+      - Separate candidate scoring
+      - Controlled turn-taking
+
+5.2 CORE PLATFORM FEATURES
+--------------------------------------------------------------------------------
+
+  [1] Real-time Observer Screen
+      - Live sessions dashboard with candidate status
+      - Evidence stream and flags
+      - Interventions without disrupting flow
+
+  [2] Blob-based Video Uploads
+      - Resumable, chunked, parallelized uploads
+      - Integrity checks
+      - Optimized for low-bandwidth centers
+
+  [3] Configurable Workflows
+      - Slot creation, center mapping, attendance
+      - Evaluations, moderation, publishing — all in one place
+
+  [4] Role-based Access
+      - Separate portals for: Assessor, Trainer, Candidate, NCVET Master, 
+        Awarding Bodies
+      - Granular permissions per role
+
+  [5] Proctoring & Integrity
+      - Photo ID checks
+      - Session time-caps
+      - Geo-fencing
+      - Randomization
+      - Dual-device capture
+      - Audit trails
+
+  [6] Reports & Analytics
+      - Candidate-wise, batch-wise, center-wise dashboards
+      - Awarding-body dashboards
+      - Exports and API access
+
+  [7] Identity & eKYC (Aadhaar)
+      - Aadhaar QR/OCR capture and match
+      - Consent prompts and encrypted storage
+
+  [8] Face Match & Liveness
+      - Face verification with passive liveness checks
+      - Reduces impersonation during check-in and viva
+
+  [9] Geo-tagging & Geo-fencing
+      - Capture location meta for evidence
+      - Enforce center geofences
+      - Detect out-of-bounds attempts
+
+  [10] AI Analysis & QA
+      - Automated rubric completeness checks
+      - Anomaly detection
+      - Transcript summaries
+      - Moderation assists
+
+  [11] Online & Offline Modes
+      - Offline-first capture with background sync
+      - Online proctored theory/viva
+      - Bandwidth-adaptive media
+
+  [12] Group Sessions Orchestration
+      - Synchronize multi-candidate viva/practicals
+      - Assign panelists
+      - Record shared artifacts with per-candidate scoring
+
+5.3 NCVET-ALIGNED GOVERNANCE & COMPLIANCE
+--------------------------------------------------------------------------------
+
+  - NSQF Level Tagging: Map assessments to NSQF levels and qualification codes
+  - AB / AA Role Separation: Distinct logins & permissions for Awarding Bodies 
+    and Assessment Agencies
+  - Evidence & Audit Trails: Immutable timestamps, geo-tags, version history
+  - Assessor Empanelment: Registry, qualifications, empanelment cycles, 
+    conflict-of-interest checks
+  - Malpractice & Grievances: Flagging, incident recording, escalation paths
+  - Data Retention Controls: Configurable retention/archival windows
+  - Compliance Matrix Template: Configure controls per Awarding Body/AA SOPs
+
+5.4 ROLE-BASED LOGIN PORTALS
+--------------------------------------------------------------------------------
+
+  [A] Assessor Login
+      - Assigned batches, rubrics, evidence capture, scoring, submission
+      - Works offline, syncs when online
+
+  [B] Trainer Login
+      - Practice tests, remediation insights
+      - Candidate readiness dashboards
+
+  [C] Candidate Login
+      - Admit cards, slot details, instructions
+      - ID verification, result downloads
+
+  [D] NCVET Master Login
+      - Policy rules, center accreditation
+      - Master data, performance reports, audits
+
+  [E] Awarding Body Login
+      - Qualification mapping, moderation
+      - Center-wise analytics, certificate templates, compliance exports
+
+5.5 CERTIFICATE ISSUANCE
+--------------------------------------------------------------------------------
+
+  - Generate and issue digital certificates instantly after moderation
+  - Templated designs: Brand-aligned layouts with signatures and holograms
+  - QR-based validation and public verification endpoints
+  - Bulk publishing capability
+
+5.6 MOBILE APPS FOR FIELD USE
+--------------------------------------------------------------------------------
+
+  - Android & iOS apps built for field assessors
+  - Offline-first design with background uploads
+  - Battery-friendly sessions
+  - Features: Offline mode, Online mode, Aadhaar QR, Face match, Geo-tagging
+
+5.7 TYPICAL WORKFLOW
+--------------------------------------------------------------------------------
+
+  Plan    → Create slots, map centers, allocate assessors (with clash checks)
+  Conduct → Capture practicals, run viva, deliver secure theory exams
+  Close   → Moderate results, issue certificates, share exports/APIs
+
+================================================================================
+6. MODULE 5: JOB GUARANTEE PROGRAM (naukripromise.com)
+================================================================================
+
+OVERVIEW:
+Outcome-linked courses with assured jobs on successful program completion.
+Connects training, projects, and placement in one structured program.
+
+FEATURES:
+  - Training Programs: Industry-aligned skill training
+  - Projects: Hands-on project work for practical experience
+  - Assured Placement*: Job guarantee upon successful completion
+  - Progress tracking throughout the program
+  - Assessment-driven certification before placement
+
+================================================================================
+7. MODULE 6: APPRENTICESHIP (mytat.org/naps/)
+================================================================================
+
+OVERVIEW:
+Structured apprenticeship assessments to track skills, progress, and job 
+readiness. Aligned with National Apprenticeship Promotion Scheme (NAPS).
+
+FEATURES:
+  - Apprentice Hiring: Streamlined recruitment of apprentices
+  - NAPS Support: Full compliance with National Apprenticeship Promotion Scheme
+  - BVOC / DVOC: Support for Bachelor/Vocational and Diploma/Vocational courses
+  - OJT & Certifications: On-the-job training tracking and certification
+  - Skill progress tracking over apprenticeship duration
+  - Workplace assessment capabilities
+  - Mentor/evaluator coordination
+
+================================================================================
+8. MODULE 7: HIGH-STAKE EXAMS (entrance.assessment360.ai)
+      "Proctored Desktop & Browser Exams"
+================================================================================
+
+OVERVIEW:
+Secure, proctored high-stakes entrance and semester exams with robust 
+anti-cheat analytics & reports. Desktop application with full lockdown 
+capabilities and browser-based delivery options.
+
+NAVIGATION MODULES: Web App | Admin Suite | Proctoring | Observer | 
+                    Question Types | GD & AI-PI | Results
+
+8.1 SECURE DESKTOP DELIVERY
+--------------------------------------------------------------------------------
+
+  - Cross-platform desktop application (Windows, macOS, Linux)
+  - Online & offline modes
+  - Application & process lockdown (restricted apps, copy/paste, print, 
+    screen-share blocking)
+  - Screen recording (configurable)
+  - Browser isolation
+  - Virtual machine detection
+  - Pre-flight checks: camera, mic, network, storage, time sync
+  - Cryptographically signed packages
+  - Encrypted question & response files
+  - Background sync for offline centers
+  - Resumable uploads
+
+8.2 BROWSER-BASED DELIVERY (NO INSTALL)
+--------------------------------------------------------------------------------
+
+  - Secure exams directly in browser
+  - Ideal for distributed candidates and BYOD centers
+  - Secure modes: kiosk / Chromium-based lockdown / extension-guarded sessions
+  - WebRTC checks for camera, mic, screen
+  - Multiple-device detection
+  - Bandwidth-adaptive streams
+  - Resumable uploads for stability
+  - SSO/OTP login
+  - Admit card QR scan
+  - Device readiness wizard
+  - Limited offline caching for objective items
+  - Supported browsers: Chromium preferred, Chrome, Edge, Firefox (limited)
+
+8.3 ADMIN SUITE
+--------------------------------------------------------------------------------
+
+  [A] Admit Card Creation
+      - Generate & bulk-dispatch admit cards
+      - QR/Barcodes, instructions, center/slot data
+
+  [B] Scheduling & Slotting
+      - Create programs, subjects, and slots
+      - Auto-avoid clashes
+      - Seat allocation and capacity planning
+
+  [C] Bank & Blueprint
+      - Item bank with metadata, difficulty, syllabus tags
+      - Blueprinting and randomization templates
+
+  [D] Integrity & Compliance
+      - Audit logs, dual approval for paper publishing
+      - Secure keys, center readiness checklists
+      - Policy locks
+
+  [E] Reports & Dashboards
+      - Live candidate counts, attendance, exceptions, health indicators
+      - CSV/Excel/PDF exports
+
+  [F] Observer/Invigilator Tools
+      - Attendance capture, candidate notes
+      - Incident logging, escalation workflows
+
+8.4 PROCTORING — LIVE + AI
+--------------------------------------------------------------------------------
+
+  [A] Identity Checks
+      - Photo ID capture, face verification
+      - Passive liveness detection
+      - Configurable retakes & manual override
+
+  [B] Live Proctoring
+      - 1:many and many:many rooms
+      - Chat to candidate
+      - Instant flagging
+      - Evidence clips
+      - Intervention tools
+
+  [C] AI Proctoring & Analysis
+      - Flag unusual gaze, multiple faces
+      - Device change detection
+      - Mic/speech anomaly detection
+      - Prioritized review queue
+
+  [D] Lockdown Controls
+      - Disable switching, block apps/sites
+      - Prevent screenshots, detect VMs
+      - Manage permitted apps list
+
+  [E] Privacy & Policy
+      - Consent flows, regional data routing
+      - Retention windows
+      - Transparent review trails
+
+8.5 OBSERVER CONSOLE
+--------------------------------------------------------------------------------
+
+  - Monitor every exam in real time
+  - See attendance, health checks, flags, recordings
+  - Non-intrusive candidate monitoring
+
+8.6 QUESTION TYPES
+--------------------------------------------------------------------------------
+
+  [1] MCQ / MSQ
+      - Single/multiple correct, negative marks, shuffling, anchored options
+
+  [2] Reading Comprehension
+      - Passage + timed sub-items, highlight-based questions, per-section timers
+
+  [3] Subjective / Essay
+      - Rich text, math (LaTeX), diagrams upload
+      - Rubric-based evaluation, optional double-blind
+
+  [4] Case Study
+      - Multi-file stems, exhibits, branched questioning, partial credit
+
+  [5] Fill-in-the-Blank
+      - Exact/regex/keyword matches, tolerance & case options, synonyms
+
+  [6] Match-the-Following
+      - Matrix & pair styles, shuffle & distractors, drag-and-drop
+
+  [7] Numeric / Short Answer
+      - Range & precision checks, units, calculator policy toggles
+
+  [8] Media-based
+      - Audio/video prompts, speaking/listening tasks, background upload
+
+  [9] Coding / Practical
+      - Sandboxed environments, test cases, file uploads, plagiarism checks
+
+8.7 GROUP DISCUSSION & AI-BASED PERSONAL INTERVIEW (GD & AI-PI)
+--------------------------------------------------------------------------------
+
+  - GD rooms with speaking order, timers, shared prompts, individual scoring
+  - AI-PI assists: transcript, topic coverage, sentiment & rubric completeness
+  - Panel notes, highlights, candidate evidence bundles
+  - Post-session review with searchable transcripts and auto-tagged moments
+
+8.8 RESULT DECLARATION & ANALYTICS
+--------------------------------------------------------------------------------
+
+  [A] Publishing
+      - One-click publish after QA/moderation
+      - Merit lists, cut-offs, rank generation
+
+  [B] Analytics
+      - Score distributions, item analysis, DIF
+      - Section-wise difficulty, performance by center
+
+  [C] Recheck & Grievances
+      - Secure candidate view, challenge windows
+      - Audit-ready change logs
+
+================================================================================
+9. MODULE 8: FREE ATS (Applicant Tracking System)
+================================================================================
+
+OVERVIEW:
+Streamlined, always-free applicant tracking to manage resumes, interviews, 
+and hiring. No user limits, no job limits.
+
+KEY FEATURES:
+  - Always Free — No hidden costs
+  - Unlimited Users — Add as many team members as needed
+  - Unlimited Jobs — Post as many job openings as required
+  - Resume management and parsing
+  - Interview scheduling and tracking
+  - Candidate pipeline management
+  - Collaborative hiring workflows
+  - Status tracking and notifications
+
+================================================================================
+10. MODULE 9: LMS (learning.assessment360.ai)
+      "AI-Powered Learning Management System"
+================================================================================
+
+OVERVIEW:
+AI learning for companies & training institutes. Combines AI learning 
+workflows, AI assessments, and live virtual classrooms. Design, deliver, and 
+certify training programs at scale.
+
+SUB-MODULES:
+  - Learning
+  - Practice
+  - AI-Based Answers
+  - Android / iOS Apps
+
+TARGET USERS:
+  - Corporates & Enterprises
+  - Training Institutes
+  - EdTech Providers
+  - Professional Bodies
+
+10.1 AI-GUIDED COURSE AUTHORING
+--------------------------------------------------------------------------------
+
+  - Build structured courses and learning paths using AI suggestions
+  - AI-suggested modules, topics, and assessments
+  - Mix videos, files, quizzes, and assignments
+  - Reduce course creation time by up to 50%
+  - Rich multimedia content support
+
+10.2 AI ASSESSMENTS & QUESTION BANKS
+--------------------------------------------------------------------------------
+
+  - Generate assessment questions with AI
+  - Set difficulty levels automatically
+  - Auto-grade objective items
+  - AI-assisted evaluation of descriptive answers
+  - Multiple choice, case-based & scenario questions
+  - AI question generation and AI scoring
+
+10.3 LIVE CLASSES WITH AI-ENHANCED INSIGHTS
+--------------------------------------------------------------------------------
+
+  - Schedule live classes on preferred video platform
+  - AI summarizes sessions
+  - Highlights key concepts and action items
+  - AI class summaries and AI attendance patterns
+  - Works with Zoom / Meet / Teams
+  - Real-time engagement tracking
+
+10.4 CERTIFICATIONS POWERED BY AI TRACKING
+--------------------------------------------------------------------------------
+
+  - Combine AI learning paths and AI assessments
+  - Control when certificates are issued
+  - Track renewals and recertification windows automatically
+  - Completion rules and AI risk alerts
+  - Configurable for each program or client
+
+10.5 AI ANALYTICS ON LEARNER PROGRESS
+--------------------------------------------------------------------------------
+
+  - AI-driven dashboards for team/institute/batch monitoring
+  - Spot learners likely to drop off and intervene early
+  - AI predictions and AI cohort analysis
+  - Exportable reports for reviews & audits
+  - Engagement scoring
+
+10.6 SECURE AND CONTROLLED AI ACCESS
+--------------------------------------------------------------------------------
+
+  - Role-based access for admins, trainers, and learners
+  - AI features governed and auditable
+  - Clear visibility over AI decisions and assessment results
+  - Logs and AI usage aligned to organizational policies
+
+10.7 SAMPLE AI LEARNING CONSOLE METRICS
+--------------------------------------------------------------------------------
+
+  - AI Learning Tracks (e.g., AI Onboarding 101, AI Sales Playbook)
+  - AI-predicted completion rates (e.g., 89%)
+  - AI assessments per week tracking
+  - Certificates issued tracking
+  - Live class scheduling with AI engagement scores
+  - AI auto-grades assessments in real time
+
+================================================================================
+11. MODULE 10: HRMS (Human Resource Management System)
+================================================================================
+
+OVERVIEW:
+Unified HRMS to manage attendance, payroll, performance, and employee data.
+
+FEATURES:
+  - Attendance management and tracking
+  - Payroll processing
+  - Performance management
+  - Employee data management
+  - AI Chatbot integration (Coming Soon)
+
+================================================================================
+12. MODULE 11: MISS BRIGANZA (AI Assistant)
+================================================================================
+
+OVERVIEW:
+A friendly AI guide for schools & events — outreach, event assessments, and 
+creative programs. Available as Android and iOS apps.
+
+FEATURES:
+  - AI-powered conversational interface
+  - School outreach assistance
+  - Event assessment management
+  - Creative program guidance
+  - Mobile app availability (Android & iOS)
+
+APP DOWNLOAD:
+  - Download Android App (Google Play Store)
+  - Download iOS App (Apple App Store)
+
+================================================================================
+13. CROSS-PLATFORM AI CAPABILITIES
+================================================================================
+
+The following AI capabilities are integrated across multiple modules:
+
+  [1] AI Question Generation
+      - Automatically generate assessment questions from documents, JDs, or topics
+      - Adjustable difficulty levels
+      - Multiple question formats supported
+
+  [2] AI Scoring & Evaluation
+      - Auto-grade objective questions (MCQ, FITB, coding, matching)
+      - AI-assisted grading for subjective/descriptive answers
+      - Rubric-based AI scoring with human oversight
+
+  [3] AI Proctoring
+      - Multiple face detection
+      - Unusual gaze detection
+      - Device change detection
+      - Mic/speech anomaly detection
+      - Prioritized review queues for suspicious activity
+
+  [4] AI Interview Analysis
+      - Real-time transcript generation
+      - Topic coverage analysis
+      - Sentiment analysis
+      - Speaking time metrics
+      - Rubric completeness checks
+      - AI-suggested probes and time cues
+
+  [5] AI Learning Analytics
+      - Predict completion rates
+      - Identify at-risk learners
+      - Cohort performance analysis
+      - Engagement scoring
+      - Drop-off prediction and early intervention alerts
+
+  [6] AI Content Summarization
+      - Class/session summaries
+      - Key concept extraction
+      - Action item highlighting
+      - Transcript summarization
+
+  [7] AI Authoring Assistance
+      - Blueprint generation from competencies
+      - Module/topic suggestions
+      - Learning path recommendations
+      - Content localization and variant generation
+
+================================================================================
+14. PROCTORING & SECURITY FEATURES
+================================================================================
+
+PLATFORM-WIDE SECURITY:
+
+  [A] Identity Verification
+      - Photo ID capture and verification
+      - Face match & face verification
+      - Passive liveness detection
+      - Aadhaar QR/OCR (for Indian vocational assessments)
+      - eKYC workflows with consent
+
+  [B] Live Proctoring
+      - 1:many and many:many monitoring rooms
+      - Chat with candidates
+      - Instant flagging system
+      - Evidence clip capture
+      - Intervention tools
+      - Real-time observer console
+
+  [C] AI Proctoring
+      - Multiple face detection
+      - Unusual gaze tracking
+      - Device/screen change detection
+      - Mic anomaly detection
+      - Automated flag generation
+      - Prioritized review queues
+
+  [D] Lockdown Controls
+      - Application switching prevention
+      - Website/app blocking
+      - Screenshot prevention
+      - Virtual machine detection
+      - Permitted apps list management
+      - Browser isolation
+      - Copy/paste restriction
+      - Print restriction
+
+  [E] Exam Integrity
+      - Question randomization
+      - Option shuffling
+      - Session time-caps
+      - Geo-fencing
+      - Geo-tagging
+      - Dual-device capture
+      - Audit trails
+      - Encrypted question & response files
+
+  [F] Privacy & Compliance
+      - Consent flows
+      - Regional data routing
+      - Configurable retention windows
+      - Transparent review trails
+      - Encrypted storage
+      - Role-based access control
+
+================================================================================
+15. INTEGRATIONS & APIs
+================================================================================
+
+SUPPORTED INTEGRATIONS:
+
+  [1] ATS & HRMS
+      - Sync jobs, candidates, hires, and feedback
+      - APIs & webhooks included
+      - Compatible with major ATS platforms
+
+  [2] LMS Integration
+      - Single sign-on (SSO)
+      - Deep links
+      - Grade passback
+      - Assign learning after assessments
+
+  [3] Calendars & Mail
+      - Google Workspace integration
+      - Microsoft 365 integration
+      - Scheduling and shared mailboxes
+
+  [4] Conferencing & e-Sign
+      - Zoom / Meet / Teams links in invites
+      - E-signature for offer letters
+
+  [5] Background Checks
+      - Trigger checks post-offer
+      - Candidate consent via webhook/API
+
+  [6] BI & Data Warehouse
+      - Scheduled exports
+      - Event streams to analytics stack
+      - CSV/Excel/PDF exports
+      - Webhook feeds
+
+  [7] Video Platforms
+      - Zoom integration
+      - Google Meet integration
+      - Microsoft Teams integration
+
+================================================================================
+16. MOBILE APPS (ANDROID & iOS)
+================================================================================
+
+SUPPORTED PLATFORMS:
+  - Android (Google Play Store)
+  - iOS (Apple App Store)
+
+APP CAPABILITIES:
+  - Full assessment delivery
+  - Offline-first capture with background sync
+  - Video/photo evidence upload
+  - Face match & liveness verification
+  - Aadhaar QR scanning (vocational)
+  - Geo-tagging
+  - Push notifications
+  - Real-time updates
+  - Battery-friendly sessions
+  - Low-bandwidth optimization
+  - Miss Briganza AI assistant access
+  - LMS learning access
+  - Practice tests and coding challenges
+
+================================================================================
+                            END OF FEATURE ANALYSIS
+================================================================================
+
+Report Generated: 2026-06-24
+Analysis Source: Website deep-dive across all Assessment360.ai subdomains
+Subdomains Analyzed:
+  - https://assessment360.ai (Main Portal)
+  - https://corp.assessment360.ai (Corporate)
+  - https://academy.assessment360.ai (Schools)
+  - https://campushub.assessment360.ai (Campus)
+  - https://vocational.assessment360.ai (Vocational)
+  - https://learning.assessment360.ai (LMS)
+  - https://entrance.assessment360.ai (High-Stake Exams)
+  - https://naukripromise.com (Job Guarantee)
+  - https://mytat.org/naps/ (Apprenticeship)
+
+================================================================================

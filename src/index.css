@@ -1,0 +1,242 @@
+@import "tailwindcss";
+
+@theme {
+  --color-batch-1-amber: #F59E0B;
+  --color-batch-1-orange: #F97316;
+  --color-batch-2-indigo: #6366F1;
+  --color-batch-2-violet: #8B5CF6;
+  --color-batch-3-sky: #0EA5E9;
+  --color-batch-3-cyan: #06B6D4;
+  --color-batch-4-purple: #8B5CF6;
+  --color-batch-4-slate: #475569;
+  --color-teacher-indigo: #4F46E5;
+  --color-parent-emerald: #10B981;
+  --color-parent-teal: #14B8A6;
+  --color-status-completed: #22C55E;
+  --color-status-alert: #E11D48;
+  --color-surface-dark: #030712;
+
+  --font-display: "Outfit", sans-serif;
+  --font-sans: "Inter", sans-serif;
+  --font-mono: "Courier Prime", monospace;
+
+  --animate-float: float 4s ease-in-out infinite;
+  --animate-fade-up: fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-spin-slow: spin 15s linear infinite;
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Custom CSS Classes as specified in UI_FEATURES.md */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  line-height: 1;
+}
+
+.pill-amber {
+  background-color: color-mix(in srgb, var(--color-batch-1-amber) 12%, transparent);
+  color: var(--color-batch-1-amber);
+  border: 1px solid color-mix(in srgb, var(--color-batch-1-amber) 25%, transparent);
+}
+
+.pill-indigo {
+  background-color: color-mix(in srgb, var(--color-batch-2-indigo) 12%, transparent);
+  color: var(--color-batch-2-indigo);
+  border: 1px solid color-mix(in srgb, var(--color-batch-2-indigo) 25%, transparent);
+}
+
+.pill-sky {
+  background-color: color-mix(in srgb, var(--color-batch-3-sky) 12%, transparent);
+  color: var(--color-batch-3-sky);
+  border: 1px solid color-mix(in srgb, var(--color-batch-3-sky) 25%, transparent);
+}
+
+.pill-green {
+  background-color: color-mix(in srgb, var(--color-status-completed) 12%, transparent);
+  color: var(--color-status-completed);
+  border: 1px solid color-mix(in srgb, var(--color-status-completed) 25%, transparent);
+}
+
+.pill-rose {
+  background-color: color-mix(in srgb, var(--color-status-alert) 12%, transparent);
+  color: var(--color-status-alert);
+  border: 1px solid color-mix(in srgb, var(--color-status-alert) 25%, transparent);
+}
+
+.pill-slate {
+  background-color: color-mix(in srgb, var(--color-batch-4-slate) 12%, transparent);
+  color: var(--color-batch-4-slate);
+  border: 1px solid color-mix(in srgb, var(--color-batch-4-slate) 25%, transparent);
+}
+
+.pill-purple {
+  background-color: color-mix(in srgb, var(--color-batch-4-purple) 12%, transparent);
+  color: var(--color-batch-4-purple);
+  border: 1px solid color-mix(in srgb, var(--color-batch-4-purple) 25%, transparent);
+}
+
+.status-completed {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-status-completed);
+}
+.status-completed::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--color-status-completed);
+}
+
+.status-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-batch-1-amber);
+}
+.status-progress::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--color-batch-1-amber);
+}
+
+.status-review {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-batch-2-violet);
+}
+.status-review::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--color-batch-2-violet);
+}
+
+.status-notstarted {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+.status-notstarted::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #6b7280;
+}
+
+.anim-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.anim-fade-up {
+  animation: fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.anim-spin-slow {
+  animation: spin 15s linear infinite;
+}
+
+.bento-card {
+  background-color: white;
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.03);
+}
+
+.card-interactive {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.card-interactive:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background-color: #e5e7eb;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.5s ease-out;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.gradient-hero {
+  background: radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.05) 0%, transparent 40%),
+              radial-gradient(circle at 90% 80%, rgba(245, 158, 11, 0.03) 0%, transparent 40%),
+              radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.04) 0%, transparent 50%);
+}
+
+.hero-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  z-index: 0;
+  opacity: 0.6;
+}
+
+/* Base custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+body {
+  overflow-y: scroll;
+}
