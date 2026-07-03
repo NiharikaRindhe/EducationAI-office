@@ -6,6 +6,7 @@ import {
   raiseHandController,
 } from '../controllers/liveSession.controller.js';
 import { listAnnouncementsForStudentController } from '../controllers/announcement.controller.js';
+import { listTasksForStudentController, cycleTaskStatusController } from '../controllers/task.controller.js';
 
 export const studentRouter = Router();
 
@@ -16,3 +17,6 @@ studentRouter.post('/sessions/join', joinSessionController);
 studentRouter.patch('/sessions/:id/raise-hand', raiseHandController);
 
 studentRouter.get('/announcements', listAnnouncementsForStudentController);
+
+studentRouter.get('/tasks', listTasksForStudentController);
+studentRouter.patch('/tasks/:id/status', cycleTaskStatusController);

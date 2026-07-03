@@ -13,6 +13,7 @@ import {
   participantsController,
 } from '../controllers/liveSession.controller.js';
 import { createAnnouncementController, deleteAnnouncementController } from '../controllers/announcement.controller.js';
+import { createTaskController, listTasksForTeacherController } from '../controllers/task.controller.js';
 
 export const teacherRouter = Router();
 
@@ -30,3 +31,6 @@ teacherRouter.get('/sessions/:id/participants', participantsController);
 
 teacherRouter.post('/announcements', createAnnouncementController);
 teacherRouter.delete('/announcements/:id', deleteAnnouncementController);
+
+teacherRouter.post('/tasks', createTaskController);
+teacherRouter.get('/tasks', listTasksForTeacherController);
