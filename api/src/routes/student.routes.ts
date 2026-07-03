@@ -21,6 +21,7 @@ import {
 } from '../controllers/note.controller.js';
 import { getLeaderboardForStudentController } from '../controllers/leaderboard.controller.js';
 import { downloadOwnAdmitCardController } from '../controllers/admitCard.controller.js';
+import { getItemsController, submitAttemptController, getProgressController } from '../controllers/english.controller.js';
 
 export const studentRouter = Router();
 
@@ -48,3 +49,7 @@ studentRouter.delete('/notes/:id', deleteNoteController);
 studentRouter.get('/leaderboard', getLeaderboardForStudentController);
 
 studentRouter.get('/exams/:examId/admit-card', downloadOwnAdmitCardController);
+
+studentRouter.get('/english/items', getItemsController);
+studentRouter.post('/english/submit', submitAttemptController);
+studentRouter.get('/english/progress', getProgressController);
