@@ -14,6 +14,9 @@ export const env = {
   supabaseUrl: required('SUPABASE_URL'),
   supabaseAnonKey: required('SUPABASE_ANON_KEY'),
   supabaseServiceKey: required('SUPABASE_SERVICE_KEY'),
+  // Must match the local Supabase stack's GOTRUE_JWT_SECRET (see `supabase status`)
+  // so hand-minted PIN-login tokens verify identically to GoTrue-issued ones.
+  supabaseJwtSecret: required('SUPABASE_JWT_SECRET'),
 
   ollamaCloudUrl: process.env.OLLAMA_CLOUD_URL ?? 'https://ollama.com/api',
   ollamaCloudApiKey: process.env.OLLAMA_CLOUD_API_KEY ?? '',

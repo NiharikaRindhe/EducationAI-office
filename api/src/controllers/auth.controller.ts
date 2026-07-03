@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { loginSchema } from '../schemas/auth.schema.js';
+import { loginSchema, pinLoginSchema, pinRosterQuerySchema } from '../schemas/auth.schema.js';
 import * as authService from '../services/auth.service.js';
 import { ApiError } from '../lib/errors.js';
 import { supabaseAdmin } from '../lib/supabase.js';
@@ -8,6 +8,33 @@ export async function loginController(req: Request, res: Response, next: NextFun
   try {
     const input = loginSchema.parse(req.body);
     const result = await authService.login(input);
+    res.json({
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      expiresAt: result.expiresAt,
+      role: result.role,
+      schoolId: result.schoolId,
+      fullName: result.fullName,
+      redirectPath: result.redirectPath,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function pinRosterController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const query = pinRosterQuerySchema.parse(req.query);
+    res.json(await authService.getPinRoster(query));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function pinLoginController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const input = pinLoginSchema.parse(req.body);
+    const result = await authService.pinLogin(input);
     res.json({
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
