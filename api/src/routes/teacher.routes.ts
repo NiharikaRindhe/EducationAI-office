@@ -31,6 +31,8 @@ import {
   finalizeAnswerScoreController,
   getMeritListController,
 } from '../controllers/examReview.controller.js';
+import { recomputeLeaderboardController } from '../controllers/leaderboard.controller.js';
+import { downloadAllAdmitCardsController } from '../controllers/admitCard.controller.js';
 
 export const teacherRouter = Router();
 
@@ -68,3 +70,7 @@ teacherRouter.get('/exams/:examId/submissions', listSubmissionsController);
 teacherRouter.get('/exams/:examId/submissions/:submissionId', getSubmissionDetailController);
 teacherRouter.put('/exams/:examId/answers/:answerId/score', finalizeAnswerScoreController);
 teacherRouter.get('/exams/:examId/merit-list', getMeritListController);
+
+teacherRouter.post('/leaderboard/recompute', recomputeLeaderboardController);
+
+teacherRouter.get('/exams/:examId/admit-cards', downloadAllAdmitCardsController);

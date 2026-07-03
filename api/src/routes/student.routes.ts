@@ -13,6 +13,14 @@ import {
   proctorEventController,
   submitExamController,
 } from '../controllers/examTaking.controller.js';
+import {
+  createNoteController,
+  listNotesController,
+  updateNoteController,
+  deleteNoteController,
+} from '../controllers/note.controller.js';
+import { getLeaderboardForStudentController } from '../controllers/leaderboard.controller.js';
+import { downloadOwnAdmitCardController } from '../controllers/admitCard.controller.js';
 
 export const studentRouter = Router();
 
@@ -31,3 +39,12 @@ studentRouter.get('/exams/:examId/paper', getExamPaperController);
 studentRouter.put('/exam-submissions/:submissionId/answer', saveAnswerController);
 studentRouter.post('/exam-submissions/:submissionId/submit', submitExamController);
 studentRouter.post('/proctor-event', proctorEventController);
+
+studentRouter.post('/notes', createNoteController);
+studentRouter.get('/notes', listNotesController);
+studentRouter.put('/notes/:id', updateNoteController);
+studentRouter.delete('/notes/:id', deleteNoteController);
+
+studentRouter.get('/leaderboard', getLeaderboardForStudentController);
+
+studentRouter.get('/exams/:examId/admit-card', downloadOwnAdmitCardController);
