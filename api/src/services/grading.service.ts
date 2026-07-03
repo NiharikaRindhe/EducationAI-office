@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '../lib/supabase.js';
-import { chatCompletion, ollamaCloudConfigured } from '../lib/ollama.js';
+import { chatCompletion, ollamaConfigured } from '../lib/ollama.js';
 import { logger } from '../lib/logger.js';
 import { addXp, logStreakActivity } from './gamification.service.js';
 
@@ -38,7 +38,7 @@ interface AiScoreResult {
 }
 
 async function scoreSubjectiveWithAI(question: QuestionRow, studentAnswer: string, classNum: number, subject: string): Promise<AiScoreResult | null> {
-  if (!ollamaCloudConfigured) return null; // pending manual grading — not an error
+  if (!(await ollamaConfigured())) return null; // pending manual grading — not an error
 
   try {
     const raw = await chatCompletion(

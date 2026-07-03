@@ -18,10 +18,12 @@ export const env = {
   // so hand-minted PIN-login tokens verify identically to GoTrue-issued ones.
   supabaseJwtSecret: required('SUPABASE_JWT_SECRET'),
 
-  ollamaCloudUrl: process.env.OLLAMA_CLOUD_URL ?? 'https://ollama.com/api',
-  ollamaCloudApiKey: process.env.OLLAMA_CLOUD_API_KEY ?? '',
-  ollamaChatModel: process.env.OLLAMA_CHAT_MODEL ?? 'qwen3:latest',
-
-  ollamaLocalUrl: process.env.OLLAMA_LOCAL_URL ?? 'http://127.0.0.1:11434',
-  ollamaEmbedModel: process.env.OLLAMA_EMBED_MODEL ?? 'nomic-embed-text',
+  // One local Ollama daemon handles both local and cloud-hosted models —
+  // the model name decides the routing (a `-cloud` suffix means the daemon
+  // proxies to Ollama Cloud using its own auth, set once via `ollama signin`
+  // or the daemon's OLLAMA_API_KEY env var; nothing per-request from here).
+  // No separate cloud API key/URL needed at the application layer.
+  ollamaUrl: process.env.OLLAMA_URL ?? 'http://127.0.0.1:11434',
+  ollamaChatModel: process.env.OLLAMA_CHAT_MODEL ?? 'gpt-oss:20b-cloud',
+  ollamaEmbedModel: process.env.OLLAMA_EMBED_MODEL ?? 'mxbai-embed-large',
 };

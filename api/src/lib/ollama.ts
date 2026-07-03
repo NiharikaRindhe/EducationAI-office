@@ -6,25 +6,38 @@ export interface ChatMessage {
   content: string;
 }
 
-export const ollamaCloudConfigured = Boolean(env.ollamaCloudApiKey);
+let daemonReachable: boolean | null = null;
+
+/** Cached after the first check — a school lab isn't restarting its Ollama daemon mid-period. */
+async function isDaemonReachable(): Promise<boolean> {
+  if (daemonReachable !== null) return daemonReachable;
+  try {
+    const res = await fetch(`${env.ollamaUrl}/api/version`, { signal: AbortSignal.timeout(2000) });
+    daemonReachable = res.ok;
+  } catch {
+    daemonReachable = false;
+  }
+  return daemonReachable;
+}
+
+export async function ollamaConfigured(): Promise<boolean> {
+  return isDaemonReachable();
+}
 
 /**
- * Ollama Cloud exposes an OpenAI-compatible chat endpoint, so the request
- * shape here is deliberately generic — swapping to a different hosted
- * provider later (or a self-hosted Ollama instance for a school that opts
- * into local inference) is a base-URL/key change, not a rewrite.
+ * Chat completion — model name decides local vs cloud. A `-cloud` suffixed
+ * model (e.g. gpt-oss:20b-cloud) is proxied by the local daemon to Ollama
+ * Cloud using the daemon's own authenticated session; a plain model name
+ * runs fully on-box. Either way this call looks identical from here.
  */
 export async function chatCompletion(messages: ChatMessage[], opts: { jsonMode?: boolean } = {}): Promise<string> {
-  if (!ollamaCloudConfigured) {
-    throw new Error('OLLAMA_CLOUD_API_KEY is not set — AI features are unavailable until it is configured');
+  if (!(await isDaemonReachable())) {
+    throw new Error('Ollama daemon is not reachable — AI features are unavailable until it is running');
   }
 
-  const response = await fetch(`${env.ollamaCloudUrl}/chat`, {
+  const response = await fetch(`${env.ollamaUrl}/api/chat`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${env.ollamaCloudApiKey}`,
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: env.ollamaChatModel,
       messages,
@@ -35,29 +48,29 @@ export async function chatCompletion(messages: ChatMessage[], opts: { jsonMode?:
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
-    logger.error({ status: response.status, body }, 'Ollama Cloud request failed');
-    throw new Error(`Ollama Cloud request failed: ${response.status}`);
+    logger.error({ status: response.status, body }, 'Ollama chat request failed');
+    throw new Error(`Ollama chat request failed: ${response.status}`);
   }
 
   const data = (await response.json()) as { message?: { content?: string } };
   const content = data.message?.content;
-  if (!content) throw new Error('Ollama Cloud returned no content');
+  if (!content) throw new Error('Ollama returned no content');
   return content;
 }
 
-/** Local Ollama instance, embeddings only (nomic-embed-text, CPU, no GPU needed). */
+/** Embeddings always run locally (mxbai-embed-large, CPU) — needed on every retrieval, so it must not depend on cloud reachability or incur per-call cost. */
 export async function embedText(text: string): Promise<number[]> {
-  const response = await fetch(`${env.ollamaLocalUrl}/api/embeddings`, {
+  const response = await fetch(`${env.ollamaUrl}/api/embeddings`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model: env.ollamaEmbedModel, prompt: text }),
   });
 
   if (!response.ok) {
-    throw new Error(`Local Ollama embedding request failed: ${response.status}`);
+    throw new Error(`Ollama embedding request failed: ${response.status}`);
   }
 
   const data = (await response.json()) as { embedding?: number[] };
-  if (!data.embedding) throw new Error('Local Ollama returned no embedding');
+  if (!data.embedding) throw new Error('Ollama returned no embedding');
   return data.embedding;
 }

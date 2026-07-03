@@ -22,6 +22,13 @@ import {
 import { getLeaderboardForStudentController } from '../controllers/leaderboard.controller.js';
 import { downloadOwnAdmitCardController } from '../controllers/admitCard.controller.js';
 import { getItemsController, submitAttemptController, getProgressController } from '../controllers/english.controller.js';
+import {
+  createSessionController,
+  listSessionsController,
+  getHistoryController,
+  sendMessageController,
+} from '../controllers/chat.controller.js';
+import { rateLimit } from '../middleware/rateLimit.js';
 
 export const studentRouter = Router();
 
@@ -53,3 +60,10 @@ studentRouter.get('/exams/:examId/admit-card', downloadOwnAdmitCardController);
 studentRouter.get('/english/items', getItemsController);
 studentRouter.post('/english/submit', submitAttemptController);
 studentRouter.get('/english/progress', getProgressController);
+
+const chatLimiter = rateLimit({ windowMs: 24 * 60 * 60_000, max: 50, keyFn: (req) => `chat:${req.user!.id}` });
+
+studentRouter.post('/chat/sessions', createSessionController);
+studentRouter.get('/chat/sessions', listSessionsController);
+studentRouter.get('/chat/sessions/:id/history', getHistoryController);
+studentRouter.post('/chat/sessions/:id/message', chatLimiter, sendMessageController);

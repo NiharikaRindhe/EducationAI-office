@@ -1,8 +1,10 @@
 -- ─────────────────────────────────────────────────────────────
 --  RAG: TEXT CHUNKS + BOOK IMAGES
---  vector(768) — nomic-embed-text via local Ollama, not OpenAI's
---  1536-dim embeddings. No `stream` column: Batch 4 / JEE-NEET
---  streams were removed in v2, platform is Classes 1-10 only.
+--  vector(1024) — mxbai-embed-large via local Ollama (the embedding
+--  model actually available on the school-server class of hardware),
+--  not OpenAI's 1536-dim or nomic-embed-text's 768-dim. No `stream`
+--  column: Batch 4 / JEE-NEET streams were removed in v2, platform is
+--  Classes 1-10 only.
 -- ─────────────────────────────────────────────────────────────
 create table text_chunks (
   id              uuid primary key default gen_random_uuid(),
@@ -14,7 +16,7 @@ create table text_chunks (
   page_num        int,
   content         text not null,
   token_count     int,
-  embedding       vector(768),
+  embedding       vector(1024),
   created_at      timestamptz not null default now()
 );
 
@@ -31,7 +33,7 @@ create table book_images (
   page_num        int,
   image_url       text not null,
   caption         text,
-  embedding       vector(768),
+  embedding       vector(1024),
   created_at      timestamptz not null default now()
 );
 
@@ -72,7 +74,7 @@ create index on chat_messages (session_id, created_at);
 --  pgvector SEARCH FUNCTIONS
 -- ─────────────────────────────────────────────────────────────
 create or replace function search_text_chunks(
-  query_embedding   vector(768),
+  query_embedding   vector(1024),
   match_class       int,
   match_subject     text,
   match_count       int   default 5,
@@ -99,7 +101,7 @@ language sql stable as $$
 $$;
 
 create or replace function search_book_images(
-  query_embedding   vector(768),
+  query_embedding   vector(1024),
   match_class       int,
   match_subject     text,
   match_count       int   default 3,
