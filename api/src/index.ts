@@ -10,6 +10,8 @@ import { schoolAdminRouter } from './routes/schoolAdmin.routes.js';
 import { authRouter } from './routes/auth.routes.js';
 import { teacherRouter } from './routes/teacher.routes.js';
 import { studentRouter } from './routes/student.routes.js';
+import { startStreakResetJob } from './jobs/streakReset.job.js';
+import { startLeaderboardRecomputeJob } from './jobs/leaderboardRecompute.job.js';
 
 const app = express();
 
@@ -33,4 +35,6 @@ app.use(errorHandler);
 
 app.listen(env.port, () => {
   logger.info(`EduAI API listening on http://localhost:${env.port}`);
+  startStreakResetJob();
+  startLeaderboardRecomputeJob();
 });
