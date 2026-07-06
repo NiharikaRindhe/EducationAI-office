@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { 
-  ChevronDown, ChevronRight, LogOut, 
-  BookOpen, Trophy, Calendar, CheckSquare, 
-  Gamepad, Award, Camera, ShieldAlert, 
-  Users, ClipboardList, PenTool, BarChart3, 
+import { useAuth } from '../../context/AuthContext';
+import {
+  ChevronDown, ChevronRight, LogOut,
+  BookOpen, Trophy, Calendar, CheckSquare,
+  Gamepad, Award, Camera, ShieldAlert,
+  Users, ClipboardList, PenTool, BarChart3,
   HelpCircle, Sparkles, MessageSquare, Compass,
   BookMarked, Flame, Home, Clock, Layers
 } from 'lucide-react';
@@ -19,15 +20,18 @@ export interface NavItem {
 
 interface SidebarProps {
   navItems: NavItem[];
-  batchColor: 'amber' | 'indigo' | 'sky' | 'slate' | 'emerald' | 'teacher';
+  batchColor: 'amber' | 'indigo' | 'sky' | 'slate' | 'emerald' | 'teacher' | 'schoolAdmin' | 'superAdmin';
   logoText: string;
   logoIcon: string; // Material symbol name
 }
 
+const REAL_AUTH_PORTALS = new Set(['teacher', 'schoolAdmin', 'superAdmin']);
+
 export const Sidebar: React.FC<SidebarProps> = ({ navItems, batchColor, logoText, logoIcon }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout, studentName, studentAvatar, studentXP } = useApp();
+  const { studentName, studentAvatar, studentXP, studentStreak } = useApp();
+  const { user, logout: authLogout } = useAuth();
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
 
   const toggleSubnav = (label: string) => {
@@ -86,13 +90,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, batchColor, logoText
       textColor: 'text-slate-700',
       logoBg: 'bg-indigo-600 text-white',
       accentColor: 'text-indigo-600'
+    },
+    schoolAdmin: {
+      sidebarBg: 'bg-white border-r border-rose-100 shadow-sm',
+      activeItem: 'bg-rose-600 text-white shadow-md shadow-rose-600/20',
+      hoverItem: 'hover:bg-rose-50 text-rose-900',
+      textColor: 'text-slate-700',
+      logoBg: 'bg-rose-600 text-white',
+      accentColor: 'text-rose-600'
+    },
+    superAdmin: {
+      sidebarBg: 'bg-white border-r border-slate-200 shadow-sm',
+      activeItem: 'bg-slate-800 text-white shadow-md shadow-slate-800/20',
+      hoverItem: 'hover:bg-slate-100 text-slate-900',
+      textColor: 'text-slate-700',
+      logoBg: 'bg-slate-800 text-white',
+      accentColor: 'text-slate-800'
     }
   };
 
   const currentTheme = themeClasses[batchColor];
 
   const handleLogout = () => {
-    logout();
+    authLogout();
     navigate('/login');
   };
 
@@ -176,7 +196,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, batchColor, logoText
       {/* Sidebar Footer with Avatar & Log Out */}
       <div className="pt-4 border-t border-slate-200/50 flex flex-col gap-4">
         {/* User preview for students */}
-        {(batchColor !== 'teacher' && batchColor !== 'emerald') && (
+        {!REAL_AUTH_PORTALS.has(batchColor) && (
           <div className="flex items-center justify-between p-2.5 rounded-2xl bg-white/50 border border-white/80 shadow-xs">
             <div className="flex items-center gap-2.5">
               <span className="text-2xl">{studentAvatar}</span>
@@ -187,33 +207,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, batchColor, logoText
             </div>
             <div className="flex items-center gap-0.5 text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded-lg border border-amber-100">
               <span className="material-symbols-outlined text-xs font-fill">local_fire_department</span>
-              <span className="text-[10px] font-bold">12d</span>
+              <span className="text-[10px] font-bold">{studentStreak}d</span>
             </div>
           </div>
         )}
 
-        {/* User preview for teachers */}
-        {batchColor === 'teacher' && (
+        {/* User preview for teacher / school admin / super admin — real auth data */}
+        {REAL_AUTH_PORTALS.has(batchColor) && (
           <div className="flex items-center gap-2.5 p-2 bg-slate-50 rounded-xl">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">
-              T
+            <div className={`w-8 h-8 rounded-lg text-white flex items-center justify-center font-bold text-sm ${currentTheme.logoBg}`}>
+              {(user?.full_name ?? '?').charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
-              <span className="font-display font-semibold text-xs text-slate-800 block">Mrs. Sharma</span>
-              <span className="text-[10px] text-slate-400 block font-label-caps">Science Teacher</span>
-            </div>
-          </div>
-        )}
-
-        {/* User preview for parents */}
-        {batchColor === 'emerald' && (
-          <div className="flex items-center gap-2.5 p-2 bg-slate-50 rounded-xl">
-            <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-sm">
-              P
-            </div>
-            <div className="min-w-0">
-              <span className="font-display font-semibold text-xs text-slate-800 block">Mr. Patel</span>
-              <span className="text-[10px] text-slate-400 block font-label-caps">Parent of Dev</span>
+              <span className="font-display font-semibold text-xs text-slate-800 block truncate">{user?.full_name ?? '—'}</span>
+              <span className="text-[10px] text-slate-400 block font-label-caps">
+                {batchColor === 'teacher' ? 'Teacher' : batchColor === 'schoolAdmin' ? 'School Admin' : 'Super Admin'}
+              </span>
             </div>
           </div>
         )}

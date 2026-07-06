@@ -7,12 +7,14 @@ interface TopBarProps {
   greeting: string;
   userName?: string;
   subtitle: string;
-  batchColor: 'amber' | 'indigo' | 'sky' | 'slate' | 'emerald' | 'teacher';
+  batchColor: 'amber' | 'indigo' | 'sky' | 'slate' | 'emerald' | 'teacher' | 'schoolAdmin' | 'superAdmin';
   notifCount?: number;
   userAvatar?: string;
   profileHref?: string;
   rightSlot?: React.ReactNode;
 }
+
+const NO_XP_STRIP_PORTALS = new Set(['teacher', 'emerald', 'schoolAdmin', 'superAdmin']);
 
 export const TopBar: React.FC<TopBarProps> = ({
   greeting,
@@ -32,7 +34,9 @@ export const TopBar: React.FC<TopBarProps> = ({
     sky: 'text-sky-500',
     slate: 'text-purple-600',
     emerald: 'text-emerald-600',
-    teacher: 'text-indigo-600'
+    teacher: 'text-indigo-600',
+    schoolAdmin: 'text-rose-600',
+    superAdmin: 'text-slate-800'
   };
 
   const ringColors = {
@@ -41,7 +45,9 @@ export const TopBar: React.FC<TopBarProps> = ({
     sky: 'focus:ring-sky-500/20 focus:border-sky-500',
     slate: 'focus:ring-purple-500/20 focus:border-purple-500',
     emerald: 'focus:ring-emerald-500/20 focus:border-emerald-500',
-    teacher: 'focus:ring-indigo-500/20 focus:border-indigo-500'
+    teacher: 'focus:ring-indigo-500/20 focus:border-indigo-500',
+    schoolAdmin: 'focus:ring-rose-500/20 focus:border-rose-500',
+    superAdmin: 'focus:ring-slate-500/20 focus:border-slate-500'
   };
 
   return (
@@ -58,7 +64,7 @@ export const TopBar: React.FC<TopBarProps> = ({
       {/* Right controls */}
       <div className="flex items-center gap-6">
         {/* Streak / XP summary for student portals */}
-        {batchColor !== 'teacher' && batchColor !== 'emerald' && !rightSlot && (
+        {!NO_XP_STRIP_PORTALS.has(batchColor) && !rightSlot && (
           <div className="flex items-center gap-4 bg-slate-50 border border-slate-100 p-1.5 px-3 rounded-xl select-none">
             {/* Streak */}
             <div className="flex items-center gap-1.5">

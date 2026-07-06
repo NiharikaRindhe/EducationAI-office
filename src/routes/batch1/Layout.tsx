@@ -7,21 +7,16 @@ import { TopBar } from '../../components/shared/TopBar';
 export const Batch1Layout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { userRole, currentClass, login, studentAvatar, studentName } = useApp();
+  // ProtectedRoute already guarantees an authenticated student got here;
+  // this layout's own job is just making sure they're in the RIGHT batch
+  // (a Class 7 student navigating to /batch1/* shouldn't see Class 1-4 UI).
+  const { batchId, currentClass, studentAvatar, studentName } = useApp();
 
   useEffect(() => {
-    if (userRole !== 'student' || currentClass < 1 || currentClass > 4) {
-      // Auto redirect if not a Batch 1 student
-      if (userRole === 'teacher') navigate('/teacher/dashboard');
-      else if (userRole === 'parent') navigate('/parent/dashboard');
-      else if (userRole === 'student') {
-        // Auto-switch to Batch 1 demo student profile instead of redirecting!
-        login('student', 3, 'Dev', '🦊');
-      } else {
-        navigate('/login');
-      }
+    if (currentClass < 1 || currentClass > 4) {
+      navigate(`/batch${batchId}/home`, { replace: true });
     }
-  }, [userRole, currentClass, navigate, login]);
+  }, [batchId, currentClass, navigate]);
 
   const navItems: NavItem[] = [
     { href: '/batch1/home', label: 'Home', iconName: 'home' },
@@ -53,7 +48,7 @@ export const Batch1Layout: React.FC = () => {
 
   const header = getHeaderDetails();
 
-  if (userRole !== 'student') return null;
+  if (currentClass < 1 || currentClass > 4) return null;
 
   return (
     <div className="min-h-screen flex bg-slate-50/50">

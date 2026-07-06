@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
 
 // Task Types
 export interface Task {
@@ -136,6 +137,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const batchId = getBatchFromClass(currentClass);
+
+  // Bridge: Sidebar/TopBar and every not-yet-rewired Batch1-3 page still read
+  // student name/avatar/xp/streak/class from this (legacy mock) context, but
+  // login now happens for real via AuthContext. Rather than rewrite every
+  // page's data source in one pass, mirror the real profile in here whenever
+  // it changes -- existing pages keep working, and they show real data.
+  const { user: authUser } = useAuth();
+  useEffect(() => {
+    if (authUser?.role === 'student' && authUser.student_profiles) {
+      const sp = authUser.student_profiles;
+      setUserRole('student');
+      setStudentName(authUser.full_name);
+      setStudentAvatar(sp.avatar);
+      setStudentXP(sp.xp);
+      setStudentStreak(sp.streak);
+      setCurrentClass(sp.class_num);
+    } else if (!authUser) {
+      setUserRole(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUser]);
 
   // Sync to localStorage
   useEffect(() => {

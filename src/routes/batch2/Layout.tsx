@@ -7,20 +7,13 @@ import { TopBar } from '../../components/shared/TopBar';
 export const Batch2Layout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { userRole, currentClass, login, studentAvatar, studentName } = useApp();
+  const { batchId, currentClass, studentAvatar, studentName } = useApp();
 
   useEffect(() => {
-    if (userRole !== 'student' || currentClass < 5 || currentClass > 8) {
-      if (userRole === 'teacher') navigate('/teacher/dashboard');
-      else if (userRole === 'parent') navigate('/parent/dashboard');
-      else if (userRole === 'student') {
-        // Auto-switch to Batch 2 demo student profile instead of redirecting!
-        login('student', 7, 'Aisha', '🦋');
-      } else {
-        navigate('/login');
-      }
+    if (currentClass < 5 || currentClass > 8) {
+      navigate(`/batch${batchId}/home`, { replace: true });
     }
-  }, [userRole, currentClass, navigate, login]);
+  }, [batchId, currentClass, navigate]);
 
   const navItems: NavItem[] = [
     { href: '/batch2/home', label: 'Home', iconName: 'home' },
@@ -53,7 +46,7 @@ export const Batch2Layout: React.FC = () => {
 
   const header = getHeaderDetails();
 
-  if (userRole !== 'student') return null;
+  if (currentClass < 5 || currentClass > 8) return null;
 
   return (
     <div className="min-h-screen flex bg-slate-50/50">

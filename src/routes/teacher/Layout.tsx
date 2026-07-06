@@ -1,21 +1,12 @@
-import React, { useEffect } from 'react';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import React from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { Sidebar, NavItem } from '../../components/shared/Sidebar';
 import { TopBar } from '../../components/shared/TopBar';
 
 export const TeacherLayout: React.FC = () => {
-  const navigate = useNavigate();
   const location = useLocation();
-  const { userRole, logout } = useApp();
-
-  useEffect(() => {
-    if (userRole !== 'teacher') {
-      if (userRole === 'student') navigate('/batch1/home'); // Or appropriate batch
-      else if (userRole === 'parent') navigate('/parent/dashboard');
-      else navigate('/login');
-    }
-  }, [userRole, navigate]);
+  const { user } = useAuth();
 
   const navItems: NavItem[] = [
     { href: '/teacher/dashboard', label: 'Dashboard', iconName: 'dashboard' },
@@ -36,12 +27,10 @@ export const TeacherLayout: React.FC = () => {
 
   const header = getHeaderDetails();
 
-  if (userRole !== 'teacher') return null;
-
   return (
     <div className="min-h-screen flex bg-slate-50/50">
       {/* Sidebar Navigation */}
-      <Sidebar 
+      <Sidebar
         navItems={navItems}
         batchColor="teacher"
         logoText="EduAI"
@@ -51,9 +40,9 @@ export const TeacherLayout: React.FC = () => {
       {/* Main content wrapper */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header TopBar */}
-        <TopBar 
+        <TopBar
           greeting="Welcome,"
-          userName="Teacher"
+          userName={user?.full_name ?? 'Teacher'}
           subtitle={header.sub}
           batchColor="teacher"
           profileHref="/teacher/dashboard"
