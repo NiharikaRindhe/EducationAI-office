@@ -32,6 +32,15 @@ export async function listExamsController(req: Request, res: Response, next: Nex
   }
 }
 
+export async function duplicateExamController(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.user?.schoolId) throw new ApiError('FORBIDDEN', 'No school associated with this account');
+    res.status(201).json(await examService.duplicateExam(req.user.id, req.user.schoolId, requireId(req)));
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getExamController(req: Request, res: Response, next: NextFunction) {
   try {
     res.json(await examService.getExamDetail(req.user!.id, requireId(req)));

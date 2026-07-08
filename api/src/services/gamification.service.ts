@@ -1,6 +1,19 @@
 import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
 
+// A daily streak is guaranteed to break for a lab used 1-3x/week — the whole
+// point of a streak is to reward showing up again, not to punish a schedule
+// the student never controlled. Instead of "logged yesterday exactly", the
+// streak continues as long as the gap since the last log is within this
+// grace window (comfortably covers a weekly lab period + a holiday or two);
+// beyond it, the streak has genuinely lapsed and restarts at 1.
+export const STREAK_GRACE_DAYS = 9;
+
+function daysBetween(fromDateStr: string, toDateStr: string): number {
+  const msPerDay = 86_400_000;
+  return Math.round((new Date(toDateStr).getTime() - new Date(fromDateStr).getTime()) / msPerDay);
+}
+
 export interface StudentStats {
   xp: number;
   streak: number;
@@ -36,7 +49,9 @@ export async function addXp(studentId: string, amount: number): Promise<{ newXp:
   return { newXp, newBadges };
 }
 
-/** Idempotent per calendar day — logging in/acting twice today doesn't double-count. */
+/** Idempotent per calendar day — logging in/acting twice today doesn't double-count.
+ *  Called both when a student earns XP (task/exam/English) AND simply when they
+ *  join a live lab session (xpEarnedToday=0) — attendance alone should count. */
 export async function logStreakActivity(studentId: string, xpEarnedToday = 0): Promise<{ streak: number }> {
   const today = new Date().toISOString().slice(0, 10);
 
@@ -58,13 +73,15 @@ export async function logStreakActivity(studentId: string, xpEarnedToday = 0): P
     await supabaseAdmin.from('streak_logs').insert({ student_id: studentId, logged_date: today, xp_earned: xpEarnedToday });
   }
 
-  // Was yesterday also logged? If so the streak continues; otherwise it restarts at 1.
-  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-  const { data: yesterdayLog } = await supabaseAdmin
+  // Continue the streak if the most recent PRIOR log is within the grace
+  // window (not "exactly yesterday" — a school lab period is often days apart).
+  const { data: lastPriorLog } = await supabaseAdmin
     .from('streak_logs')
-    .select('id')
+    .select('logged_date')
     .eq('student_id', studentId)
-    .eq('logged_date', yesterday)
+    .lt('logged_date', today)
+    .order('logged_date', { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   const { data: student } = await supabaseAdmin
@@ -76,7 +93,7 @@ export async function logStreakActivity(studentId: string, xpEarnedToday = 0): P
   let newStreak = 1;
   if (existing) {
     newStreak = student?.streak ?? 1; // already logged today, streak unchanged
-  } else if (yesterdayLog) {
+  } else if (lastPriorLog && daysBetween(lastPriorLog.logged_date, today) <= STREAK_GRACE_DAYS) {
     newStreak = (student?.streak ?? 0) + 1;
   }
 
@@ -89,7 +106,7 @@ export async function logStreakActivity(studentId: string, xpEarnedToday = 0): P
   return { streak: newStreak };
 }
 
-async function getStudentStats(studentId: string): Promise<StudentStats> {
+export async function getStudentStats(studentId: string): Promise<StudentStats> {
   const { data: sp } = await supabaseAdmin
     .from('student_profiles')
     .select('xp, streak')
@@ -133,10 +150,71 @@ async function getStudentStats(studentId: string): Promise<StudentStats> {
   };
 }
 
+/** Last `days` days of streak_logs as a calendar, oldest first — powers
+ *  the streak calendar/heatmap UI. Days with no log simply have xpEarned=0. */
+export async function getStreakCalendar(studentId: string, days = 60) {
+  const { data: student, error } = await supabaseAdmin
+    .from('student_profiles')
+    .select('streak, longest_streak')
+    .eq('user_id', studentId)
+    .single();
+  if (error || !student) throw new ApiError('NOT_FOUND', 'Student not found');
+
+  const today = new Date();
+  const fromDate = new Date(today);
+  fromDate.setDate(fromDate.getDate() - (days - 1));
+  const fromDateStr = fromDate.toISOString().slice(0, 10);
+
+  const { data: logs } = await supabaseAdmin
+    .from('streak_logs')
+    .select('logged_date, xp_earned')
+    .eq('student_id', studentId)
+    .gte('logged_date', fromDateStr)
+    .order('logged_date', { ascending: true });
+
+  const logsByDate = new Map((logs ?? []).map((l) => [l.logged_date, l.xp_earned]));
+
+  const calendar: { date: string; active: boolean; xpEarned: number }[] = [];
+  for (let i = 0; i < days; i++) {
+    const d = new Date(fromDate);
+    d.setDate(d.getDate() + i);
+    const dateStr = d.toISOString().slice(0, 10);
+    calendar.push({ date: dateStr, active: logsByDate.has(dateStr), xpEarned: logsByDate.get(dateStr) ?? 0 });
+  }
+
+  return {
+    streak: student.streak,
+    longestStreak: student.longest_streak,
+    graceDays: STREAK_GRACE_DAYS,
+    calendar,
+  };
+}
+
 interface BadgeAward {
   id: string;
   name: string;
   icon: string | null;
+}
+
+/** Current value of whatever a badge's criteria_type measures — shared by
+ *  the award check and the "how close am I" progress shown on the badges page. */
+function statValueFor(criteriaType: string, stats: StudentStats): number {
+  switch (criteriaType) {
+    case 'streak':
+      return stats.streak;
+    case 'xp':
+      return stats.xp;
+    case 'tasks_done':
+      return stats.completedTasks;
+    case 'exam_score':
+      return stats.highestExamScorePct ?? 0;
+    case 'english_accuracy':
+      return stats.avgEnglishAccuracy ?? 0;
+    case 'english_fluency':
+      return stats.avgEnglishFluency ?? 0;
+    default:
+      return 0;
+  }
 }
 
 export async function evaluateAndAwardBadges(studentId: string): Promise<BadgeAward[]> {
@@ -151,27 +229,7 @@ export async function evaluateAndAwardBadges(studentId: string): Promise<BadgeAw
   for (const badge of allBadges ?? []) {
     if (earnedIds.has(badge.id)) continue;
 
-    let qualifies = false;
-    switch (badge.criteria_type) {
-      case 'streak':
-        qualifies = stats.streak >= badge.criteria_value;
-        break;
-      case 'xp':
-        qualifies = stats.xp >= badge.criteria_value;
-        break;
-      case 'tasks_done':
-        qualifies = stats.completedTasks >= badge.criteria_value;
-        break;
-      case 'exam_score':
-        qualifies = (stats.highestExamScorePct ?? 0) >= badge.criteria_value;
-        break;
-      case 'english_accuracy':
-        qualifies = (stats.avgEnglishAccuracy ?? 0) >= badge.criteria_value;
-        break;
-      case 'english_fluency':
-        qualifies = (stats.avgEnglishFluency ?? 0) >= badge.criteria_value;
-        break;
-    }
+    const qualifies = statValueFor(badge.criteria_type, stats) >= badge.criteria_value;
 
     if (qualifies) {
       const { error } = await supabaseAdmin.from('student_badges').insert({ student_id: studentId, badge_id: badge.id });
@@ -180,4 +238,39 @@ export async function evaluateAndAwardBadges(studentId: string): Promise<BadgeAw
   }
 
   return newlyAwarded;
+}
+
+/** All badges relevant to this student (their batch or batch-agnostic ones),
+ *  each flagged earned/not with a progress fraction toward the unearned ones. */
+export async function getBadgesForStudent(studentId: string, batchId: number) {
+  const stats = await getStudentStats(studentId);
+
+  const { data: allBadges, error } = await supabaseAdmin
+    .from('badges')
+    .select('id, name, description, icon, batch_id, criteria_type, criteria_value')
+    .or(`batch_id.is.null,batch_id.eq.${batchId}`);
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to load badges', error.message);
+
+  const { data: earned, error: earnedError } = await supabaseAdmin
+    .from('student_badges')
+    .select('badge_id, earned_at')
+    .eq('student_id', studentId);
+  if (earnedError) throw new ApiError('INTERNAL_ERROR', 'Failed to load earned badges', earnedError.message);
+
+  const earnedByBadgeId = new Map((earned ?? []).map((b) => [b.badge_id, b.earned_at]));
+
+  return (allBadges ?? []).map((badge) => {
+    const currentValue = statValueFor(badge.criteria_type, stats);
+    return {
+      id: badge.id,
+      name: badge.name,
+      description: badge.description,
+      icon: badge.icon,
+      criteriaType: badge.criteria_type,
+      criteriaValue: badge.criteria_value,
+      earned: earnedByBadgeId.has(badge.id),
+      earnedAt: earnedByBadgeId.get(badge.id) ?? null,
+      progress: Math.min(1, currentValue / badge.criteria_value),
+    };
+  });
 }

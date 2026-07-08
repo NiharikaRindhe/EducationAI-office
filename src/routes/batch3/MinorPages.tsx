@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Award, Flame, Search, ChevronRight, Check, Trophy, BookOpen, Clock, FileText, Plus, HelpCircle, Sparkles, MessageSquare, AlertTriangle } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { ExamCenter } from '../../components/shared/ExamCenter';
+import { ChatCenter } from '../../components/shared/ChatCenter';
+import { NotesView } from '../../components/shared/NotesView';
 
 /* ----------------------------------------------------
    1. BATCH 3 SUBJECTS LIST (UNIT ACCORDION & WEAK ALERTS)
@@ -151,64 +154,9 @@ export const Batch3Subjects: React.FC = () => {
 };
 
 /* ----------------------------------------------------
-   2. BATCH 3 DUAL CHAT (LATEX MATHS ACCENT)
+   2. BATCH 3 AI DOUBT SOLVER — real RAG chat, sky-themed
 ---------------------------------------------------- */
-
-interface ChatMessage {
-  id: string;
-  sender: string;
-  text: string;
-  citation?: string;
-}
-
-export const Batch3Chat: React.FC = () => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: '1', sender: 'ai', text: "Hello! Ready for CBSE Board Prep doubts? Ask me about Light formulas or Maths equations. (Equation: \\(a^2 + b^2 = c^2\\))", citation: 'NCERT' }
-  ]);
-  const [inputMsg, setInputMsg] = useState('');
-
-  const handleSend = () => {
-    if (!inputMsg.trim()) return;
-    setMessages(prev => [
-      ...prev,
-      { id: Date.now().toString(), sender: 'student', text: inputMsg }
-    ]);
-    setInputMsg('');
-
-    setTimeout(() => {
-      setMessages(prev => [
-        ...prev,
-        { id: Date.now().toString(), sender: 'ai', text: "Solving numerical step-by-step:\n\n\\(F = G \\frac{m_1 m_2}{d^2}\\)\n\nUnderstood? Let me know if you need concept maps!", citation: 'Science Ch 10' }
-      ]);
-    }, 1000);
-  };
-
-  return (
-    <div className="bg-white border border-sky-100 rounded-3xl overflow-hidden shadow-md flex flex-col h-[calc(100vh-160px)] font-sans select-none anim-fade-up">
-      <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
-        {messages.map((m) => (
-          <div key={m.id} className={`flex flex-col gap-1 max-w-[80%] ${m.sender === 'student' ? 'self-end items-end' : 'self-start items-start'}`}>
-            <div className={`p-4 rounded-2xl text-xs leading-relaxed ${m.sender === 'student' ? 'bg-sky-600 text-white rounded-tr-xs' : 'bg-slate-50 border border-slate-100 text-slate-700 rounded-tl-xs font-medium'}`} style={{ whiteSpace: 'pre-line' }}>
-              {m.text}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-2">
-        <input
-          type="text"
-          value={inputMsg}
-          onChange={(e) => setInputMsg(e.target.value)}
-          className="flex-1 px-4 py-3 bg-white border border-slate-200 focus:border-sky-500 rounded-xl font-sans text-xs outline-none"
-          placeholder="Ask AI Doubt Solver..."
-        />
-        <button onClick={handleSend} className="py-3 px-5 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-sans font-bold text-xs cursor-pointer shadow-md">
-          Send
-        </button>
-      </div>
-    </div>
-  );
-};
+export const Batch3Chat: React.FC = () => <ChatCenter accent="sky" />;
 
 /* ----------------------------------------------------
    3. BATCH 3 DAILY CHALLENGES (CBSE STYLES)
@@ -241,62 +189,12 @@ export const Batch3DailyChallenges: React.FC = () => {
 /* ----------------------------------------------------
    4. BATCH 3 PRACTICE EXAMS (A/B/C/D SECTIONS)
 ---------------------------------------------------- */
-export const Batch3Exams: React.FC = () => {
-  return (
-    <div className="flex flex-col gap-6 font-sans select-none anim-fade-up">
-      <div className="bento-card border border-sky-100 bg-white p-5 text-left max-w-xl mx-auto flex flex-col gap-4">
-        <span className="font-display font-bold text-xs text-slate-700">CBSE Mock Paper sections:</span>
-        <div className="flex flex-col gap-2.5 text-xs font-semibold text-slate-600 leading-normal">
-          <div className="p-3 bg-slate-50 rounded-xl flex justify-between">
-            <span>Section A (1-mark MCQs)</span>
-            <span>20 Questions</span>
-          </div>
-          <div className="p-3 bg-slate-50 rounded-xl flex justify-between">
-            <span>Section B (2-mark Short Answer)</span>
-            <span>5 Questions</span>
-          </div>
-          <div className="p-3 bg-slate-50 rounded-xl flex justify-between">
-            <span>Section C (3-mark Short Answer)</span>
-            <span>6 Questions</span>
-          </div>
-          <div className="p-3 bg-slate-50 rounded-xl flex justify-between">
-            <span>Section D (5-mark Long Answer)</span>
-            <span>4 Questions</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+export const Batch3Exams: React.FC = () => <ExamCenter accent="sky" />;
 
 /* ----------------------------------------------------
    5. BATCH 3 STUDY NOTES (BOARD TAGS)
 ---------------------------------------------------- */
-export const Batch3Notes: React.FC = () => {
-  return (
-    <div className="flex flex-col gap-6 font-sans select-none anim-fade-up">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {[
-          { title: 'Mirror formula steps', tag: '⭐ Board Important', content: 'Formula: 1/f = 1/v + 1/u. Magnification m = -v/u.' },
-          { title: 'Nationalism in India dates', tag: 'History timeline', content: '1915: Gandhiji returns. 1919: Rowlatt Act. 1920: Non-Cooperation.' }
-        ].map((item, idx) => (
-          <div key={idx} className="bento-card border border-sky-100 bg-white p-6 flex flex-col justify-between gap-5 card-interactive text-left">
-            <div>
-              <div className="flex justify-between items-start">
-                <span className="badge pill-sky text-[8px] font-black uppercase">{item.tag}</span>
-              </div>
-              <h4 className="font-display font-bold text-sm text-slate-800 mt-2.5">{item.title}</h4>
-              <p className="font-sans text-xs text-slate-500 leading-relaxed mt-2">{item.content}</p>
-            </div>
-            <button className="text-indigo-600 hover:text-indigo-800 text-[11px] font-bold font-sans text-left mt-2 cursor-pointer">
-              Edit Note
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
+export const Batch3Notes: React.FC = () => <NotesView accent="sky" />;
 
 /* ----------------------------------------------------
    6. BATCH 3 BOARD PYQ HUB

@@ -47,3 +47,12 @@ export async function atRiskController(req: Request, res: Response, next: NextFu
     next(err);
   }
 }
+
+export async function mySectionsController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { teacherId, schoolId } = requireContext(req);
+    res.json(await teacherService.getMySections(teacherId, schoolId));
+  } catch (err) {
+    next(err);
+  }
+}

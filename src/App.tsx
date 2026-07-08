@@ -32,6 +32,7 @@ import { Batch2Home } from './routes/batch2/Home';
 import { Batch2Subjects } from './routes/batch2/Subjects';
 import { Batch2Chat } from './routes/batch2/Chat';
 import { Batch2Exams } from './routes/batch2/Exams';
+import { Batch2Tasks } from './routes/batch2/Tasks';
 import {
   Batch2Notes,
   Batch2Pyq,
@@ -48,6 +49,8 @@ import { Batch3Home } from './routes/batch3/Home';
 import { Batch3BoardPrep } from './routes/batch3/BoardPrep';
 import { Batch3ConceptMap } from './routes/batch3/ConceptMap';
 import { Batch3Pomodoro } from './routes/batch3/Pomodoro';
+import { Batch3Tasks } from './routes/batch3/Tasks';
+import { Batch3Leaderboard } from './routes/batch3/Leaderboard';
 import {
   Batch3Subjects,
   Batch3Chat,
@@ -62,20 +65,30 @@ import {
 // Import Teacher Pages
 import { TeacherLayout } from './routes/teacher/Layout';
 import { TeacherDashboard } from './routes/teacher/Dashboard';
+import { TeacherLiveSession } from './routes/teacher/LiveSession';
 import { TeacherStudents } from './routes/teacher/Students';
 import { TeacherAssignTasks } from './routes/teacher/AssignTasks';
 import { TeacherCreateExam } from './routes/teacher/CreateExam';
+import { TeacherExamReview } from './routes/teacher/ExamReview';
 import { TeacherReports } from './routes/teacher/Reports';
 
 // Import School Admin Pages
 import { SchoolAdminLayout } from './routes/school-admin/Layout';
 import { SchoolAdminDashboard } from './routes/school-admin/Dashboard';
+import { SchoolAdminClassesSections } from './routes/school-admin/ClassesSections';
 import { SchoolAdminStudents } from './routes/school-admin/Students';
 import { SchoolAdminTeachers } from './routes/school-admin/Teachers';
+import { SchoolAdminLabIncharges } from './routes/school-admin/LabIncharges';
 
 // Import Super Admin Pages
 import { SuperAdminLayout } from './routes/super-admin/Layout';
 import { SuperAdminSchools } from './routes/super-admin/Schools';
+
+// Import Lab In-charge Pages
+import { LabInchargeLayout } from './routes/lab-incharge/Layout';
+import { LabInchargeDashboard } from './routes/lab-incharge/Dashboard';
+import { LabInchargeStudents } from './routes/lab-incharge/Students';
+import { LabInchargeTeachers } from './routes/lab-incharge/Teachers';
 
 function App() {
   return (
@@ -128,6 +141,7 @@ function App() {
               <Route path="subjects" element={<Batch2Subjects />} />
               <Route path="chat" element={<Batch2Chat />} />
               <Route path="exams" element={<Batch2Exams />} />
+              <Route path="tasks" element={<Batch2Tasks />} />
               <Route path="notes" element={<Batch2Notes />} />
               <Route path="pyq" element={<Batch2Pyq />} />
               <Route path="leaderboard" element={<Batch2Leaderboard />} />
@@ -155,8 +169,10 @@ function App() {
               <Route path="chat" element={<Batch3Chat />} />
               <Route path="daily-challenges" element={<Batch3DailyChallenges />} />
               <Route path="exams" element={<Batch3Exams />} />
+              <Route path="tasks" element={<Batch3Tasks />} />
               <Route path="notes" element={<Batch3Notes />} />
               <Route path="pyq" element={<Batch3Pyq />} />
+              <Route path="leaderboard" element={<Batch3Leaderboard />} />
               <Route path="streak" element={<Batch3Streak />} />
               <Route path="profile" element={<Batch3Profile />} />
             </Route>
@@ -172,9 +188,11 @@ function App() {
             >
               <Route index element={<Navigate to="/teacher/dashboard" replace />} />
               <Route path="dashboard" element={<TeacherDashboard />} />
+              <Route path="live-session" element={<TeacherLiveSession />} />
               <Route path="students" element={<TeacherStudents />} />
               <Route path="assign-tasks" element={<TeacherAssignTasks />} />
               <Route path="create-exam" element={<TeacherCreateExam />} />
+              <Route path="exams/:examId/review" element={<TeacherExamReview />} />
               <Route path="reports" element={<TeacherReports />} />
             </Route>
 
@@ -189,8 +207,10 @@ function App() {
             >
               <Route index element={<Navigate to="/school-admin/dashboard" replace />} />
               <Route path="dashboard" element={<SchoolAdminDashboard />} />
+              <Route path="classes" element={<SchoolAdminClassesSections />} />
               <Route path="students" element={<SchoolAdminStudents />} />
               <Route path="teachers" element={<SchoolAdminTeachers />} />
+              <Route path="lab-incharges" element={<SchoolAdminLabIncharges />} />
             </Route>
 
             {/* Super Admin Portal Routes */}
@@ -205,6 +225,21 @@ function App() {
               <Route index element={<Navigate to="/super-admin/schools" replace />} />
               <Route path="dashboard" element={<Navigate to="/super-admin/schools" replace />} />
               <Route path="schools" element={<SuperAdminSchools />} />
+            </Route>
+
+            {/* Lab In-charge Portal Routes */}
+            <Route
+              path="/lab-incharge"
+              element={
+                <ProtectedRoute allow={['lab_incharge']}>
+                  <LabInchargeLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Navigate to="/lab-incharge/dashboard" replace />} />
+              <Route path="dashboard" element={<LabInchargeDashboard />} />
+              <Route path="students" element={<LabInchargeStudents />} />
+              <Route path="teachers" element={<LabInchargeTeachers />} />
             </Route>
 
             {/* Catch-all fallback redirect */}

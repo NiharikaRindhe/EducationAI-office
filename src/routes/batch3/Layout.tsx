@@ -23,8 +23,10 @@ export const Batch3Layout: React.FC = () => {
     { href: '/batch3/chat', label: 'AI Doubt Tutor', iconName: 'chat' },
     { href: '/batch3/daily-challenges', label: 'Daily Challenges', iconName: 'electric_bolt' },
     { href: '/batch3/exams', label: 'Exams & Mocks', iconName: 'edit_document' },
+    { href: '/batch3/tasks', label: 'My Tasks', iconName: 'assignment_turned_in' },
     { href: '/batch3/notes', label: 'Study Notes', iconName: 'sticky_note_2' },
     { href: '/batch3/pyq', label: 'Board PYQ Hub', iconName: 'bookmark' },
+    { href: '/batch3/leaderboard', label: 'Leaderboard', iconName: 'emoji_events' },
     { href: '/batch3/pomodoro', label: 'Pomodoro Timer', iconName: 'timer' },
     { href: '/batch3/streak', label: 'Streak', iconName: 'local_fire_department' },
     { href: '/batch3/profile', label: 'Profile', iconName: 'person' }
@@ -38,8 +40,10 @@ export const Batch3Layout: React.FC = () => {
     if (path.includes('/chat')) return { title: 'AI Doubt Solver', sub: 'Step-by-step problem solver with LaTeX support.' };
     if (path.includes('/daily-challenges')) return { title: 'CBSE Daily Challenges', sub: 'Practice HOTS, Case Study, and Assertion & Reason questions.' };
     if (path.includes('/exams')) return { title: 'Practice Exams', sub: 'CBSE Board exam pattern mock tests.' };
-    if (path.includes('/notes')) return { title: 'Board Study Notes', sub: 'Create notes, tag board topics, and generate summaries.' };
+    if (path.includes('/tasks')) return { title: 'My Tasks', sub: 'Complete work your teacher has assigned to earn XP.' };
+    if (path.includes('/notes')) return { title: 'Board Study Notes', sub: 'Create notes and tag board topics.' };
     if (path.includes('/pyq')) return { title: 'Board PYQ Papers', sub: 'CBSE past year papers with examiner schemes.' };
+    if (path.includes('/leaderboard')) return { title: 'Leaderboard', sub: 'Compete with your classmates to top the ranks!' };
     if (path.includes('/pomodoro')) return { title: 'Pomodoro Focus Timer', sub: 'Utilize 25/5 or 50/10 focus intervals to track study times.' };
     if (path.includes('/streak')) return { title: 'Streak tracker', sub: 'Streak calendar tied to board prep milestones.' };
     if (path.includes('/profile')) return { title: 'Syllabus Profile', sub: 'View board readiness progress levels.' };

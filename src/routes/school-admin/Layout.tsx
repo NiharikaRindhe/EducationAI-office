@@ -8,14 +8,18 @@ export const SchoolAdminLayout: React.FC = () => {
 
   const navItems: NavItem[] = [
     { href: '/school-admin/dashboard', label: 'Dashboard', iconName: 'dashboard' },
+    { href: '/school-admin/classes', label: 'Classes & Sections', iconName: 'view_module' },
     { href: '/school-admin/students', label: 'Students', iconName: 'groups' },
     { href: '/school-admin/teachers', label: 'Teachers', iconName: 'school' },
+    { href: '/school-admin/lab-incharges', label: 'Lab In-charges', iconName: 'support_agent' },
   ];
 
   const getHeaderDetails = () => {
     const path = location.pathname;
-    if (path.includes('/students')) return { title: 'Students', sub: 'Import students, download credential cards, manage accounts.' };
-    if (path.includes('/teachers')) return { title: 'Teachers', sub: 'Add teachers and assign the classes they teach.' };
+    if (path.includes('/classes')) return { title: 'Classes & Sections', sub: 'Define sections, assign class teachers and subject teachers.' };
+    if (path.includes('/students')) return { title: 'Students', sub: 'Import students, print login slips, manage accounts.' };
+    if (path.includes('/teachers')) return { title: 'Teachers', sub: 'Add teachers, reset passwords, then map them to sections on the Classes page.' };
+    if (path.includes('/lab-incharges')) return { title: 'Lab In-charges', sub: 'Add lab in-charges who can reset logins without touching grades.' };
     return { title: 'School Admin', sub: 'Set up and manage your school on EduAI.' };
   };
 

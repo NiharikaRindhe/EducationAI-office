@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
+import { logStreakActivity } from './gamification.service.js';
 import type { StartSessionInput } from '../schemas/liveSession.schema.js';
 
 // One active session per class+section at a time — starting a new one for
@@ -50,6 +51,21 @@ export async function getActiveSessionForTeacher(teacherId: string) {
     .eq('teacher_id', teacherId)
     .eq('is_active', true)
     .maybeSingle();
+  return data;
+}
+
+/** School-wide view of every currently-live session — the Lab In-charge
+ *  overview ("is anything live right now, and where") rather than a single
+ *  teacher's own session. */
+export async function listActiveSessionsForSchool(schoolId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('live_sessions')
+    .select('id, class_num, section, subject, started_at, teacher_profiles(user_profiles(full_name))')
+    .eq('school_id', schoolId)
+    .eq('is_active', true)
+    .order('started_at', { ascending: false });
+
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to list active sessions', error.message);
   return data;
 }
 
@@ -107,6 +123,11 @@ export async function joinSession(studentId: string, sessionId: string) {
     .single();
 
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to join session', error.message);
+
+  // Showing up to lab counts toward the streak on its own — a student
+  // shouldn't need to also finish a task/exam that period to keep it alive.
+  await logStreakActivity(studentId, 0);
+
   return data;
 }
 

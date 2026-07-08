@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { Sidebar, NavItem } from '../../components/shared/Sidebar';
 import { TopBar } from '../../components/shared/TopBar';
+import { SessionEndWatcher } from '../../components/shared/SessionEndWatcher';
 
 export const Batch1Layout: React.FC = () => {
   const navigate = useNavigate();
@@ -52,8 +53,9 @@ export const Batch1Layout: React.FC = () => {
 
   return (
     <div className="min-h-screen flex bg-slate-50/50">
+      <SessionEndWatcher />
       {/* Sidebar Navigation */}
-      <Sidebar 
+      <Sidebar
         navItems={navItems}
         batchColor="amber"
         logoText="EduAI"

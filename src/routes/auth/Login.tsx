@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, ArrowRight, Loader2, ArrowLeft } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Eye, EyeOff, ArrowRight, Loader2, ArrowLeft, Info } from 'lucide-react';
 import { useAuth, friendlyAuthError } from '../../context/AuthContext';
 import { api } from '../../lib/api';
 
@@ -12,13 +12,21 @@ interface RosterStudent {
 
 type Mode = 'password' | 'pin-setup' | 'pin-roster' | 'pin-pad';
 
+const REDIRECT_MESSAGES: Record<string, string> = {
+  idle: "You were signed out after a period of inactivity — sign in again to continue.",
+  'session-ended': 'Your teacher ended the class session, so you were signed out. Sign in again once class starts.',
+};
+
 export const Login: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, pinLogin } = useAuth();
 
   const [mode, setMode] = useState<Mode>('password');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const redirectReason = (location.state as { reason?: string } | null)?.reason;
+  const redirectMessage = redirectReason ? REDIRECT_MESSAGES[redirectReason] : undefined;
 
   // Password mode
   const [email, setEmail] = useState('');
@@ -146,6 +154,12 @@ export const Login: React.FC = () => {
             <h1 className="font-display font-bold text-2xl text-slate-800">Welcome back</h1>
             <p className="font-sans text-xs text-slate-400 mt-1">Sign in to your EduAI account to continue learning</p>
           </div>
+
+          {redirectMessage && !error && (
+            <div className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-medium rounded-xl px-4 py-3 flex items-center gap-2">
+              <Info size={14} className="shrink-0" /> {redirectMessage}
+            </div>
+          )}
 
           {error && (
             <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium rounded-xl px-4 py-3">

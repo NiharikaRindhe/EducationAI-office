@@ -10,6 +10,9 @@ export const createTaskSchema = z.object({
   assignTo: z.discriminatedUnion('mode', [
     z.object({ mode: z.literal('students'), studentIds: z.array(z.string().uuid()).min(1) }),
     z.object({ mode: z.literal('class'), classNum: z.number().int().min(1).max(10), section: z.string().min(1) }),
+    // One task across any set of the teacher's sections ("same task to 7A,
+    // 7B and 8C") — the multi-section picker in the UI sends this mode.
+    z.object({ mode: z.literal('sections'), sectionIds: z.array(z.string().uuid()).min(1) }),
     z.object({ mode: z.literal('batch'), batchId: z.number().int().min(1).max(3) }),
   ]),
 });

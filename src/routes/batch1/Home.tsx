@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { Flame, Star, Trophy, BookOpen, Sparkles, CheckCircle2, ArrowRight } from 'lucide-react';
+import { TodayPanel } from '../../components/shared/TodayPanel';
 
 export const Batch1Home: React.FC = () => {
   const navigate = useNavigate();
@@ -25,6 +26,8 @@ export const Batch1Home: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-6 select-none anim-fade-up">
+      <TodayPanel accent="amber" tasksHref="/batch1/tasks" examsHref="/batch1/exams" />
+
       {/* Welcome banner */}
       <div className="bg-gradient-to-r from-amber-400 via-orange-500 to-amber-500 rounded-3xl p-6 md:p-8 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-lg shadow-amber-500/10">
         <div className="flex items-center gap-5">

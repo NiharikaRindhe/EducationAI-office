@@ -9,6 +9,14 @@ function requireId(req: Request, name = 'id'): string {
   return value;
 }
 
+export async function listExamsForStudentController(req: Request, res: Response, next: NextFunction) {
+  try {
+    res.json(await examTakingService.listExamsForStudent(req.user!.id));
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getExamPaperController(req: Request, res: Response, next: NextFunction) {
   try {
     res.json(await examTakingService.getExamPaper(req.user!.id, requireId(req, 'examId')));

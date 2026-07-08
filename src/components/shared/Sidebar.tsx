@@ -20,12 +20,12 @@ export interface NavItem {
 
 interface SidebarProps {
   navItems: NavItem[];
-  batchColor: 'amber' | 'indigo' | 'sky' | 'slate' | 'emerald' | 'teacher' | 'schoolAdmin' | 'superAdmin';
+  batchColor: 'amber' | 'indigo' | 'sky' | 'slate' | 'emerald' | 'teacher' | 'schoolAdmin' | 'superAdmin' | 'labIncharge';
   logoText: string;
   logoIcon: string; // Material symbol name
 }
 
-const REAL_AUTH_PORTALS = new Set(['teacher', 'schoolAdmin', 'superAdmin']);
+const REAL_AUTH_PORTALS = new Set(['teacher', 'schoolAdmin', 'superAdmin', 'labIncharge']);
 
 export const Sidebar: React.FC<SidebarProps> = ({ navItems, batchColor, logoText, logoIcon }) => {
   const location = useLocation();
@@ -106,6 +106,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, batchColor, logoText
       textColor: 'text-slate-700',
       logoBg: 'bg-slate-800 text-white',
       accentColor: 'text-slate-800'
+    },
+    labIncharge: {
+      sidebarBg: 'bg-white border-r border-teal-100 shadow-sm',
+      activeItem: 'bg-teal-600 text-white shadow-md shadow-teal-600/20',
+      hoverItem: 'hover:bg-teal-50 text-teal-900',
+      textColor: 'text-slate-700',
+      logoBg: 'bg-teal-600 text-white',
+      accentColor: 'text-teal-600'
     }
   };
 
@@ -221,7 +229,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, batchColor, logoText
             <div className="min-w-0">
               <span className="font-display font-semibold text-xs text-slate-800 block truncate">{user?.full_name ?? '—'}</span>
               <span className="text-[10px] text-slate-400 block font-label-caps">
-                {batchColor === 'teacher' ? 'Teacher' : batchColor === 'schoolAdmin' ? 'School Admin' : 'Super Admin'}
+                {batchColor === 'teacher'
+                  ? 'Teacher'
+                  : batchColor === 'schoolAdmin'
+                    ? 'School Admin'
+                    : batchColor === 'labIncharge'
+                      ? 'Lab In-charge'
+                      : 'Super Admin'}
               </span>
             </div>
           </div>

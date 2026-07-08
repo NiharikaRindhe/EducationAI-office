@@ -1,20 +1,22 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { Bell, Search } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Bell, Search, LogOut } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 
 interface TopBarProps {
   greeting: string;
   userName?: string;
   subtitle: string;
-  batchColor: 'amber' | 'indigo' | 'sky' | 'slate' | 'emerald' | 'teacher' | 'schoolAdmin' | 'superAdmin';
+  batchColor: 'amber' | 'indigo' | 'sky' | 'slate' | 'emerald' | 'teacher' | 'schoolAdmin' | 'superAdmin' | 'labIncharge';
   notifCount?: number;
   userAvatar?: string;
   profileHref?: string;
   rightSlot?: React.ReactNode;
 }
 
-const NO_XP_STRIP_PORTALS = new Set(['teacher', 'emerald', 'schoolAdmin', 'superAdmin']);
+const NO_XP_STRIP_PORTALS = new Set(['teacher', 'emerald', 'schoolAdmin', 'superAdmin', 'labIncharge']);
+const STUDENT_PORTALS = new Set(['amber', 'indigo', 'sky']);
 
 export const TopBar: React.FC<TopBarProps> = ({
   greeting,
@@ -27,6 +29,13 @@ export const TopBar: React.FC<TopBarProps> = ({
   rightSlot
 }) => {
   const { studentXP, studentStreak } = useApp();
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   const themeColors = {
     amber: 'text-amber-600',
@@ -36,7 +45,8 @@ export const TopBar: React.FC<TopBarProps> = ({
     emerald: 'text-emerald-600',
     teacher: 'text-indigo-600',
     schoolAdmin: 'text-rose-600',
-    superAdmin: 'text-slate-800'
+    superAdmin: 'text-slate-800',
+    labIncharge: 'text-teal-600'
   };
 
   const ringColors = {
@@ -47,7 +57,8 @@ export const TopBar: React.FC<TopBarProps> = ({
     emerald: 'focus:ring-emerald-500/20 focus:border-emerald-500',
     teacher: 'focus:ring-indigo-500/20 focus:border-indigo-500',
     schoolAdmin: 'focus:ring-rose-500/20 focus:border-rose-500',
-    superAdmin: 'focus:ring-slate-500/20 focus:border-slate-500'
+    superAdmin: 'focus:ring-slate-500/20 focus:border-slate-500',
+    labIncharge: 'focus:ring-teal-500/20 focus:border-teal-500'
   };
 
   return (
@@ -82,6 +93,19 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         {/* Custom right slot if provided */}
         {rightSlot}
+
+        {/* Kiosk hygiene: always-visible logout for shared lab PCs — the next
+            student must never inherit a session, and shouldn't have to hunt
+            through the sidebar to sign out between periods. */}
+        {STUDENT_PORTALS.has(batchColor) && (
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-100 text-slate-400 hover:text-red-500 hover:bg-red-50 hover:border-red-100 font-sans text-xs font-bold transition-all cursor-pointer"
+          >
+            <LogOut size={14} />
+            <span className="hidden sm:inline">Log Out</span>
+          </button>
+        )}
 
         {/* Action icons */}
         <div className="flex items-center gap-3">

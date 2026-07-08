@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
 import { addXp, logStreakActivity } from './gamification.service.js';
+import { getTeachingScope } from './teacher.service.js';
 import type { CreateTaskInput } from '../schemas/task.schema.js';
 
 const STATUS_ORDER = ['not_started', 'in_progress', 'in_review', 'completed'] as const;
@@ -17,6 +18,20 @@ async function resolveStudentIds(schoolId: string, assignTo: CreateTaskInput['as
 
   if (assignTo.mode === 'class') {
     query = query.eq('student_profiles.class_num', assignTo.classNum).eq('student_profiles.section', assignTo.section);
+  } else if (assignTo.mode === 'sections') {
+    const { data: sections, error } = await supabaseAdmin
+      .from('class_sections')
+      .select('id, class_num, section_label')
+      .in('id', assignTo.sectionIds)
+      .eq('school_id', schoolId);
+    if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to resolve sections', error.message);
+    if (!sections || sections.length !== assignTo.sectionIds.length) {
+      throw new ApiError('VALIDATION_ERROR', 'One or more sections do not exist in this school');
+    }
+    const pairs = sections
+      .map((s) => `and(class_num.eq.${s.class_num},section.eq.${String(s.section_label).replace(/[^A-Za-z0-9]/g, '')})`)
+      .join(',');
+    query = query.or(pairs, { referencedTable: 'student_profiles' });
   } else {
     query = query.eq('student_profiles.batch_id', assignTo.batchId);
   }
@@ -27,6 +42,16 @@ async function resolveStudentIds(schoolId: string, assignTo: CreateTaskInput['as
 }
 
 export async function createAndAssignTask(teacherId: string, schoolId: string, input: CreateTaskInput) {
+  // Same scoping rule as everywhere else in the service-role layer: a
+  // teacher may only target sections they actually teach.
+  if (input.assignTo.mode === 'sections') {
+    const scope = await getTeachingScope(teacherId, schoolId);
+    const allowed = new Set(scope.sections.map((s) => s.classSectionId));
+    if (input.assignTo.sectionIds.some((id) => !allowed.has(id))) {
+      throw new ApiError('FORBIDDEN', 'You can only assign tasks to sections you teach');
+    }
+  }
+
   const studentIds = await resolveStudentIds(schoolId, input.assignTo);
   if (studentIds.length === 0) throw new ApiError('VALIDATION_ERROR', 'No students matched the assignment target');
 

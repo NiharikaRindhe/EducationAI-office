@@ -10,6 +10,7 @@ import { schoolAdminRouter } from './routes/schoolAdmin.routes.js';
 import { authRouter } from './routes/auth.routes.js';
 import { teacherRouter } from './routes/teacher.routes.js';
 import { studentRouter } from './routes/student.routes.js';
+import { labInchargeRouter } from './routes/labIncharge.routes.js';
 import { startStreakResetJob } from './jobs/streakReset.job.js';
 import { startLeaderboardRecomputeJob } from './jobs/leaderboardRecompute.job.js';
 
@@ -29,6 +30,7 @@ app.use('/api/super-admin', superAdminRouter);
 app.use('/api/school-admin', schoolAdminRouter);
 app.use('/api/teacher', teacherRouter);
 app.use('/api/student', studentRouter);
+app.use('/api/lab-incharge', labInchargeRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

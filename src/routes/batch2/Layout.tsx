@@ -20,6 +20,7 @@ export const Batch2Layout: React.FC = () => {
     { href: '/batch2/subjects', label: 'Subjects', iconName: 'library_books' },
     { href: '/batch2/chat', label: 'AI Doubt Tutor', iconName: 'chat' },
     { href: '/batch2/exams', label: 'Exams & Mocks', iconName: 'edit_document' },
+    { href: '/batch2/tasks', label: 'My Tasks', iconName: 'assignment_turned_in' },
     { href: '/batch2/notes', label: 'Study Notes', iconName: 'sticky_note_2' },
     { href: '/batch2/pyq', label: 'PYQ Hub', iconName: 'bookmark' },
     { href: '/batch2/leaderboard', label: 'Leaderboard', iconName: 'emoji_events' },
@@ -34,7 +35,8 @@ export const Batch2Layout: React.FC = () => {
     if (path.includes('/subjects')) return { title: 'Subjects & Chapters', sub: 'Complete your NCERT syllabus and take practice sets.' };
     if (path.includes('/chat')) return { title: 'AI Doubt Solver', sub: 'Ask questions about mathematics and science formulas!' };
     if (path.includes('/exams')) return { title: 'Mock Exams', sub: 'Complete term exams and test your readiness.' };
-    if (path.includes('/notes')) return { title: 'Study Notes Manager', sub: 'Organize study notes and generate AI summaries.' };
+    if (path.includes('/tasks')) return { title: 'My Tasks', sub: 'Complete work your teacher has assigned to earn XP.' };
+    if (path.includes('/notes')) return { title: 'Study Notes Manager', sub: 'Organize and review your study notes.' };
     if (path.includes('/pyq')) return { title: 'PYQ Hub', sub: 'Attempt past board papers and review solutions.' };
     if (path.includes('/leaderboard')) return { title: 'Podium Leaderboard', sub: 'Compete with your classmates to top the classroom ranks!' };
     if (path.includes('/daily-challenges')) return { title: 'Daily Challenges', sub: 'Solve CBSE pattern questions to win double XP!' };

@@ -13,6 +13,26 @@ async function requireWhitelistedSubject(classNum: number, subject: string) {
   if (!data) throw new ApiError('SUBJECT_NOT_WHITELISTED', `${subject} is not offered for Class ${classNum}`);
 }
 
+/** Powers the subject picker in Chat/Notes — the same class_subjects
+ *  whitelist every task/exam/chat validates against, scoped to this
+ *  student's own class so they never see an invalid option. */
+export async function listMySubjects(studentId: string) {
+  const { data: sp, error: spError } = await supabaseAdmin
+    .from('student_profiles')
+    .select('class_num')
+    .eq('user_id', studentId)
+    .single();
+  if (spError || !sp) throw new ApiError('NOT_FOUND', 'Student profile not found');
+
+  const { data, error } = await supabaseAdmin
+    .from('class_subjects')
+    .select('subject')
+    .eq('class_num', sp.class_num)
+    .order('subject');
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to list subjects', error.message);
+  return (data ?? []).map((r) => r.subject as string);
+}
+
 export async function createSession(studentId: string, input: CreateChatSessionInput) {
   await requireWhitelistedSubject(input.classNum, input.subject);
 

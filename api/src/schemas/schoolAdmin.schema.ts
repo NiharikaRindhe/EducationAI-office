@@ -39,5 +39,32 @@ export const addSingleTeacherSchema = z.object({
   classesTaught: z.array(z.number().int().min(1).max(10)).default([]),
 });
 
+export const addSingleLabInchargeSchema = z.object({
+  fullName: z.string().min(2),
+});
+
+export const addSectionSchema = z.object({
+  classNum: z.number().int().min(1).max(10),
+  sectionLabel: z.string().min(1).max(4),
+});
+
+export const updateSectionSchema = z.object({
+  classTeacherId: z.string().uuid().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const addTeachingAssignmentSchema = z.object({
+  teacherId: z.string().uuid(),
+  classSectionId: z.string().uuid(),
+  subject: z.string().min(1),
+});
+
+// Multipart text fields arrive as strings; when present they pin every
+// imported row to one class+section (the "scoped import" flow).
+export const importScopeSchema = z.object({
+  classNum: z.coerce.number().int().min(1).max(10).optional(),
+  section: z.string().min(1).max(4).optional(),
+});
+
 export type StudentCsvRow = z.infer<typeof studentCsvRowSchema>;
 export type TeacherCsvRow = z.infer<typeof teacherCsvRowSchema>;

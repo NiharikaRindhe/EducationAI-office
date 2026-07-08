@@ -5,6 +5,7 @@ import {
   listStudentsController,
   studentDrillDownController,
   atRiskController,
+  mySectionsController,
 } from '../controllers/teacher.controller.js';
 import {
   startSessionController,
@@ -19,6 +20,7 @@ import {
   createExamController,
   listExamsController,
   getExamController,
+  duplicateExamController,
   addQuestionController,
   addQuestionsFromBankController,
   removeQuestionController,
@@ -39,6 +41,7 @@ export const teacherRouter = Router();
 teacherRouter.use(requireAuth, requireRole('teacher'));
 
 teacherRouter.get('/dashboard', dashboardController);
+teacherRouter.get('/my-sections', mySectionsController);
 teacherRouter.get('/students', listStudentsController);
 teacherRouter.get('/students/:id', studentDrillDownController);
 teacherRouter.get('/at-risk', atRiskController);
@@ -65,6 +68,7 @@ teacherRouter.post('/exams/:id/questions/from-bank', addQuestionsFromBankControl
 teacherRouter.delete('/exams/:examId/questions/:questionId', removeQuestionController);
 teacherRouter.post('/exams/:id/publish', publishExamController);
 teacherRouter.post('/exams/:id/close', closeExamController);
+teacherRouter.post('/exams/:id/duplicate', duplicateExamController);
 
 teacherRouter.get('/exams/:examId/submissions', listSubmissionsController);
 teacherRouter.get('/exams/:examId/submissions/:submissionId', getSubmissionDetailController);

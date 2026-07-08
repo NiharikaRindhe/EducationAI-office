@@ -9,6 +9,14 @@ function requireId(req: Request, name = 'id'): string {
   return value;
 }
 
+export async function listMySubjectsController(req: Request, res: Response, next: NextFunction) {
+  try {
+    res.json(await chatService.listMySubjects(req.user!.id));
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function createSessionController(req: Request, res: Response, next: NextFunction) {
   try {
     const input = createChatSessionSchema.parse(req.body);

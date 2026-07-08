@@ -31,6 +31,20 @@ export const publishExamSchema = z.object({
   assignTo: z.discriminatedUnion('mode', [
     z.object({ mode: z.literal('students'), studentIds: z.array(z.string().uuid()).min(1) }),
     z.object({ mode: z.literal('class'), classNum: z.number().int().min(1).max(10), section: z.string().min(1) }),
+    // One exam, many sections, each with its OWN open/close window —
+    // 7-A sits it Monday, 7-B Wednesday. Windows are optional (always-open).
+    z.object({
+      mode: z.literal('sections'),
+      sections: z
+        .array(
+          z.object({
+            sectionId: z.string().uuid(),
+            startsAt: z.string().datetime().optional(),
+            endsAt: z.string().datetime().optional(),
+          }),
+        )
+        .min(1),
+    }),
     z.object({ mode: z.literal('batch'), batchId: z.number().int().min(1).max(3) }),
   ]),
   randomizeQuestions: z.boolean().default(true),

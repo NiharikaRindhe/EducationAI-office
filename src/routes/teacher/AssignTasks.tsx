@@ -1,252 +1,264 @@
-import React, { useState } from 'react';
-import { useApp } from '../../context/AppContext';
-import { ClipboardList, Users, Check, AlertCircle, Calendar } from 'lucide-react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { Loader2, AlertCircle, Send, CheckCircle2, ClipboardList } from 'lucide-react';
+import { api, ApiClientError } from '../../lib/api';
+
+interface TeachingSection {
+  classSectionId: string;
+  classNum: number;
+  section: string;
+  subjects: string[];
+  isClassTeacher: boolean;
+}
+
+interface MySections {
+  sections: TeachingSection[];
+  legacyFallback: boolean;
+  subjectsByClass: Record<number, string[]>;
+}
+
+interface TaskRow {
+  id: string;
+  title: string;
+  subject: string;
+  task_type: string;
+  xp_reward: number;
+  due_date: string | null;
+  created_at: string;
+  totalAssigned: number;
+  completed: number;
+}
+
+const TASK_TYPES = [
+  { value: 'custom', label: 'Custom' },
+  { value: 'quiz', label: 'Quiz' },
+  { value: 'reading', label: 'Reading' },
+  { value: 'practice', label: 'Practice' },
+  { value: 'pyq', label: 'PYQ' },
+] as const;
 
 export const TeacherAssignTasks: React.FC = () => {
-  const { studentsList, addTask } = useApp();
-
-  const [taskType, setTaskType] = useState<'Quiz' | 'Reading' | 'Practice' | 'PYQ' | 'Custom'>('Quiz');
-  const [subject, setSubject] = useState('Mathematics');
-  const [dueDate, setDueDate] = useState('Today');
-  const [title, setTitle] = useState('');
-  const [instructions, setInstructions] = useState('');
-  
-  // Assign targeting states
-  const [targetMode, setTargetMode] = useState<'student' | 'class' | 'batch'>('student');
-  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
-  const [selectedClass, setSelectedClass] = useState('7-A');
-  const [selectedBatch, setSelectedBatch] = useState(2);
-
-  // Success toast state
-  const [showToast, setShowToast] = useState(false);
+  const [mySections, setMySections] = useState<MySections | null>(null);
+  const [tasks, setTasks] = useState<TaskRow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
-  const handleStudentToggle = (id: string) => {
-    setSelectedStudents(prev => 
-      prev.includes(id) ? prev.filter(sId => sId !== id) : [...prev, id]
-    );
+  // Form state
+  const [title, setTitle] = useState('');
+  const [subject, setSubject] = useState('');
+  const [taskType, setTaskType] = useState<string>('custom');
+  const [instructions, setInstructions] = useState('');
+  const [xpReward, setXpReward] = useState(10);
+  const [dueDate, setDueDate] = useState('');
+  const [selectedSectionIds, setSelectedSectionIds] = useState<Set<string>>(new Set());
+
+  const loadAll = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [sections, taskData] = await Promise.all([
+        api.get<MySections>('/teacher/my-sections'),
+        api.get<TaskRow[]>('/teacher/tasks'),
+      ]);
+      setMySections(sections);
+      setTasks(taskData);
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Failed to load your sections');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadAll(); }, [loadAll]);
+
+  const toggleSection = (id: string) => {
+    setSelectedSectionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
-  const handleAssign = (e: React.FormEvent) => {
+  // Subjects valid for EVERY selected section's class — a task tagged with a
+  // subject must not reach a class that doesn't have that subject.
+  const subjectOptions = useMemo(() => {
+    if (!mySections) return [];
+    const selected = mySections.sections.filter((s) => selectedSectionIds.has(s.classSectionId));
+    if (selected.length === 0) return [];
+    const classNums = [...new Set(selected.map((s) => s.classNum))];
+    const lists = classNums.map((c) => mySections.subjectsByClass[c] ?? []);
+    return (lists[0] ?? []).filter((subj) => lists.every((list) => list.includes(subj)));
+  }, [mySections, selectedSectionIds]);
+
+  useEffect(() => {
+    if (subject && !subjectOptions.includes(subject)) setSubject('');
+  }, [subjectOptions, subject]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
-
+    if (selectedSectionIds.size === 0) {
+      setError('Select at least one section to assign this task to.');
+      return;
+    }
+    setError('');
+    setSuccessMessage('');
     setIsSubmitting(true);
-
-    // Simulate 800ms API dispatch
-    setTimeout(() => {
-      // Add mock task to AppContext
-      addTask({
+    try {
+      const result = await api.post<{ task: { id: string }; assignedCount: number }>('/teacher/tasks', {
         title,
         subject,
-        xp: taskType === 'Quiz' ? 50 : taskType === 'Reading' ? 40 : 60,
-        dueDate,
-        batchId: targetMode === 'batch' ? selectedBatch : 2 // default to Batch 2 or selected
+        taskType,
+        instructions: instructions || undefined,
+        xpReward,
+        dueDate: dueDate || undefined,
+        assignTo: { mode: 'sections', sectionIds: [...selectedSectionIds] },
       });
-
-      setIsSubmitting(false);
-      setShowToast(true);
+      setSuccessMessage(`Task assigned to ${result.assignedCount} student${result.assignedCount === 1 ? '' : 's'}.`);
       setTitle('');
       setInstructions('');
-      setSelectedStudents([]);
-      
-      // Auto hide toast after 3000ms
-      setTimeout(() => setShowToast(false), 3000);
-    }, 800);
+      setDueDate('');
+      setSelectedSectionIds(new Set());
+      const taskData = await api.get<TaskRow[]>('/teacher/tasks');
+      setTasks(taskData);
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Failed to assign task');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
+  if (isLoading) {
+    return <div className="flex justify-center py-16"><Loader2 className="animate-spin text-indigo-400" /></div>;
+  }
+
   return (
-    <div className="max-w-2xl mx-auto font-sans select-none anim-fade-up">
-      {/* Toast Alert Success */}
-      {showToast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 bg-emerald-500 text-white font-sans font-bold text-xs py-3 px-5 rounded-2xl shadow-lg flex items-center gap-2 anim-fade-up z-50">
-          <Check size={16} />
-          <span>✓ Task assigned successfully! Students will see it immediately.</span>
+    <div className="flex flex-col gap-6">
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium rounded-xl px-4 py-3 flex items-center gap-2">
+          <AlertCircle size={14} /> {error}
+        </div>
+      )}
+      {successMessage && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium rounded-xl px-4 py-3 flex items-center gap-2">
+          <CheckCircle2 size={14} /> {successMessage}
         </div>
       )}
 
-      <div className="bento-card border border-slate-100 bg-white p-6 md:p-8 flex flex-col gap-6 text-left">
-        <h3 className="font-display font-bold text-sm text-slate-800">Configure Assignment</h3>
-        
-        <form onSubmit={handleAssign} className="flex flex-col gap-5">
-          {/* Task Type selector buttons */}
-          <div className="flex flex-col gap-2">
-            <label className="font-label-caps text-[9px] font-bold text-slate-400">ASSIGNMENT TYPE</label>
-            <div className="flex flex-wrap gap-2">
-              {([
-                { key: 'Quiz', label: 'Quiz' },
-                { key: 'Reading', label: 'Reading' },
-                { key: 'Practice', label: 'Practice Problems' },
-                { key: 'PYQ', label: 'PYQ Paper' },
-                { key: 'Custom', label: 'Custom' }
-              ] as const).map(item => (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => setTaskType(item.key)}
-                  className={`py-2 px-4 rounded-xl font-sans text-xs font-semibold border transition-all cursor-pointer ${
-                    taskType === item.key 
-                      ? 'bg-indigo-600 border-transparent text-white shadow-md shadow-indigo-600/10' 
-                      : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
+      {/* Create + assign */}
+      <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm flex flex-col gap-5">
+        <div>
+          <h2 className="font-display font-bold text-lg text-slate-800">New Task</h2>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Pick one or more of your sections — the same task goes to every selected section. Create separate tasks to give sections different work.
+          </p>
+        </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            {/* Subject dropdown */}
-            <div className="flex flex-col gap-1.5">
-              <label className="font-label-caps text-[9px] font-bold text-slate-400">SUBJECT</label>
-              <select
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl text-xs font-semibold outline-none"
-              >
-                {['Mathematics', 'Science', 'English', 'Social Science', 'Hindi'].map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Due date picker */}
-            <div className="flex flex-col gap-1.5">
-              <label className="font-label-caps text-[9px] font-bold text-slate-400">DUE DATE</label>
-              <select
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl text-xs font-semibold outline-none"
-              >
-                <option value="Today">Due Today</option>
-                <option value="Tomorrow">Due Tomorrow</option>
-                <option value="This Week">Due This Week</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Task Title */}
-          <div className="flex flex-col gap-1.5">
-            <label className="font-label-caps text-[9px] font-bold text-slate-400">TASK TITLE</label>
-            <input
-              type="text"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl font-sans text-xs outline-none"
-              placeholder="e.g. Solve Ch 3 Linear equations practice"
-            />
-          </div>
-
-          {/* Instructions */}
-          <div className="flex flex-col gap-1.5">
-            <label className="font-label-caps text-[9px] font-bold text-slate-400">SPECIAL INSTRUCTIONS (OPTIONAL)</label>
-            <textarea
-              rows={3}
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl font-sans text-xs outline-none resize-none"
-              placeholder="e.g. Focus on exercise 3.2 variables..."
-            />
-          </div>
-
-          {/* Targeting controls */}
-          <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 mt-2">
-            <div className="flex justify-between items-center select-none">
-              <label className="font-label-caps text-[9px] font-bold text-slate-400">ASSIGN TARGET RANGE</label>
-              <div className="flex bg-slate-100 p-1 rounded-lg text-[9px] font-black">
-                {([
-                  { key: 'student', label: 'Pupils' },
-                  { key: 'class', label: 'Class' },
-                  { key: 'batch', label: 'Batch' }
-                ] as const).map(item => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => setTargetMode(item.key)}
-                    className={`py-1 px-3 rounded-md cursor-pointer transition-all ${
-                      targetMode === item.key ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-400'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Target mode rendering */}
-            {targetMode === 'student' && (
-              <div className="grid grid-cols-4 gap-2 bg-slate-50 border border-slate-100 p-3.5 rounded-2xl select-none">
-                {studentsList.map((stud) => {
-                  const isSelected = selectedStudents.includes(stud.id);
+        {mySections && mySections.sections.length === 0 ? (
+          <p className="text-xs text-slate-400 text-center py-6">
+            No sections are mapped to you yet — ask your School Admin to assign you on the Classes &amp; Sections page.
+          </p>
+        ) : (
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            {/* Section picker */}
+            <div>
+              <label className="text-[9px] font-label-caps text-slate-400 tracking-wider block mb-2">ASSIGN TO SECTIONS</label>
+              <div className="flex flex-wrap gap-2">
+                {mySections?.sections.map((s) => {
+                  const isSelected = selectedSectionIds.has(s.classSectionId);
                   return (
                     <button
-                      key={stud.id}
                       type="button"
-                      onClick={() => handleStudentToggle(stud.id)}
-                      className={`p-2.5 rounded-xl border flex flex-col items-center gap-1 cursor-pointer transition-all ${
-                        isSelected 
-                          ? 'border-indigo-500 bg-white shadow-xs font-bold text-indigo-600 scale-102' 
-                          : 'border-slate-200 bg-white/50 text-slate-500'
+                      key={s.classSectionId}
+                      onClick={() => toggleSection(s.classSectionId)}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                        isSelected
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                          : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-300'
                       }`}
                     >
-                      <span className="text-xl">{stud.avatar}</span>
-                      <span className="text-[9px] truncate max-w-[70px]">{stud.name}</span>
+                      {s.classNum}-{s.section}
                     </button>
                   );
                 })}
               </div>
-            )}
+            </div>
 
-            {targetMode === 'class' && (
-              <div className="grid grid-cols-4 gap-2">
-                {['3-A', '7-A', '9-C', '12-A'].map((cls) => (
-                  <button
-                    key={cls}
-                    type="button"
-                    onClick={() => setSelectedClass(cls)}
-                    className={`py-3.5 border rounded-xl font-bold font-sans text-xs cursor-pointer transition-all ${
-                      selectedClass === cls
-                        ? 'border-indigo-500 bg-indigo-50/20 text-indigo-700'
-                        : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-500'
-                    }`}
-                  >
-                    Class {cls}
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Task title (e.g. Read Chapter 4 — Nutrition in Plants)"
+                className="md:col-span-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-indigo-400" />
 
-            {targetMode === 'batch' && (
-              <div className="grid grid-cols-4 gap-2">
-                {[1, 2, 3, 4].map((num) => (
-                  <button
-                    key={num}
-                    type="button"
-                    onClick={() => setSelectedBatch(num)}
-                    className={`py-3.5 border rounded-xl font-bold font-sans text-xs cursor-pointer transition-all ${
-                      selectedBatch === num
-                        ? 'border-indigo-500 bg-indigo-50/20 text-indigo-700'
-                        : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-500'
-                    }`}
-                  >
-                    Batch {num}
-                  </button>
-                ))}
+              <select required value={subject} onChange={(e) => setSubject(e.target.value)} disabled={selectedSectionIds.size === 0}
+                className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs outline-none disabled:bg-slate-50 disabled:text-slate-400">
+                <option value="">{selectedSectionIds.size === 0 ? 'Select sections first' : 'Subject'}</option>
+                {subjectOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+
+              <select value={taskType} onChange={(e) => setTaskType(e.target.value)}
+                className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs outline-none">
+                {TASK_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-slate-500 whitespace-nowrap">XP reward</label>
+                <input type="number" min={0} max={1000} value={xpReward} onChange={(e) => setXpReward(Number(e.target.value))}
+                  className="w-24 px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-indigo-400" />
               </div>
-            )}
+
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-slate-500 whitespace-nowrap">Due date</label>
+                <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
+                  className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-indigo-400" />
+              </div>
+
+              <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Instructions (optional)" rows={3}
+                className="md:col-span-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-indigo-400 resize-none" />
+            </div>
+
+            <button type="submit" disabled={isSubmitting}
+              className="self-start flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl px-5 py-2.5 transition-all cursor-pointer">
+              {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              Assign Task
+            </button>
+          </form>
+        )}
+      </div>
+
+      {/* Existing tasks */}
+      <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+        <h2 className="font-display font-bold text-lg text-slate-800 mb-4 flex items-center gap-2">
+          <ClipboardList size={17} className="text-indigo-500" /> My Tasks ({tasks.length})
+        </h2>
+        {tasks.length === 0 ? (
+          <p className="text-xs text-slate-400 text-center py-8">No tasks yet — assign your first one above.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-slate-400 font-label-caps text-[9px] border-b border-slate-100">
+                  <th className="pb-2">Title</th><th className="pb-2">Subject</th><th className="pb-2">Type</th><th className="pb-2">XP</th><th className="pb-2">Due</th><th className="pb-2">Progress</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tasks.map((t) => (
+                  <tr key={t.id} className="border-b border-slate-50">
+                    <td className="py-2.5 font-semibold text-slate-700">{t.title}</td>
+                    <td className="py-2.5">{t.subject}</td>
+                    <td className="py-2.5 capitalize">{t.task_type}</td>
+                    <td className="py-2.5">{t.xp_reward}</td>
+                    <td className="py-2.5">{t.due_date ? new Date(t.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—'}</td>
+                    <td className="py-2.5">
+                      <span className={`font-bold ${t.completed === t.totalAssigned && t.totalAssigned > 0 ? 'text-emerald-600' : 'text-slate-600'}`}>
+                        {t.completed}/{t.totalAssigned}
+                      </span>{' '}
+                      completed
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-
-          {/* Submit button */}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-4 mt-2 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white font-sans font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-indigo-500/10 transition-all disabled:opacity-50"
-          >
-            {isSubmitting ? 'Assigning Task...' : 'Assign Task'}
-          </button>
-        </form>
+        )}
       </div>
     </div>
   );

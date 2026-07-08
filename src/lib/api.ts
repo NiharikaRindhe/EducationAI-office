@@ -82,9 +82,12 @@ export const api = {
     if (!res.ok) throw new ApiClientError('DOWNLOAD_FAILED', res.statusText, res.status);
     return res.blob();
   },
-  async upload<T>(path: string, file: File): Promise<T> {
+  async upload<T>(path: string, file: File, fields?: Record<string, string>): Promise<T> {
     const formData = new FormData();
     formData.append('file', file);
+    if (fields) {
+      for (const [key, value] of Object.entries(fields)) formData.append(key, value);
+    }
     const headers: Record<string, string> = {};
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
     const res = await fetch(buildUrl(path), { method: 'POST', headers, body: formData });

@@ -8,6 +8,7 @@ import {
 import { listAnnouncementsForStudentController } from '../controllers/announcement.controller.js';
 import { listTasksForStudentController, cycleTaskStatusController } from '../controllers/task.controller.js';
 import {
+  listExamsForStudentController,
   getExamPaperController,
   saveAnswerController,
   proctorEventController,
@@ -23,6 +24,7 @@ import { getLeaderboardForStudentController } from '../controllers/leaderboard.c
 import { downloadOwnAdmitCardController } from '../controllers/admitCard.controller.js';
 import { getItemsController, submitAttemptController, getProgressController } from '../controllers/english.controller.js';
 import {
+  listMySubjectsController,
   createSessionController,
   listSessionsController,
   getHistoryController,
@@ -43,6 +45,7 @@ studentRouter.get('/announcements', listAnnouncementsForStudentController);
 studentRouter.get('/tasks', listTasksForStudentController);
 studentRouter.patch('/tasks/:id/status', cycleTaskStatusController);
 
+studentRouter.get('/exams', listExamsForStudentController);
 studentRouter.get('/exams/:examId/paper', getExamPaperController);
 studentRouter.put('/exam-submissions/:submissionId/answer', saveAnswerController);
 studentRouter.post('/exam-submissions/:submissionId/submit', submitExamController);
@@ -60,6 +63,8 @@ studentRouter.get('/exams/:examId/admit-card', downloadOwnAdmitCardController);
 studentRouter.get('/english/items', getItemsController);
 studentRouter.post('/english/submit', submitAttemptController);
 studentRouter.get('/english/progress', getProgressController);
+
+studentRouter.get('/subjects', listMySubjectsController);
 
 const chatLimiter = rateLimit({ windowMs: 24 * 60 * 60_000, max: 50, keyFn: (req) => `chat:${req.user!.id}` });
 

@@ -7,6 +7,7 @@ interface QuestionRow {
   id: string;
   type: string;
   text: string;
+  options: { id: string; isCorrect?: boolean; is_correct?: boolean }[] | null;
   correct_answer: string | null;
   marks: number;
   rubric: string | null;
@@ -23,7 +24,13 @@ function normalize(s: string | null | undefined): string {
 function gradeObjective(question: QuestionRow, selectedOptionId: string | null, studentAnswer: string | null) {
   let isCorrect = false;
   if (question.type === 'mcq') {
-    isCorrect = normalize(selectedOptionId) === normalize(question.correct_answer);
+    // The correct choice lives as a flag on the option itself. Builder-written
+    // questions use `isCorrect`, bank-seeded ones `is_correct` — accept both,
+    // with `correct_answer` (an option id) as a last-resort fallback.
+    const correctOption = (question.options ?? []).find((o) => o.isCorrect === true || o.is_correct === true);
+    isCorrect = correctOption
+      ? normalize(selectedOptionId) === normalize(correctOption.id)
+      : normalize(selectedOptionId) === normalize(question.correct_answer);
   } else {
     isCorrect = normalize(studentAnswer) === normalize(question.correct_answer);
   }
@@ -128,22 +135,22 @@ export async function gradeSubmission(examSubmissionId: string) {
 export async function recomputeSubmissionTotals(examSubmissionId: string) {
   const { data: answers } = await supabaseAdmin
     .from('exam_answers')
-    .select('final_score, questions(marks)')
+    .select('final_score')
     .eq('exam_submission_id', examSubmissionId);
-
-  const maxScore = (answers ?? []).reduce((sum, a) => {
-    const q = Array.isArray(a.questions) ? a.questions[0] : a.questions;
-    return sum + (q?.marks ?? 0);
-  }, 0);
-
-  const allReviewed = (answers ?? []).every((a) => a.final_score !== null);
-  const totalScore = (answers ?? []).reduce((sum, a) => sum + Number(a.final_score ?? 0), 0);
 
   const { data: submission } = await supabaseAdmin
     .from('exam_submissions')
-    .select('student_id, xp_awarded, is_reviewed')
+    .select('student_id, xp_awarded, is_reviewed, exams(total_marks)')
     .eq('id', examSubmissionId)
     .single();
+
+  // Max is the whole paper, not just what was answered — otherwise skipping
+  // a hard question would RAISE a student's percentage on the merit list.
+  const exam = submission && (Array.isArray(submission.exams) ? submission.exams[0] : submission.exams);
+  const maxScore = exam?.total_marks ?? 0;
+
+  const allReviewed = (answers ?? []).every((a) => a.final_score !== null);
+  const totalScore = (answers ?? []).reduce((sum, a) => sum + Number(a.final_score ?? 0), 0);
 
   await supabaseAdmin
     .from('exam_submissions')
