@@ -106,8 +106,8 @@ export const Batch1Layout: React.FC = () => {
         </header>
       )}
 
-      {/* ── Page content ── */}
-      <main className={`relative z-10 flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 ${isHome ? 'py-4' : 'py-2 pb-10'}`}>
+      {/* ── Page content — fill the screen on lab monitors ── */}
+      <main className={`relative z-10 flex-1 w-full max-w-[1700px] mx-auto px-4 sm:px-8 lg:px-14 ${isHome ? 'py-4' : 'py-2 pb-10'}`}>
         <Outlet />
       </main>
     </div>

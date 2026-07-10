@@ -116,12 +116,13 @@ export const Batch1Home: React.FC = () => {
       <TodayPanel accent="sky" tasksHref="/batch1/tasks" examsHref="/batch1/exams" />
 
       {/* ── The island: six glossy tiles ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-5 relative z-10">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-5 lg:gap-7 relative z-10">
         {TILES.map((tile, i) => (
           <Link
             key={tile.href}
             to={tile.href}
-            className="relative rounded-[30px] min-h-[150px] sm:min-h-[170px] flex flex-col items-center justify-center gap-2
+            className="relative rounded-[30px] min-h-[150px] sm:min-h-[180px] lg:min-h-[210px] xl:min-h-[230px]
+                       flex flex-col items-center justify-center gap-2
                        overflow-hidden cursor-pointer select-none transition-transform duration-150
                        hover:-translate-y-1.5 hover:scale-[1.02] active:translate-y-1"
             style={{
@@ -136,13 +137,13 @@ export const Batch1Home: React.FC = () => {
               aria-hidden="true"
             />
             <span
-              className="text-6xl anim-bob"
+              className="text-6xl lg:text-7xl anim-bob"
               style={{ filter: 'drop-shadow(0 4px 4px rgba(0,0,0,.18))', animationDelay: `${(i % 3) * 0.4}s` }}
             >
               {tile.emoji}
             </span>
             {!isPreReader && (
-              <span className="font-display font-black text-lg text-white tracking-wide" style={{ textShadow: '0 2px 3px rgba(0,0,0,.22)' }}>
+              <span className="font-display font-black text-lg lg:text-xl text-white tracking-wide" style={{ textShadow: '0 2px 3px rgba(0,0,0,.22)' }}>
                 {tile.label}
               </span>
             )}
@@ -150,9 +151,9 @@ export const Batch1Home: React.FC = () => {
         ))}
       </div>
 
-      {/* ── Green hill at the bottom of the island ── */}
+      {/* ── Green hill — spans the whole viewport, not just the column ── */}
       <div
-        className="absolute -bottom-10 -left-16 -right-16 h-28 pointer-events-none"
+        className="absolute -bottom-10 left-1/2 -translate-x-1/2 w-screen h-32 pointer-events-none"
         style={{ background: 'linear-gradient(180deg,#8FE06A,#6FCB47)', borderRadius: '50% 50% 0 0' }}
         aria-hidden="true"
       />

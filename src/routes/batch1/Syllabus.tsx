@@ -30,12 +30,12 @@ interface CurriculumChapter {
   completed: boolean;
 }
 
-/* Track geometry */
-const TRACK_W = 620;
+/* Track geometry — wide enough to feel like a real map on lab monitors */
+const TRACK_W = 900;
 const STEP_Y = 155;
 const TOP_PAD = 80;
-const X_LEFT = 150;
-const X_RIGHT = 470;
+const X_LEFT = 220;
+const X_RIGHT = 680;
 
 const SUBJECT_EMOJI = (s: string) => {
   const l = s.toLowerCase();

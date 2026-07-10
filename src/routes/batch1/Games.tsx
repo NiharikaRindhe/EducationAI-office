@@ -396,7 +396,7 @@ export const Batch1Games: React.FC = () => {
               </div>
 
               {/* This chapter's games */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
                 {chapter.games.map((game) => renderGameCard(game))}
               </div>
             </div>
@@ -420,7 +420,7 @@ export const Batch1Games: React.FC = () => {
                 )}
               </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
               {challengeGames.map((game) => renderGameCard(game, true))}
             </div>
           </div>
