@@ -34,11 +34,22 @@ export async function listMySubjects(studentId: string) {
 }
 
 export async function createSession(studentId: string, input: CreateChatSessionInput) {
-  await requireWhitelistedSubject(input.classNum, input.subject);
+  // The session's class is ALWAYS the student's own class from their profile —
+  // never the client-supplied value. This is what guarantees a Class 5 student's
+  // RAG retrieval can only ever hit Class 5 chunks, even for topics that also
+  // exist in Class 7 books (same trust boundary as games/exams).
+  const { data: sp, error: spError } = await supabaseAdmin
+    .from('student_profiles')
+    .select('class_num')
+    .eq('user_id', studentId)
+    .single();
+  if (spError || !sp) throw new ApiError('NOT_FOUND', 'Student profile not found');
+
+  await requireWhitelistedSubject(sp.class_num, input.subject);
 
   const { data, error } = await supabaseAdmin
     .from('chat_sessions')
-    .insert({ student_id: studentId, class_num: input.classNum, subject: input.subject })
+    .insert({ student_id: studentId, class_num: sp.class_num, subject: input.subject })
     .select()
     .single();
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to create chat session', error.message);
