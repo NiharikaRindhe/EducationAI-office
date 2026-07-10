@@ -31,6 +31,14 @@ interface GameItem {
   locked: boolean;
 }
 
+interface ChapterGroup {
+  chapterRef: string;
+  subject: string;
+  chapterNum: number;
+  chapterTitle: string;
+  games: GameItem[];
+}
+
 interface AttemptResponse {
   attempt: {
     student_id: string;
@@ -222,6 +230,26 @@ export const Batch1Games: React.FC = () => {
 
   /* ───────────── Gallery View ───────────── */
 
+  /* Group games by chapter */
+  const groupGamesByChapter = (): ChapterGroup[] => {
+    const grouped = new Map<string, GameItem[]>();
+    for (const game of games) {
+      const key = game.chapterRef || 'no-chapter';
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(game);
+    }
+    return Array.from(grouped.entries()).map(([ref, gameList]) => {
+      const first = gameList[0];
+      return {
+        chapterRef: ref,
+        subject: first?.subject || 'Unknown',
+        chapterNum: 0,
+        chapterTitle: first?.chapterRef ? first.chapterRef.split('-').pop() || 'Chapter' : 'Miscellaneous',
+        games: gameList,
+      };
+    }).sort((a, b) => a.subject.localeCompare(b.subject));
+  };
+
   const renderGallery = () => {
     if (loading) {
       return (
@@ -247,11 +275,21 @@ export const Batch1Games: React.FC = () => {
       );
     }
 
+    const chapters = groupGamesByChapter();
+
     return (
       <div className="flex flex-col gap-8">
-        {/* Regular games */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-          {games.map((game) => (
+        {/* Games grouped by chapter */}
+        {chapters.map((chapter) => (
+          <div key={chapter.chapterRef} className="flex flex-col gap-3">
+            {!isPreReader && (
+              <div className="flex items-center gap-2 px-1">
+                <span className="text-lg">📖</span>
+                <h3 className="font-display font-black text-base text-slate-700">{chapter.subject}</h3>
+              </div>
+            )}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+              {chapter.games.map((game) => (
           <button
             key={game.gameId}
             disabled={game.locked}
@@ -294,9 +332,11 @@ export const Batch1Games: React.FC = () => {
             {!isPreReader && (
               <span className="badge pill-amber text-[8px] font-black">{game.subject}</span>
             )}
-          </button>
+              </button>
+              ))}
+            </div>
+          </div>
         ))}
-        </div>
 
         {/* Challenge games – only show if student has mastered skills */}
         {challengeGames.length > 0 && (
