@@ -1,523 +1,1052 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Trophy, RefreshCw, Star, Play, ArrowLeft } from 'lucide-react';
+import { api } from '../../lib/api';
+import { useSearchParams } from 'react-router-dom';
+import { Star, ArrowLeft } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-interface Game {
-  id: string;
-  name: string;
-  icon: string;
-  subject: string;
-  stars: number;
-  locked?: boolean;
+/* ───────────────────────── Types ───────────────────────── */
+
+interface GameParams {
+  max?: number;
+  ops?: string[];
+  letters?: string[];
+  case?: 'upper' | 'lower';
+  pairs?: { emoji: string; letter: string }[];
 }
 
+interface GameItem {
+  gameId: string;
+  engine: string;
+  subject: string;
+  skillTag: string;
+  classNum: number;
+  level: number;
+  chapterRef: string;
+  name: string;
+  icon: string;
+  params: GameParams;
+  stars: number;
+  bestScore: number | null;
+  locked: boolean;
+}
+
+interface AttemptResponse {
+  attempt: {
+    student_id: string;
+    game_id: string;
+    stars: number;
+    best_score: number;
+    attempts_count: number;
+    last_played_at: string;
+  };
+  xpGained: number;
+  newBadges: string[];
+}
+
+/* ───────────────────────── CSS keyframe injection ───────────────────────── */
+
+const INJECTED_STYLES_ID = 'games-dynamic-styles';
+
+function injectStyles() {
+  if (document.getElementById(INJECTED_STYLES_ID)) return;
+  const style = document.createElement('style');
+  style.id = INJECTED_STYLES_ID;
+  style.textContent = `
+    @keyframes game-shake {
+      0%, 100% { transform: translateX(0); }
+      10%, 30%, 50%, 70%, 90% { transform: translateX(-6px); }
+      20%, 40%, 60%, 80% { transform: translateX(6px); }
+    }
+    .animate-game-shake {
+      animation: game-shake 0.5s ease-in-out;
+    }
+    @keyframes game-glow-green {
+      0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
+      50% { box-shadow: 0 0 24px 8px rgba(34,197,94,0.35); }
+      100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+    }
+    .animate-glow-green {
+      animation: game-glow-green 0.6s ease-out;
+    }
+    @keyframes game-pulse-hint {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.15); opacity: 0.85; }
+    }
+    .animate-pulse-hint {
+      animation: game-pulse-hint 0.6s ease-in-out 3;
+    }
+    @keyframes xp-float {
+      0% { opacity: 1; transform: translateY(0) scale(1); }
+      100% { opacity: 0; transform: translateY(-60px) scale(1.3); }
+    }
+    .animate-xp-float {
+      animation: xp-float 1.4s ease-out forwards;
+    }
+    @keyframes card-bounce-tap {
+      0% { transform: scale(1); }
+      50% { transform: scale(0.93); }
+      100% { transform: scale(1); }
+    }
+    .card-bounce-tap:active {
+      animation: card-bounce-tap 0.25s ease-out;
+    }
+    @keyframes skeleton-pulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 0.8; }
+    }
+    .skeleton-pulse {
+      animation: skeleton-pulse 1.5s ease-in-out infinite;
+      background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+      background-size: 200% 100%;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+/* ───────────────────────── Helpers ───────────────────────── */
+
+function starsForCountAdd(correct: number): number {
+  if (correct >= 5) return 3;
+  if (correct >= 4) return 2;
+  if (correct >= 3) return 1;
+  return 0;
+}
+
+function starsForPhonicsPop(mistakes: number): number {
+  if (mistakes === 0) return 3;
+  if (mistakes === 1) return 2;
+  return 1;
+}
+
+/* ───────────────────────── Main Component ───────────────────────── */
+
 export const Batch1Games: React.FC = () => {
-  const { incrementXP } = useApp();
+  const { currentClass, incrementXP } = useApp();
+  const [searchParams] = useSearchParams();
 
-  const [activeGameId, setActiveGameId] = useState<string | null>(null);
+  /* ── Loading state ── */
+  const [loading, setLoading] = useState(true);
+  const [games, setGames] = useState<GameItem[]>([]);
+  const [challengeGames, setChallengeGames] = useState<GameItem[]>([]);
+  const [activeGame, setActiveGame] = useState<GameItem | null>(null);
 
-  const gamesData: Game[] = [
-    { id: 'alphabet-tracing', name: 'Alphabet Tracing', icon: '✍️', subject: 'English', stars: 3 },
-    { id: 'phonics-pop', name: 'Phonics Pop', icon: '🎈', subject: 'English', stars: 2 },
-    { id: 'count-and-add', name: 'Count & Add Stars', icon: '🔢', subject: 'Maths', stars: 0 },
-    { id: 'g4', name: 'Shape sorter', icon: '🔷', subject: 'Maths', stars: 3, locked: true },
-    { id: 'g5', name: 'Word builder', icon: '✏️', subject: 'English', stars: 1, locked: true },
-    { id: 'g6', name: 'Animal sounds matching', icon: '🦁', subject: 'Science', stars: 0, locked: true },
-    { id: 'g7', name: 'Color picker fun', icon: '🎨', subject: 'EVS', stars: 2, locked: true },
-    { id: 'g8', name: 'Fruit count race', icon: '🍎', subject: 'Maths', stars: 0, locked: true },
-    { id: 'g9', name: 'Plant grower clicker', icon: '🌻', subject: 'Science', stars: 0, locked: true },
-    { id: 'g10', name: 'Map puzzle helper', icon: '🗺️', subject: 'EVS', stars: 0, locked: true },
-    { id: 'g11', name: 'Spelling bee train', icon: '🚂', subject: 'English', stars: 0, locked: true },
-    { id: 'g12', name: 'Pattern blocks matcher', icon: '⏹️', subject: 'Maths', stars: 0, locked: true },
-    { id: 'g13', name: 'Space adventure count', icon: '🚀', subject: 'Science', stars: 0, locked: true },
-    { id: 'g14', name: 'Body parts labeling', icon: '🧍', subject: 'EVS', stars: 0, locked: true },
-    { id: 'g15', name: 'Sentence composer', icon: '📝', subject: 'English', stars: 0, locked: true },
-    { id: 'g16', name: 'Clock time explorer', icon: '⏰', subject: 'Maths', stars: 0, locked: true }
-  ];
+  /* ── XP float animation ── */
+  const [xpFloat, setXpFloat] = useState<{ amount: number; key: number } | null>(null);
 
-  /* ----------------------------------------------------
-     GAME 1: ALPHABET TRACING
-  ---------------------------------------------------- */
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  /* Chrome variant */
+  const isPreReader = currentClass <= 2;
+  const numChoices = isPreReader ? 3 : 4;
+
+  useEffect(() => {
+    injectStyles();
+  }, []);
+
+  /* ── Auto-open game from chapter param ── */
+  useEffect(() => {
+    const chapterRef = searchParams.get('chapter');
+    if (chapterRef && games.length > 0) {
+      const gameForChapter = games.find((g) => g.chapterRef === chapterRef);
+      if (gameForChapter) {
+        setActiveGame(gameForChapter);
+      }
+    }
+  }, [games, searchParams]);
+
+  /* ── Fetch games from API ── */
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+
+    api
+      .get<{ games: GameItem[]; challengeGames: GameItem[] }>('/student/games')
+      .then((res) => {
+        if (!cancelled) {
+          setGames(res.games);
+          setChallengeGames(res.challengeGames ?? []);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          console.error('Failed to load games:', err);
+          setGames([]);
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /* ── Submit attempt helper ── */
+  const submitAttempt = useCallback(
+    async (gameId: string, stars: number, score: number) => {
+      try {
+        const res = await api.post<AttemptResponse>(
+          '/student/games/' + gameId + '/attempts',
+          { stars, score },
+        );
+
+        /* Show XP float */
+        if (res.xpGained > 0) {
+          incrementXP(res.xpGained);
+          setXpFloat({ amount: res.xpGained, key: Date.now() });
+          setTimeout(() => setXpFloat(null), 1600);
+        }
+
+        /* Confetti on new badges */
+        if (res.newBadges && res.newBadges.length > 0) {
+          confetti({ particleCount: 120, spread: 80, colors: ['#f59e0b', '#22c55e', '#6366f1'] });
+        }
+
+        /* Update local star count */
+        setGames((prev) =>
+          prev.map((g) =>
+            g.gameId === gameId ? { ...g, stars: Math.max(g.stars, stars), bestScore: res.attempt.best_score } : g,
+          ),
+        );
+      } catch {
+        /* Silently fall back – still update local XP */
+        incrementXP(stars * 5);
+        setXpFloat({ amount: stars * 5, key: Date.now() });
+        setTimeout(() => setXpFloat(null), 1600);
+        setGames((prev) =>
+          prev.map((g) => (g.gameId === gameId ? { ...g, stars: Math.max(g.stars, stars) } : g)),
+        );
+      }
+    },
+    [incrementXP],
+  );
+
+  /* ───────────── Gallery View ───────────── */
+
+  const renderGallery = () => {
+    if (loading) {
+      return (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="bento-card border border-amber-100/50 flex flex-col gap-4 p-5" style={{ minHeight: 160 }}>
+              <div className="skeleton-pulse w-16 h-16 rounded-2xl" />
+              <div className="skeleton-pulse w-24 h-3 rounded-full" />
+              <div className="skeleton-pulse w-16 h-3 rounded-full" />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (games.length === 0) {
+      return (
+        <div className="bento-card border border-dashed border-amber-200 bg-amber-50/30 p-12 text-center flex flex-col items-center gap-4">
+          <span className="text-6xl">🦉</span>
+          <h3 className="font-display font-black text-lg text-amber-900">New games coming soon!</h3>
+          <p className="text-xs text-amber-700">Check back later to play and collect stars.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col gap-8">
+        {/* Regular games */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+          {games.map((game) => (
+          <button
+            key={game.gameId}
+            disabled={game.locked}
+            onClick={() => !game.locked && setActiveGame(game)}
+            className={`bento-card border border-amber-100/50 bg-white flex flex-col items-center justify-center gap-3 p-5 select-none relative overflow-hidden card-bounce-tap cursor-pointer
+              ${game.locked ? 'opacity-40 cursor-not-allowed' : 'card-interactive'}`}
+            style={{ minHeight: 140, minWidth: 120, borderRadius: '1.5rem' }}
+          >
+            {/* Locked overlay */}
+            {game.locked && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/60 z-10 rounded-3xl">
+                <span className="text-4xl">🔒</span>
+              </div>
+            )}
+
+            {/* Big icon */}
+            <span className="text-5xl leading-none">{game.icon}</span>
+
+            {/* Star rating */}
+            {!game.locked && (
+              <div className="flex gap-0.5">
+                {[1, 2, 3].map((n) => (
+                  <Star
+                    key={n}
+                    size={16}
+                    className={n <= game.stars ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Text label – only for early-readers */}
+            {!isPreReader && (
+              <h4 className="font-display font-bold text-xs text-slate-700 text-center leading-tight mt-0.5">
+                {game.name}
+              </h4>
+            )}
+
+            {/* Subject badge */}
+            {!isPreReader && (
+              <span className="badge pill-amber text-[8px] font-black">{game.subject}</span>
+            )}
+          </button>
+        ))}
+        </div>
+
+        {/* Challenge games – only show if student has mastered skills */}
+        {challengeGames.length > 0 && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🚀</span>
+              {!isPreReader && (
+                <h3 className="font-display font-black text-lg text-amber-900">Challenge Section</h3>
+              )}
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+              {challengeGames.map((game) => (
+                <button
+                  key={game.gameId}
+                  onClick={() => !game.locked && setActiveGame(game)}
+                  className={`bento-card border border-amber-100/50 bg-gradient-to-br from-white to-amber-50/30 flex flex-col items-center justify-center gap-3 p-5 select-none cursor-pointer card-bounce-tap
+                    ${game.locked ? 'opacity-40 cursor-not-allowed' : 'card-interactive'}`}
+                  style={{ minHeight: 140, minWidth: 120, borderRadius: '1.5rem' }}
+                >
+                  <span className="text-5xl leading-none">{game.icon}</span>
+                  {!isPreReader && (
+                    <h4 className="font-display font-bold text-xs text-slate-700 text-center leading-tight">
+                      {game.name}
+                    </h4>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  /* ───────────── Render engine view ───────────── */
+
+  const renderActiveGame = () => {
+    if (!activeGame) return null;
+
+    switch (activeGame.engine) {
+      case 'count-add':
+        return <CountAddEngine game={activeGame} numChoices={numChoices} isPreReader={isPreReader} onFinish={submitAttempt} />;
+      case 'letter-trace':
+        return <LetterTraceEngine game={activeGame} isPreReader={isPreReader} onFinish={submitAttempt} />;
+      case 'phonics-pop':
+        return <PhonicsPopEngine game={activeGame} numChoices={numChoices} isPreReader={isPreReader} onFinish={submitAttempt} />;
+      default:
+        return (
+          <div className="text-center py-12 anim-fade-up">
+            <span className="text-5xl">{activeGame.icon}</span>
+            <p className="font-display font-bold text-slate-500 mt-4">Coming soon!</p>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-6 font-sans select-none anim-fade-up relative">
+      {/* XP float animation */}
+      {xpFloat && (
+        <div
+          key={xpFloat.key}
+          className="animate-xp-float fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-amber-400 text-white font-display font-black text-lg px-5 py-2 rounded-full shadow-lg"
+        >
+          +{xpFloat.amount} XP
+        </div>
+      )}
+
+      {activeGame ? (
+        /* ── Active game wrapper ── */
+        <div className="bg-white border border-amber-100 rounded-3xl p-6 md:p-8 shadow-md anim-fade-up">
+          {/* Header bar */}
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
+            <button
+              onClick={() => setActiveGame(null)}
+              className="flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-5 py-2.5 shadow-md shadow-amber-400/20 transition-all cursor-pointer"
+              style={{ minHeight: 44, minWidth: 64 }}
+            >
+              <ArrowLeft size={18} strokeWidth={3} />
+              {!isPreReader && <span>Back</span>}
+            </button>
+            <span className="badge pill-amber text-[10px] font-black">ACTIVE PLAY</span>
+          </div>
+
+          {renderActiveGame()}
+        </div>
+      ) : (
+        /* ── Gallery ── */
+        renderGallery()
+      )}
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   ENGINE: COUNT & ADD
+   ═══════════════════════════════════════════════════════════ */
+
+interface EngineProps {
+  game: GameItem;
+  numChoices: number;
+  isPreReader: boolean;
+  onFinish: (gameId: string, stars: number, score: number) => void;
+}
+
+const CountAddEngine: React.FC<EngineProps> = ({ game, numChoices, isPreReader, onFinish }) => {
+  const maxVal = game.params.max ?? 9;
+  const ops = game.params.ops ?? ['+'];
+
+  const [round, setRound] = useState(0);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [left, setLeft] = useState(0);
+  const [right, setRight] = useState(0);
+  const [op, setOp] = useState('+');
+  const [answer, setAnswer] = useState(0);
+  const [options, setOptions] = useState<number[]>([]);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
+  const [finished, setFinished] = useState(false);
+
+  const TOTAL_ROUNDS = 5;
+
+  const generateProblem = useCallback(() => {
+    const chosenOp = ops[Math.floor(Math.random() * ops.length)];
+    let a: number, b: number, ans: number;
+
+    if (chosenOp === '-') {
+      a = Math.floor(Math.random() * maxVal) + 1;
+      b = Math.floor(Math.random() * a) + 1; // ensure b <= a so answer >= 0
+      ans = a - b;
+    } else {
+      a = Math.floor(Math.random() * maxVal) + 1;
+      b = Math.floor(Math.random() * maxVal) + 1;
+      ans = a + b;
+    }
+
+    setLeft(a);
+    setRight(b);
+    setOp(chosenOp);
+    setAnswer(ans);
+    setSelected(null);
+    setFeedback(null);
+
+    /* Generate unique options */
+    const optSet = new Set<number>([ans]);
+    let tries = 0;
+    while (optSet.size < numChoices && tries < 50) {
+      const offset = Math.floor(Math.random() * 5) - 2;
+      const candidate = ans + offset;
+      if (candidate >= 0 && candidate !== ans) optSet.add(candidate);
+      tries++;
+    }
+    /* Fill if not enough */
+    while (optSet.size < numChoices) {
+      optSet.add(ans + optSet.size);
+    }
+    setOptions(Array.from(optSet).sort(() => Math.random() - 0.5));
+  }, [maxVal, ops, numChoices]);
+
+  useEffect(() => {
+    generateProblem();
+  }, [generateProblem]);
+
+  const handleSelect = (val: number) => {
+    if (selected !== null) return;
+    setSelected(val);
+
+    if (val === answer) {
+      setFeedback('correct');
+      const newCorrect = correctCount + 1;
+      setCorrectCount(newCorrect);
+      confetti({ particleCount: 25, spread: 30, origin: { y: 0.7 } });
+
+      if (round + 1 >= TOTAL_ROUNDS) {
+        setTimeout(() => {
+          const earned = starsForCountAdd(newCorrect);
+          setFinished(true);
+          onFinish(game.gameId, earned, newCorrect);
+          if (earned >= 2) {
+            confetti({ particleCount: 80, spread: 60, colors: ['#f59e0b', '#22c55e', '#6366f1'] });
+          }
+        }, 1200);
+      } else {
+        setTimeout(() => {
+          setRound((r) => r + 1);
+          generateProblem();
+        }, 1400);
+      }
+    } else {
+      setFeedback('wrong');
+      if (round + 1 >= TOTAL_ROUNDS) {
+        setTimeout(() => {
+          const newCorrect2 = correctCount; // wrong answer, no increment
+          const earned = starsForCountAdd(newCorrect2);
+          setFinished(true);
+          onFinish(game.gameId, earned, newCorrect2);
+        }, 1500);
+      } else {
+        setTimeout(() => {
+          setRound((r) => r + 1);
+          generateProblem();
+        }, 2000);
+      }
+    }
+  };
+
+  const handlePlayAgain = () => {
+    setRound(0);
+    setCorrectCount(0);
+    setFinished(false);
+    generateProblem();
+  };
+
+  if (finished) {
+    const earned = starsForCountAdd(correctCount);
+    return (
+      <div className="flex flex-col items-center gap-5 py-10 anim-fade-up">
+        <span className="text-6xl">🏆</span>
+        <div className="flex gap-1">
+          {[1, 2, 3].map((n) => (
+            <Star key={n} size={32} className={n <= earned ? 'fill-amber-400 text-amber-400' : 'text-slate-200'} />
+          ))}
+        </div>
+        {!isPreReader && (
+          <p className="font-display font-bold text-slate-600 text-sm">
+            {correctCount} / {TOTAL_ROUNDS} correct
+          </p>
+        )}
+        <button
+          onClick={handlePlayAgain}
+          className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer"
+          style={{ minHeight: 48, minWidth: 120 }}
+        >
+          🔄 {isPreReader ? '' : 'Play Again'}
+        </button>
+      </div>
+    );
+  }
+
+  const opEmoji = op === '-' ? '➖' : '➕';
+  const emojiItem = op === '-' ? '🌟' : '⭐';
+
+  return (
+    <div className="flex flex-col items-center gap-6 max-w-lg mx-auto anim-fade-up">
+      {/* Progress dots */}
+      <div className="flex gap-2">
+        {Array.from({ length: TOTAL_ROUNDS }).map((_, i) => (
+          <div
+            key={i}
+            className={`w-3.5 h-3.5 rounded-full transition-all ${
+              i < round ? 'bg-emerald-400' : i === round ? 'bg-amber-400 scale-125' : 'bg-slate-200'
+            }`}
+          />
+        ))}
+      </div>
+
+      {/* Visual equation – emoji items */}
+      <div className="flex items-center gap-5 bg-amber-50/60 border border-amber-100 p-6 rounded-3xl select-none">
+        <div className="grid grid-cols-3 gap-1 min-h-[64px] items-center justify-items-center">
+          {Array.from({ length: left }).map((_, i) => (
+            <span key={'l' + i} className="text-3xl" style={{ animationDelay: `${i * 80}ms` }}>
+              {emojiItem}
+            </span>
+          ))}
+        </div>
+        <span className="text-3xl">{opEmoji}</span>
+        <div className="grid grid-cols-3 gap-1 min-h-[64px] items-center justify-items-center">
+          {Array.from({ length: right }).map((_, i) => (
+            <span key={'r' + i} className="text-3xl" style={{ animationDelay: `${i * 80}ms` }}>
+              {emojiItem}
+            </span>
+          ))}
+        </div>
+        <span className="font-display font-black text-3xl text-slate-400">=</span>
+        <span className="font-display font-black text-4xl text-amber-500">?</span>
+      </div>
+
+      {/* Answer buttons */}
+      <div className="flex gap-4 flex-wrap justify-center">
+        {options.map((opt) => {
+          const isSelected = selected === opt;
+          const isCorrectOpt = opt === answer;
+          let cls =
+            'bg-white border-2 border-slate-200 hover:border-amber-300 text-slate-700';
+          let extraStyle: React.CSSProperties = {};
+
+          if (selected !== null) {
+            if (isCorrectOpt) {
+              cls = 'bg-emerald-500 border-2 border-emerald-500 text-white animate-glow-green';
+              extraStyle = { transform: 'scale(1.15)' };
+            } else if (isSelected && !isCorrectOpt) {
+              cls = 'bg-red-400 border-2 border-red-400 text-white animate-game-shake opacity-50';
+            } else {
+              cls = 'bg-slate-100 border-2 border-slate-100 text-slate-300';
+            }
+          }
+
+          // Pulse correct answer after wrong selection
+          if (selected !== null && feedback === 'wrong' && isCorrectOpt) {
+            cls += ' animate-pulse-hint';
+          }
+
+          return (
+            <button
+              key={opt}
+              onClick={() => handleSelect(opt)}
+              disabled={selected !== null}
+              className={`w-16 h-16 rounded-2xl font-display font-extrabold text-2xl flex items-center justify-center transition-all cursor-pointer shadow-sm ${cls}`}
+              style={{ minWidth: 64, minHeight: 64, ...extraStyle }}
+            >
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   ENGINE: LETTER TRACE
+   ═══════════════════════════════════════════════════════════ */
+
+interface TraceProps {
+  game: GameItem;
+  isPreReader: boolean;
+  onFinish: (gameId: string, stars: number, score: number) => void;
+}
+
+const LetterTraceEngine: React.FC<TraceProps> = ({ game, isPreReader, onFinish }) => {
+  const lettersRaw = game.params.letters ?? ['A'];
+  const letterCase = game.params.case ?? 'upper';
+  const letters = lettersRaw.map((l) => (letterCase === 'lower' ? l.toLowerCase() : l.toUpperCase()));
+
+  const [letterIndex, setLetterIndex] = useState(0);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [tracingFinished, setTracingFinished] = useState(false);
+  const [traceDone, setTraceDone] = useState(false);
+  const [allDone, setAllDone] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Initialize canvas with dotted guideline
-  const initCanvas = () => {
+  const currentLetter = letters[letterIndex] ?? letters[0];
+
+  const initCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Clear
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    setTracingFinished(false);
+    setTraceDone(false);
 
-    // Draw dotted 'A' guideline
-    ctx.font = 'bold 240px Outfit, sans-serif';
+    /* Dotted guide letter */
+    ctx.font = 'bold 200px Outfit, sans-serif';
     ctx.strokeStyle = '#e2e8f0';
     ctx.lineWidth = 4;
     ctx.setLineDash([8, 8]);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.strokeText('A', canvas.width / 2, canvas.height / 2);
+    ctx.strokeText(currentLetter, canvas.width / 2, canvas.height / 2);
 
-    // Reset settings for drawing
     ctx.setLineDash([]);
     ctx.strokeStyle = '#f59e0b';
     ctx.lineWidth = 14;
     ctx.lineCap = 'round';
-  };
+  }, [currentLetter]);
 
   useEffect(() => {
-    if (activeGameId === 'alphabet-tracing') {
-      setTimeout(initCanvas, 50); // Wait for canvas element render
-    }
-  }, [activeGameId]);
+    const timer = setTimeout(initCanvas, 60);
+    return () => clearTimeout(timer);
+  }, [initCanvas, letterIndex]);
 
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  /* ── Drawing helpers (shared by mouse + touch) ── */
+  const getCanvasCoords = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
+    if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+  };
 
+  const beginStroke = (x: number, y: number) => {
+    const ctx = canvasRef.current?.getContext('2d');
+    if (!ctx) return;
     ctx.beginPath();
     ctx.moveTo(x, y);
     setIsDrawing(true);
   };
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const continueStroke = (x: number, y: number) => {
     if (!isDrawing) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvasRef.current?.getContext('2d');
     if (!ctx) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
     ctx.lineTo(x, y);
     ctx.stroke();
   };
 
-  const stopDrawing = () => {
-    setIsDrawing(false);
+  const endStroke = () => setIsDrawing(false);
+
+  /* ── Mouse events ── */
+  const onMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const coords = getCanvasCoords(e.clientX, e.clientY);
+    if (coords) beginStroke(coords.x, coords.y);
+  };
+  const onMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const coords = getCanvasCoords(e.clientX, e.clientY);
+    if (coords) continueStroke(coords.x, coords.y);
   };
 
-  const finishTracing = () => {
-    setTracingFinished(true);
-    incrementXP(40);
-    confetti({
-      particleCount: 50,
-      spread: 40
-    });
+  /* ── Touch events ── */
+  const onTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    if (!touch) return;
+    const coords = getCanvasCoords(touch.clientX, touch.clientY);
+    if (coords) beginStroke(coords.x, coords.y);
+  };
+  const onTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    if (!touch) return;
+    const coords = getCanvasCoords(touch.clientX, touch.clientY);
+    if (coords) continueStroke(coords.x, coords.y);
+  };
+  const onTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    endStroke();
   };
 
-  /* ----------------------------------------------------
-     GAME 2: PHONICS POP
-  ---------------------------------------------------- */
-  const [phonicsScore, setPhonicsScore] = useState(0);
-  const [phonicsBalloons, setPhonicsBalloons] = useState<{ id: number; char: string; x: number; y: number; color: string }[]>([]);
-  const [phonicsPrompt, setPhonicsPrompt] = useState('A'); // Sound: 'Ah'
-  const [phonicsFinished, setPhonicsFinished] = useState(false);
+  /* ── Verify / Next ── */
+  const handleVerify = () => {
+    setTraceDone(true);
+    confetti({ particleCount: 40, spread: 40 });
 
-  const initPhonics = () => {
-    setPhonicsScore(0);
-    setPhonicsFinished(false);
-    generateBalloons('A');
-  };
-
-  const generateBalloons = (correctChar: string) => {
-    setPhonicsPrompt(correctChar);
-    const pool = ['A', 'B', 'C', 'D', 'E', 'F'];
-    const colors = ['bg-rose-400', 'bg-sky-400', 'bg-amber-400', 'bg-emerald-400', 'bg-purple-400', 'bg-indigo-400'];
-
-    const newBalloons = [];
-    for (let i = 0; i < 6; i++) {
-      const char = i === 0 ? correctChar : pool.filter(c => c !== correctChar)[Math.floor(Math.random() * 5)];
-      newBalloons.push({
-        id: Math.random() + i,
-        char,
-        x: 10 + Math.random() * 80, // percentage left
-        y: 20 + Math.random() * 60, // percentage top
-        color: colors[Math.floor(Math.random() * colors.length)]
-      });
-    }
-
-    // Shuffle balloons
-    setPhonicsBalloons(newBalloons.sort(() => Math.random() - 0.5));
-  };
-
-  useEffect(() => {
-    if (activeGameId === 'phonics-pop') {
-      initPhonics();
-    }
-  }, [activeGameId]);
-
-  const handlePopBalloon = (char: string, id: number) => {
-    if (char === phonicsPrompt) {
-      setPhonicsScore(prev => prev + 1);
-      setPhonicsBalloons(prev => prev.filter(b => b.id !== id));
-      
-      confetti({
-        particleCount: 20,
-        spread: 30,
-        colors: ['#3b82f6', '#f59e0b', '#ef4444']
-      });
-
-      if (phonicsScore + 1 >= 5) {
-        setPhonicsFinished(true);
-        incrementXP(50);
-      } else {
-        // Generate next prompt
-        const prompts = ['B', 'C', 'D', 'E', 'F'];
-        const nextPrompt = prompts[phonicsScore % prompts.length];
-        setTimeout(() => generateBalloons(nextPrompt), 400);
-      }
+    if (letterIndex + 1 >= letters.length) {
+      /* All letters traced – 3 stars always */
+      setAllDone(true);
+      onFinish(game.gameId, 3, letters.length);
+      confetti({ particleCount: 100, spread: 70, colors: ['#f59e0b', '#22c55e', '#3b82f6'] });
     }
   };
 
-  /* ----------------------------------------------------
-     GAME 3: COUNT & ADD STARS
-  ---------------------------------------------------- */
-  const [countScore, setCountScore] = useState(0);
-  const [countLeftStars, setCountLeftStars] = useState(3);
-  const [countRightStars, setCountRightStars] = useState(2);
-  const [countOptions, setCountOptions] = useState<number[]>([]);
-  const [countSelected, setCountSelected] = useState<number | null>(null);
-  const [countFeedback, setCountFeedback] = useState<'correct' | 'wrong' | null>(null);
-  const [countFinished, setCountFinished] = useState(false);
-
-  const initCountGame = () => {
-    setCountScore(0);
-    setCountFinished(false);
-    generateAddSum();
+  const handleNext = () => {
+    setLetterIndex((i) => i + 1);
   };
 
-  const generateAddSum = () => {
-    setCountSelected(null);
-    setCountFeedback(null);
-
-    const left = Math.floor(Math.random() * 4) + 1; // 1 to 4
-    const right = Math.floor(Math.random() * 4) + 1; // 1 to 4
-    setCountLeftStars(left);
-    setCountRightStars(right);
-
-    const total = left + right;
-    const optionsPool = [total, total + 1, total - 1, total + 2].filter(n => n > 0 && n <= 10);
-    // Unique options
-    const uniqueOpts = Array.from(new Set(optionsPool)).slice(0, 3);
-    if (!uniqueOpts.includes(total)) uniqueOpts[0] = total;
-
-    setCountOptions(uniqueOpts.sort(() => Math.random() - 0.5));
+  const handlePlayAgain = () => {
+    setLetterIndex(0);
+    setAllDone(false);
+    setTraceDone(false);
   };
 
-  useEffect(() => {
-    if (activeGameId === 'count-and-add') {
-      initCountGame();
-    }
-  }, [activeGameId]);
-
-  const handleSelectCount = (val: number) => {
-    const total = countLeftStars + countRightStars;
-    setCountSelected(val);
-
-    if (val === total) {
-      setCountFeedback('correct');
-      setCountScore(prev => prev + 1);
-      confetti({
-        particleCount: 15,
-        spread: 20
-      });
-
-      if (countScore + 1 >= 5) {
-        setTimeout(() => {
-          setCountFinished(true);
-          incrementXP(50);
-        }, 1200);
-      } else {
-        setTimeout(generateAddSum, 1500);
-      }
-    } else {
-      setCountFeedback('wrong');
-    }
-  };
+  if (allDone) {
+    return (
+      <div className="flex flex-col items-center gap-5 py-10 anim-fade-up">
+        <span className="text-6xl">✨</span>
+        <div className="flex gap-1">
+          {[1, 2, 3].map((n) => (
+            <Star key={n} size={32} className="fill-amber-400 text-amber-400" />
+          ))}
+        </div>
+        {!isPreReader && (
+          <p className="font-display font-bold text-slate-600 text-sm">
+            All {letters.length} letters traced!
+          </p>
+        )}
+        <button
+          onClick={handlePlayAgain}
+          className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer"
+          style={{ minHeight: 48 }}
+        >
+          🔄 {isPreReader ? '' : 'Play Again'}
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-6 font-sans select-none anim-fade-up">
-      {activeGameId ? (
-        /* ACTIVE GAME WRAPPER */
-        <div className="bg-white border border-amber-100 rounded-3xl p-6 md:p-8 shadow-md">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
+    <div className="flex flex-col items-center gap-5 max-w-md mx-auto anim-fade-up">
+      {/* Letter progress */}
+      <div className="flex gap-2">
+        {letters.map((l, i) => (
+          <div
+            key={i}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center font-display font-bold text-sm transition-all ${
+              i < letterIndex
+                ? 'bg-emerald-400 text-white'
+                : i === letterIndex
+                ? 'bg-amber-400 text-white scale-110'
+                : 'bg-slate-100 text-slate-400'
+            }`}
+          >
+            {l}
+          </div>
+        ))}
+      </div>
+
+      {/* Canvas */}
+      <div
+        className="border-2 border-amber-200 rounded-3xl overflow-hidden bg-amber-50/30 shadow-inner relative"
+        style={{ touchAction: 'none' }}
+      >
+        <canvas
+          ref={canvasRef}
+          width={340}
+          height={340}
+          onMouseDown={onMouseDown}
+          onMouseMove={onMouseMove}
+          onMouseUp={endStroke}
+          onMouseLeave={endStroke}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          className="cursor-crosshair block w-full h-auto"
+          style={{ maxWidth: 340 }}
+        />
+      </div>
+
+      {/* Buttons */}
+      <div className="flex gap-3 w-full max-w-xs">
+        <button
+          onClick={initCanvas}
+          className="flex-1 py-3 border-2 border-slate-200 hover:bg-slate-50 text-slate-500 font-display font-bold text-sm rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-all"
+          style={{ minHeight: 48 }}
+        >
+          🔄
+        </button>
+
+        {traceDone && letterIndex + 1 < letters.length ? (
+          <button
+            onClick={handleNext}
+            className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-display font-bold text-sm rounded-2xl flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all animate-glow-green"
+            style={{ minHeight: 48 }}
+          >
+            ✅ {isPreReader ? '→' : 'Next'}
+          </button>
+        ) : (
+          <button
+            onClick={handleVerify}
+            disabled={traceDone}
+            className="flex-1 py-3 bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-2xl flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all disabled:opacity-40"
+            style={{ minHeight: 48 }}
+          >
+            {traceDone ? '✅' : '✓'}
+            {!isPreReader && (traceDone ? ' Done!' : ' Check')}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   ENGINE: PHONICS POP (silent-lab — emoji + letter match)
+   ═══════════════════════════════════════════════════════════ */
+
+const PhonicsPopEngine: React.FC<EngineProps> = ({ game, numChoices, isPreReader, onFinish }) => {
+  const pairs = game.params.pairs ?? [
+    { emoji: '🍎', letter: 'A' },
+    { emoji: '🐻', letter: 'B' },
+    { emoji: '🐱', letter: 'C' },
+    { emoji: '🐶', letter: 'D' },
+    { emoji: '🐘', letter: 'E' },
+  ];
+
+  const TOTAL_ROUNDS = Math.min(pairs.length, 5);
+
+  const [round, setRound] = useState(0);
+  const [mistakes, setMistakes] = useState(0);
+  const [finished, setFinished] = useState(false);
+  const [balloons, setBalloons] = useState<{ id: number; letter: string; x: number; y: number; color: string; popped: boolean; shake: boolean }[]>([]);
+  const [promptPair, setPromptPair] = useState(pairs[0]);
+
+  const BALLOON_COLORS = [
+    'bg-rose-400', 'bg-sky-400', 'bg-amber-400',
+    'bg-emerald-400', 'bg-purple-400', 'bg-indigo-400',
+    'bg-pink-400', 'bg-teal-400',
+  ];
+
+  const generateBalloons = useCallback(
+    (pairIdx: number) => {
+      const target = pairs[pairIdx];
+      setPromptPair(target);
+
+      const allLetters = pairs.map((p) => p.letter);
+      const pool = allLetters.filter((l) => l !== target.letter);
+
+      const items: typeof balloons = [];
+
+      /* Add correct balloon */
+      items.push({
+        id: Date.now(),
+        letter: target.letter,
+        x: 10 + Math.random() * 70,
+        y: 10 + Math.random() * 65,
+        color: BALLOON_COLORS[Math.floor(Math.random() * BALLOON_COLORS.length)],
+        popped: false,
+        shake: false,
+      });
+
+      /* Add distractors */
+      const count = numChoices - 1;
+      for (let i = 0; i < count; i++) {
+        const letter = pool.length > 0 ? pool[i % pool.length] : String.fromCharCode(65 + ((i + 3) % 26));
+        items.push({
+          id: Date.now() + i + 1,
+          letter,
+          x: 10 + Math.random() * 70,
+          y: 10 + Math.random() * 65,
+          color: BALLOON_COLORS[Math.floor(Math.random() * BALLOON_COLORS.length)],
+          popped: false,
+          shake: false,
+        });
+      }
+
+      setBalloons(items.sort(() => Math.random() - 0.5));
+    },
+    [pairs, numChoices],
+  );
+
+  useEffect(() => {
+    generateBalloons(0);
+  }, [generateBalloons]);
+
+  const handlePop = (balloon: typeof balloons[0]) => {
+    if (balloon.popped) return;
+
+    if (balloon.letter === promptPair.letter) {
+      /* Correct */
+      setBalloons((prev) =>
+        prev.map((b) => (b.id === balloon.id ? { ...b, popped: true } : b)),
+      );
+      confetti({ particleCount: 20, spread: 30, origin: { y: 0.6 } });
+
+      const nextRound = round + 1;
+      if (nextRound >= TOTAL_ROUNDS) {
+        setTimeout(() => {
+          const earned = starsForPhonicsPop(mistakes);
+          setFinished(true);
+          onFinish(game.gameId, earned, TOTAL_ROUNDS - mistakes);
+          if (earned >= 2) {
+            confetti({ particleCount: 80, spread: 60 });
+          }
+        }, 800);
+      } else {
+        setTimeout(() => {
+          setRound(nextRound);
+          generateBalloons(nextRound);
+        }, 900);
+      }
+    } else {
+      /* Wrong – shake + dim */
+      setMistakes((m) => m + 1);
+      setBalloons((prev) =>
+        prev.map((b) =>
+          b.id === balloon.id ? { ...b, shake: true } : b,
+        ),
+      );
+      /* Reset shake after animation */
+      setTimeout(() => {
+        setBalloons((prev) =>
+          prev.map((b) => (b.id === balloon.id ? { ...b, shake: false } : b)),
+        );
+      }, 600);
+    }
+  };
+
+  const handlePlayAgain = () => {
+    setRound(0);
+    setMistakes(0);
+    setFinished(false);
+    generateBalloons(0);
+  };
+
+  if (finished) {
+    const earned = starsForPhonicsPop(mistakes);
+    return (
+      <div className="flex flex-col items-center gap-5 py-10 anim-fade-up">
+        <span className="text-6xl">🎈</span>
+        <div className="flex gap-1">
+          {[1, 2, 3].map((n) => (
+            <Star key={n} size={32} className={n <= earned ? 'fill-amber-400 text-amber-400' : 'text-slate-200'} />
+          ))}
+        </div>
+        {!isPreReader && (
+          <p className="font-display font-bold text-slate-600 text-sm">
+            {TOTAL_ROUNDS - mistakes} / {TOTAL_ROUNDS} correct
+          </p>
+        )}
+        <button
+          onClick={handlePlayAgain}
+          className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer"
+          style={{ minHeight: 48 }}
+        >
+          🔄 {isPreReader ? '' : 'Play Again'}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-5 max-w-lg mx-auto anim-fade-up">
+      {/* Progress dots */}
+      <div className="flex gap-2">
+        {Array.from({ length: TOTAL_ROUNDS }).map((_, i) => (
+          <div
+            key={i}
+            className={`w-3.5 h-3.5 rounded-full transition-all ${
+              i < round ? 'bg-emerald-400' : i === round ? 'bg-amber-400 scale-125' : 'bg-slate-200'
+            }`}
+          />
+        ))}
+      </div>
+
+      {/* Emoji prompt – "What letter does this start with?" */}
+      <div className="bg-amber-50 border-2 border-amber-200 p-5 rounded-3xl flex flex-col items-center gap-2 select-none">
+        <span className="text-6xl">{promptPair.emoji}</span>
+        <span className="text-2xl text-amber-500">❓</span>
+      </div>
+
+      {/* Balloon field */}
+      <div
+        className="w-full bg-sky-50/50 border border-sky-100/30 rounded-3xl relative overflow-hidden"
+        style={{ height: 280 }}
+      >
+        {balloons.map((bal) => {
+          if (bal.popped) return null;
+
+          return (
             <button
-              onClick={() => setActiveGameId(null)}
-              className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+              key={bal.id}
+              onClick={() => handlePop(bal)}
+              className={`absolute flex items-center justify-center text-white font-display font-black text-xl cursor-pointer transition-all shadow-lg
+                ${bal.color}
+                ${bal.shake ? 'animate-game-shake opacity-50' : 'hover:scale-110'}`}
+              style={{
+                left: `${bal.x}%`,
+                top: `${bal.y}%`,
+                width: 64,
+                height: 80,
+                borderRadius: '50% 50% 50% 50% / 40% 40% 60% 60%',
+                minWidth: 64,
+                minHeight: 64,
+              }}
             >
-              <ArrowLeft size={16} />
-              Quit Game
+              {bal.letter}
             </button>
-            <span className="badge pill-amber text-[10px] font-black">ACTIVE PLAY</span>
-          </div>
-
-          {/* 1. ALPHABET TRACING GAME PANEL */}
-          {activeGameId === 'alphabet-tracing' && (
-            <div className="flex flex-col items-center gap-6 max-w-md mx-auto">
-              <div>
-                <h3 className="font-display font-black text-lg text-slate-800 text-center">Trace the Letter 'A'</h3>
-                <p className="font-sans text-xs text-slate-400 text-center mt-1">Draw inside the dotted guidelines on the board.</p>
-              </div>
-
-              <div className="border border-slate-200 rounded-2xl overflow-hidden bg-[#fafaf9] shadow-inner relative">
-                <canvas
-                  ref={canvasRef}
-                  width={340}
-                  height={340}
-                  onMouseDown={startDrawing}
-                  onMouseMove={draw}
-                  onMouseUp={stopDrawing}
-                  onMouseLeave={stopDrawing}
-                  className="cursor-crosshair block"
-                />
-              </div>
-
-              <div className="flex gap-3 w-full">
-                <button
-                  onClick={initCanvas}
-                  className="flex-1 py-3 border border-slate-200 hover:bg-slate-50 text-slate-600 font-sans font-bold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-all"
-                >
-                  <RefreshCw size={14} />
-                  Reset Board
-                </button>
-                <button
-                  onClick={finishTracing}
-                  disabled={tracingFinished}
-                  className="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-white font-sans font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-amber-500/10 transition-all disabled:opacity-50"
-                >
-                  {tracingFinished ? 'Well Done! +40 XP' : 'Verify Trace'}
-                </button>
-              </div>
-
-              {tracingFinished && (
-                <div className="text-center font-sans text-xs text-emerald-600 font-bold mt-2 animate-bounce">
-                  ✨ Perfect trace! You earned +40 XP bonus! ✨
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 2. PHONICS POP LETTER GAME PANEL */}
-          {activeGameId === 'phonics-pop' && (
-            <div className="flex flex-col items-center gap-6 max-w-lg mx-auto">
-              <div className="text-center">
-                <h3 className="font-display font-black text-lg text-slate-800">Phonics Balloon Pop!</h3>
-                <p className="font-sans text-xs text-slate-400 mt-1">Pop the balloons matching the sound target.</p>
-              </div>
-
-              {/* Phonics prompt sound block */}
-              <div className="bg-amber-50 border border-amber-100 p-4 px-8 rounded-2xl flex flex-col items-center gap-1.5 select-none animate-pulse">
-                <span className="font-sans text-[10px] font-bold text-amber-700">TAP THE BALLOON CONTAINING</span>
-                <span className="font-display font-extrabold text-4xl text-amber-500">{phonicsPrompt}</span>
-              </div>
-
-              {!phonicsFinished ? (
-                /* BALLOONS CONTAINER BOARD */
-                <div className="w-full h-80 bg-sky-50/50 border border-sky-100/30 rounded-3xl relative overflow-hidden my-2">
-                  {phonicsBalloons.map((bal) => (
-                    <button
-                      key={bal.id}
-                      onClick={() => handlePopBalloon(bal.char, bal.id)}
-                      className={`absolute w-12 h-16 rounded-full flex items-center justify-center text-white font-display font-black text-lg cursor-pointer hover:scale-110 shadow-md ${bal.color} animate-float`}
-                      style={{ 
-                        left: `${bal.x}%`, 
-                        top: `${bal.y}%`, 
-                        borderRadius: '50% 50% 50% 50% / 40% 40% 60% 60%' 
-                      }}
-                    >
-                      {bal.char}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                /* PHONICS FINISHED SCREEN */
-                <div className="text-center flex flex-col items-center gap-4 py-8 anim-fade-up">
-                  <span className="text-4xl select-none">🎈🎉</span>
-                  <h4 className="font-display font-black text-xl text-slate-800">You Popped All Balloons!</h4>
-                  <p className="font-sans text-xs text-slate-400">Awesome, your spelling/phonics ear is perfect.</p>
-                  <div className="bg-amber-50 border border-amber-100 p-3 px-6 rounded-xl text-xs font-bold text-amber-800 select-none">
-                    +50 XP Bonus Earned
-                  </div>
-                  <button
-                    onClick={initPhonics}
-                    className="py-2.5 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-sans font-bold text-xs shadow-md transition-all cursor-pointer"
-                  >
-                    Play Again
-                  </button>
-                </div>
-              )}
-
-              <div className="flex justify-between items-center w-full px-4 text-xs font-bold text-slate-500 select-none">
-                <span>Score: {phonicsScore} / 5</span>
-                <span>Goal: 5 pops</span>
-              </div>
-            </div>
-          )}
-
-          {/* 3. COUNT & ADD GAME PANEL */}
-          {activeGameId === 'count-and-add' && (
-            <div className="flex flex-col items-center gap-6 max-w-lg mx-auto">
-              <div className="text-center">
-                <h3 className="font-display font-black text-lg text-slate-800">Count & Add Stars</h3>
-                <p className="font-sans text-xs text-slate-400 mt-1">Count the stars on the left and right, then add them up!</p>
-              </div>
-
-              {!countFinished ? (
-                <div className="w-full flex flex-col gap-6 items-center">
-                  {/* Visual Equation display */}
-                  <div className="flex items-center gap-6 bg-slate-50 border border-slate-100 p-6 rounded-3xl shadow-inner select-none animate-fade-up">
-                    {/* Left stars */}
-                    <div className="grid grid-cols-2 gap-1.5 min-h-[60px] items-center">
-                      {Array.from({ length: countLeftStars }).map((_, i) => (
-                        <span key={i} className="text-3xl animate-bounce" style={{ animationDelay: `${i * 0.1}s` }}>⭐</span>
-                      ))}
-                    </div>
-                    
-                    <span className="font-display font-black text-3xl text-slate-400 font-sans">+</span>
-
-                    {/* Right stars */}
-                    <div className="grid grid-cols-2 gap-1.5 min-h-[60px] items-center">
-                      {Array.from({ length: countRightStars }).map((_, i) => (
-                        <span key={i} className="text-3xl animate-bounce" style={{ animationDelay: `${i * 0.1}s` }}>⭐</span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Math Formula prompt */}
-                  <div className="font-display font-bold text-xl text-slate-800">
-                    {countLeftStars} + {countRightStars} = ?
-                  </div>
-
-                  {/* Selector options */}
-                  <div className="flex gap-4">
-                    {countOptions.map((opt) => {
-                      const correct = countLeftStars + countRightStars;
-                      const isSelected = countSelected === opt;
-                      const isCorrect = opt === correct;
-
-                      let btnStyle = 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700';
-                      if (countSelected !== null) {
-                        if (isCorrect) btnStyle = 'bg-emerald-500 text-white border-transparent shadow-md shadow-emerald-500/10 scale-105';
-                        else if (isSelected) btnStyle = 'bg-red-500 text-white border-transparent shadow-md shadow-red-500/10';
-                        else btnStyle = 'opacity-30 border-slate-100 text-slate-400';
-                      }
-
-                      return (
-                        <button
-                          key={opt}
-                          onClick={() => handleSelectCount(opt)}
-                          disabled={countSelected !== null}
-                          className={`w-16 h-16 rounded-2xl border font-display font-extrabold text-2xl flex items-center justify-center transition-all cursor-pointer ${btnStyle}`}
-                        >
-                          {opt}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Feedback toast */}
-                  {countFeedback !== null && (
-                    <div className={`text-xs font-bold font-sans ${
-                      countFeedback === 'correct' ? 'text-emerald-600' : 'text-red-500'
-                    }`}>
-                      {countFeedback === 'correct' ? '🎉 Great job! Correct answer!' : '❌ Oops! Try counting again!'}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                /* COUNT FINISHED */
-                <div className="text-center flex flex-col items-center gap-4 py-8 anim-fade-up">
-                  <span className="text-4xl select-none">🔢🏆</span>
-                  <h4 className="font-display font-black text-xl text-slate-800">Math Star Completed!</h4>
-                  <p className="font-sans text-xs text-slate-400">You solved all addition counts perfectly.</p>
-                  <div className="bg-amber-50 border border-amber-100 p-3 px-6 rounded-xl text-xs font-bold text-amber-800 select-none">
-                    +50 XP Bonus Earned
-                  </div>
-                  <button
-                    onClick={initCountGame}
-                    className="py-2.5 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-sans font-bold text-xs shadow-md transition-all cursor-pointer"
-                  >
-                    Play Again
-                  </button>
-                </div>
-              )}
-
-              <div className="flex justify-between items-center w-full px-4 text-xs font-bold text-slate-500 select-none border-t border-slate-100 pt-4 mt-2">
-                <span>Score: {countScore} / 5</span>
-                <span>Goal: 5 stars</span>
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        /* GAMES LIST GALLERY VIEW */
-        <div className="flex flex-col gap-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {gamesData.map((game) => (
-              <div 
-                key={game.id}
-                className={`bento-card border border-amber-100/50 bg-white flex flex-col justify-between p-5 select-none ${
-                  game.locked ? 'opacity-50' : 'card-interactive'
-                }`}
-              >
-                <div className="flex justify-between items-start">
-                  <span className="text-3xl bg-slate-50 border border-slate-100 p-2.5 rounded-2xl block">
-                    {game.icon}
-                  </span>
-                  {/* Star scores */}
-                  {!game.locked && (
-                    <div className="flex gap-0.5 text-amber-500">
-                      {[1, 2, 3].map((num) => (
-                        <Star 
-                          key={num}
-                          size={12}
-                          className={num <= game.stars ? 'fill-amber-500' : 'text-slate-200'}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-3">
-                  <span className="badge pill-amber text-[8px] font-black">{game.subject}</span>
-                  <h4 className="font-display font-bold text-xs text-slate-800 mt-1">{game.name}</h4>
-                </div>
-
-                {game.locked ? (
-                  <button
-                    disabled
-                    className="w-full py-2 bg-slate-100 text-slate-400 font-sans font-bold text-[10px] rounded-lg mt-3"
-                  >
-                    🔒 Locked
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setActiveGameId(game.id)}
-                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-sans font-bold text-[10px] rounded-lg mt-3 shadow-xs cursor-pointer flex items-center justify-center gap-1 transition-all"
-                  >
-                    <Play size={10} className="fill-white" />
-                    Play Game
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 };
