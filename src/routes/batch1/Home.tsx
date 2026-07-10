@@ -1,71 +1,43 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { TodayPanel } from '../../components/shared/TodayPanel';
 import { LogOut } from 'lucide-react';
-import { api } from '../../lib/api';
+import { getClassTheme } from './theme';
 
 /**
- * Batch 1 Home — Island-map style with 5 huge picture tiles.
+ * Batch 1 Home — "Adventure Island".
  *
- * Design (BATCH1_UI_CONTENT_PLAN §2.1):
- * - NO sidebar. Home IS the navigation: 5 big tiles.
- * - Mascot greeting + XP/streak as pictures.
- * - TodayPanel only when a live session is active.
- * - Pre-reader variant (Class 1–2): tiles show only pictures, no words.
- * - Early-reader variant (Class 3–4): tiles show picture + one word.
- * - Per-class identity: mascot + accent color per class (1→egg, 2→rabbit, 3→fox, 4→owl).
+ * A scene, not a menu: the mascot greets the child in a speech bubble,
+ * XP/streak are shiny HUD chips, and six glossy 3D tiles bob gently and
+ * physically press down on tap. Pre-readers (Class 1–2) see pictures only;
+ * early readers (3–4) get one word under each picture.
  */
 
-interface HomeTile {
+interface Tile {
   emoji: string;
   label: string;
   href: string;
-  color: string;
-  hoverColor: string;
-  shadowColor: string;
-  delay: string;
+  from: string;
+  to: string;
+  shadow: string;
 }
 
-const TILES: HomeTile[] = [
-  { emoji: '📖', label: 'Stories',  href: '/batch1/stories',  color: 'bg-sky-400',     hoverColor: 'hover:bg-sky-500',     shadowColor: 'shadow-sky-400/30',     delay: '0ms' },
-  { emoji: '🎮', label: 'Games',   href: '/batch1/games',    color: 'bg-emerald-400', hoverColor: 'hover:bg-emerald-500', shadowColor: 'shadow-emerald-400/30', delay: '50ms' },
-  { emoji: '⭐', label: 'Quizzes', href: '/batch1/exams',    color: 'bg-amber-400',   hoverColor: 'hover:bg-amber-500',   shadowColor: 'shadow-amber-400/30',   delay: '100ms' },
-  { emoji: '✅', label: 'Tasks',   href: '/batch1/tasks',    color: 'bg-violet-400',  hoverColor: 'hover:bg-violet-500',  shadowColor: 'shadow-violet-400/30',  delay: '150ms' },
-  { emoji: '📚', label: 'Syllabus', href: '/batch1/syllabus', color: 'bg-orange-400',  hoverColor: 'hover:bg-orange-500',  shadowColor: 'shadow-orange-400/30',  delay: '200ms' },
-  { emoji: '🏆', label: 'My Stuff', href: '/batch1/my-stuff', color: 'bg-rose-400',   hoverColor: 'hover:bg-rose-500',    shadowColor: 'shadow-rose-400/30',    delay: '250ms' },
+const TILES: Tile[] = [
+  { emoji: '📖', label: 'Stories', href: '/batch1/stories', from: '#3FC0FF', to: '#1CA5F1', shadow: '#0E86CC' },
+  { emoji: '🎮', label: 'Games', href: '/batch1/games', from: '#74DE22', to: '#55C400', shadow: '#3F9C00' },
+  { emoji: '⭐', label: 'Quizzes', href: '/batch1/exams', from: '#FFD53E', to: '#FFBB00', shadow: '#DB9A00' },
+  { emoji: '✅', label: 'Tasks', href: '/batch1/tasks', from: '#B678FF', to: '#9A4DF6', shadow: '#7C31D6' },
+  { emoji: '🗺️', label: 'My Journey', href: '/batch1/syllabus', from: '#22D6C4', to: '#00BCAA', shadow: '#00988A' },
+  { emoji: '🏆', label: 'My Stuff', href: '/batch1/my-stuff', from: '#FF8FC0', to: '#FF62A5', shadow: '#E2418B' },
 ];
-
-interface ClassTheme {
-  mascot: string;
-  accentColor: string;
-  gradientFrom: string;
-  gradientTo: string;
-  headerBg: string;
-}
-
-const getClassTheme = (classNum: number): ClassTheme => {
-  switch (classNum) {
-    case 1:
-      return { mascot: '🐣', accentColor: 'yellow', gradientFrom: 'from-yellow-300', gradientTo: 'to-yellow-400', headerBg: 'bg-gradient-to-r from-yellow-300 via-yellow-50 to-yellow-300' };
-    case 2:
-      return { mascot: '🐰', accentColor: 'pink', gradientFrom: 'from-pink-300', gradientTo: 'to-pink-400', headerBg: 'bg-gradient-to-r from-pink-300 via-pink-50 to-pink-300' };
-    case 3:
-      return { mascot: '🦊', accentColor: 'orange', gradientFrom: 'from-orange-300', gradientTo: 'to-orange-400', headerBg: 'bg-gradient-to-r from-orange-300 via-orange-50 to-orange-300' };
-    case 4:
-      return { mascot: '🦉', accentColor: 'amber', gradientFrom: 'from-amber-400', gradientTo: 'to-amber-500', headerBg: 'bg-gradient-to-r from-amber-400 via-orange-50 to-amber-400' };
-    default:
-      return { mascot: '🦉', accentColor: 'amber', gradientFrom: 'from-amber-400', gradientTo: 'to-amber-500', headerBg: 'bg-gradient-to-r from-amber-400 via-orange-50 to-amber-400' };
-  }
-};
 
 export const Batch1Home: React.FC = () => {
   const { studentName, studentAvatar, studentXP, studentStreak, currentClass } = useApp();
   const { logout } = useAuth();
   const navigate = useNavigate();
 
-  // Chrome variant: pre-reader (Class 1-2) vs early-reader (Class 3-4)
   const isPreReader = currentClass <= 2;
   const theme = getClassTheme(currentClass);
 
@@ -75,97 +47,102 @@ export const Batch1Home: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col gap-5 select-none anim-fade-up">
-      {/* Header: mascot greeting + avatar + stats + logout */}
-      <div className="flex items-center justify-between">
-        {/* Left: avatar + greeting */}
-        <div className="flex items-center gap-3 sm:gap-4">
-          <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white border-2 flex items-center justify-center text-3xl sm:text-4xl shadow-md select-none animate-[bounce_2s_ease-in-out_infinite] ${
-            currentClass === 1 ? 'border-yellow-300' :
-            currentClass === 2 ? 'border-pink-300' :
-            currentClass === 3 ? 'border-orange-300' :
-            'border-amber-300'
-          }`}>
-            {studentAvatar}
+    <div className="flex flex-col gap-5 select-none anim-fade-up relative pb-16">
+      {/* ── HUD: mascot + speech bubble | chips + exit ── */}
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex items-end gap-3">
+          <div
+            className="w-20 h-20 rounded-3xl bg-white flex items-center justify-center text-5xl anim-bob-big"
+            style={{ boxShadow: '0 8px 0 rgba(20,90,140,.18)' }}
+          >
+            {studentAvatar || theme.mascot}
           </div>
-          <div>
-            <h1 className={`font-display font-black text-xl sm:text-2xl tracking-tight ${
-              currentClass === 1 ? 'text-yellow-950' :
-              currentClass === 2 ? 'text-pink-950' :
-              currentClass === 3 ? 'text-orange-950' :
-              'text-amber-950'
-            }`}>
-              {isPreReader ? `${theme.mascot} ${studentName}!` : `Hi ${studentName}!`}
-            </h1>
-            {!isPreReader && (
-              <p className={`text-xs font-bold mt-0.5 ${
-                currentClass === 1 ? 'text-yellow-700' :
-                currentClass === 2 ? 'text-pink-700' :
-                currentClass === 3 ? 'text-orange-700' :
-                'text-amber-700'
-              }`}>Ready to learn something fun? ✨</p>
-            )}
+          <div
+            className="relative bg-white rounded-2xl px-5 py-3 max-w-xs"
+            style={{ boxShadow: '0 6px 0 rgba(20,90,140,.14)' }}
+          >
+            <span
+              className="absolute -left-2 bottom-4 w-0 h-0 border-8 border-transparent border-r-white"
+              aria-hidden="true"
+            />
+            <div className="font-display font-black text-lg leading-tight" style={{ color: '#17425F' }}>
+              {isPreReader ? `${theme.mascot} ${studentName}!` : `Hi ${studentName}! Ready to play?`}
+            </div>
+            <div className="text-xs font-bold" style={{ color: '#7BA2BC' }}>
+              Class {currentClass} · {theme.teamName}
+            </div>
           </div>
         </div>
 
-        {/* Right: XP + streak chips + logout */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* XP chip */}
-          <div className={`flex items-center gap-1.5 text-white rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5 shadow-md ${
-            currentClass === 1 ? 'bg-yellow-400 shadow-yellow-400/20' :
-            currentClass === 2 ? 'bg-pink-400 shadow-pink-400/20' :
-            currentClass === 3 ? 'bg-orange-400 shadow-orange-400/20' :
-            'bg-amber-400 shadow-amber-400/20'
-          }`}>
-            <span className="text-lg sm:text-xl">⭐</span>
-            <span className="font-display font-black text-sm sm:text-base">{studentXP.toLocaleString()}</span>
+        <div className="flex items-center gap-2.5">
+          <div
+            className="flex items-center gap-2 bg-white rounded-2xl px-4 py-2.5"
+            style={{ boxShadow: '0 5px 0 rgba(20,90,140,.16)' }}
+          >
+            <span className="text-xl">⭐</span>
+            <span>
+              <span className="block text-[9px] font-black tracking-widest leading-none" style={{ color: '#8FB4CB' }}>STARS</span>
+              <span className="font-display font-black text-lg leading-tight" style={{ color: '#17425F' }}>
+                {studentXP.toLocaleString()}
+              </span>
+            </span>
           </div>
-          {/* Streak chip */}
-          <div className="flex items-center gap-1.5 bg-orange-500 text-white rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5 shadow-md shadow-orange-500/20">
-            <span className="text-lg sm:text-xl">🔥</span>
-            <span className="font-display font-black text-sm sm:text-base">{studentStreak}</span>
+          <div
+            className="flex items-center gap-2 bg-white rounded-2xl px-4 py-2.5"
+            style={{ boxShadow: '0 5px 0 rgba(20,90,140,.16)' }}
+          >
+            <span className="text-xl">🔥</span>
+            <span>
+              <span className="block text-[9px] font-black tracking-widest leading-none" style={{ color: '#8FB4CB' }}>STREAK</span>
+              <span className="font-display font-black text-lg leading-tight" style={{ color: '#17425F' }}>
+                {studentStreak}
+              </span>
+            </span>
           </div>
-          {/* Logout button */}
           <button
             onClick={handleLogout}
-            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white/80 hover:bg-red-50 border border-slate-200
-                       flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 bg-white/60 hover:bg-white border-2 border-white/80 rounded-2xl
+                       px-3.5 py-3 font-bold text-sm cursor-pointer transition-colors"
+            style={{ color: '#3E6B87' }}
             aria-label="Log out"
           >
             <LogOut size={16} />
+            {!isPreReader && <span>Exit</span>}
           </button>
         </div>
       </div>
 
-      {/* TodayPanel — shows live session, pending tasks, open exams */}
-      <TodayPanel accent="amber" tasksHref="/batch1/tasks" examsHref="/batch1/exams" />
+      {/* ── Live session / today ── */}
+      <TodayPanel accent="sky" tasksHref="/batch1/tasks" examsHref="/batch1/exams" />
 
-      {/* 5 GIANT PICTURE TILES — the island map */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-5 mt-1">
-        {TILES.map((tile) => (
+      {/* ── The island: six glossy tiles ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-5 relative z-10">
+        {TILES.map((tile, i) => (
           <Link
             key={tile.href}
             to={tile.href}
-            className={`
-              ${tile.color} ${tile.hoverColor} ${tile.shadowColor}
-              rounded-3xl shadow-xl
-              flex flex-col items-center justify-center gap-2 sm:gap-3
-              min-h-[140px] sm:min-h-[180px]
-              p-4 sm:p-6
-              transition-all duration-200 ease-out
-              hover:scale-[1.04] active:scale-[0.97]
-              cursor-pointer select-none
-            `}
-            style={{ animationDelay: tile.delay }}
+            className="relative rounded-[30px] min-h-[150px] sm:min-h-[170px] flex flex-col items-center justify-center gap-2
+                       overflow-hidden cursor-pointer select-none transition-transform duration-150
+                       hover:-translate-y-1.5 hover:scale-[1.02] active:translate-y-1"
+            style={{
+              background: `linear-gradient(180deg, ${tile.from}, ${tile.to})`,
+              boxShadow: `0 8px 0 ${tile.shadow}, 0 16px 26px ${tile.to}59`,
+            }}
           >
-            {/* Big emoji */}
-            <span className="text-5xl sm:text-6xl drop-shadow-sm"
-                  style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}>
+            {/* glossy top light */}
+            <span
+              className="absolute top-0 left-0 right-0 h-[46%] pointer-events-none"
+              style={{ background: 'linear-gradient(180deg, rgba(255,255,255,.34), rgba(255,255,255,0))', borderRadius: '30px 30px 60% 60%' }}
+              aria-hidden="true"
+            />
+            <span
+              className="text-6xl anim-bob"
+              style={{ filter: 'drop-shadow(0 4px 4px rgba(0,0,0,.18))', animationDelay: `${(i % 3) * 0.4}s` }}
+            >
               {tile.emoji}
             </span>
-            {/* Label — hidden for pre-readers (Class 1-2) */}
             {!isPreReader && (
-              <span className="font-display font-black text-white text-base sm:text-lg tracking-wide drop-shadow-sm">
+              <span className="font-display font-black text-lg text-white tracking-wide" style={{ textShadow: '0 2px 3px rgba(0,0,0,.22)' }}>
                 {tile.label}
               </span>
             )}
@@ -173,15 +150,12 @@ export const Batch1Home: React.FC = () => {
         ))}
       </div>
 
-      {/* Mascot tip — only for early readers */}
-      {!isPreReader && (
-        <div className="flex items-center gap-3 bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-amber-200/40 mt-1">
-          <span className="text-3xl">🦉</span>
-          <p className="text-xs text-amber-800 font-bold">
-            Tap any picture to start! Collect stars ⭐ in every game.
-          </p>
-        </div>
-      )}
+      {/* ── Green hill at the bottom of the island ── */}
+      <div
+        className="absolute -bottom-10 -left-16 -right-16 h-28 pointer-events-none"
+        style={{ background: 'linear-gradient(180deg,#8FE06A,#6FCB47)', borderRadius: '50% 50% 0 0' }}
+        aria-hidden="true"
+      />
     </div>
   );
 };

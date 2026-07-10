@@ -34,6 +34,48 @@
   }
 }
 
+/* ── Adventure Island (Batch 1) animation kit ─────────────── */
+@keyframes island-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+@keyframes island-bob-big {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-10px) rotate(1deg); }
+}
+@keyframes island-drift {
+  from { transform: translateX(-120px); }
+  to { transform: translateX(110vw); }
+}
+@keyframes island-drift-rtl {
+  from { transform: translateX(110vw); }
+  to { transform: translateX(-160px); }
+}
+@keyframes island-pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(255, 200, 0, 0.55); }
+  70% { box-shadow: 0 0 0 18px rgba(255, 200, 0, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 200, 0, 0); }
+}
+@keyframes island-twinkle {
+  0%, 100% { opacity: 0.25; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+@keyframes island-wiggle {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+.anim-bob { animation: island-bob 3s ease-in-out infinite; }
+.anim-bob-big { animation: island-bob-big 3.4s ease-in-out infinite; }
+.anim-twinkle { animation: island-twinkle 3s ease-in-out infinite; }
+.anim-wiggle { animation: island-wiggle 2.6s ease-in-out infinite; }
+.anim-pulse-ring { animation: island-pulse-ring 2.2s infinite; }
+.cloud-drift { animation: island-drift 70s linear infinite; }
+.cloud-drift-rtl { animation: island-drift-rtl 95s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .anim-bob, .anim-bob-big, .anim-twinkle, .anim-wiggle, .anim-pulse-ring,
+  .cloud-drift, .cloud-drift-rtl { animation: none; }
+}
+
 /* Custom CSS Classes as specified in UI_FEATURES.md */
 
 .badge {

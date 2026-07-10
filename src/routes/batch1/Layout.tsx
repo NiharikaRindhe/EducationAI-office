@@ -1,17 +1,23 @@
 import React, { useEffect } from 'react';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { Sidebar, NavItem } from '../../components/shared/Sidebar';
-import { TopBar } from '../../components/shared/TopBar';
+import { useAuth } from '../../context/AuthContext';
 import { SessionEndWatcher } from '../../components/shared/SessionEndWatcher';
+import { LogOut } from 'lucide-react';
+import { getClassTheme } from './theme';
 
+/**
+ * Batch 1 Layout — "Adventure Island" shell for ages 6–9.
+ *
+ * The whole batch lives inside one scene: sky gradient, a slowly spinning
+ * sun, drifting clouds. Pages render on top of it. No sidebar, no topbar —
+ * inner pages get one giant 🏠 button; Home IS the navigation.
+ */
 export const Batch1Layout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  // ProtectedRoute already guarantees an authenticated student got here;
-  // this layout's own job is just making sure they're in the RIGHT batch
-  // (a Class 7 student navigating to /batch1/* shouldn't see Class 1-4 UI).
-  const { batchId, currentClass, studentAvatar, studentName } = useApp();
+  const { batchId, currentClass, studentName, studentAvatar } = useApp();
+  const { logout } = useAuth();
 
   useEffect(() => {
     if (currentClass < 1 || currentClass > 4) {
@@ -19,66 +25,91 @@ export const Batch1Layout: React.FC = () => {
     }
   }, [batchId, currentClass, navigate]);
 
-  const navItems: NavItem[] = [
-    { href: '/batch1/home', label: 'Home', iconName: 'home' },
-    { href: '/batch1/stories', label: 'Stories', iconName: 'menu_book' },
-    { href: '/batch1/exams', label: 'Mini Quizzes', iconName: 'star' },
-    { href: '/batch1/progress', label: 'My Progress', iconName: 'trending_up' },
-    { href: '/batch1/tasks', label: 'My Tasks', iconName: 'assignment_turned_in' },
-    { href: '/batch1/games', label: 'Games', iconName: 'sports_esports' },
-    { href: '/batch1/badges', label: 'Badges', iconName: 'military_tech' },
-    { href: '/batch1/show-and-tell', label: 'Show & Tell', iconName: 'mic' },
-    { href: '/batch1/streak', label: 'My Streak', iconName: 'local_fire_department' },
-    { href: '/batch1/profile', label: 'Profile', iconName: 'person' }
-  ];
-
-  // Map route path to page header titles
-  const getHeaderDetails = () => {
-    const path = location.pathname;
-    if (path.includes('/stories')) return { title: 'Story Reader', sub: 'Read stories, listen to narration, and take star quizzes!' };
-    if (path.includes('/exams')) return { title: 'Mini Quizzes & Tests', sub: 'Collect 3 stars in every quiz to show your skills!' };
-    if (path.includes('/progress')) return { title: 'My Progress Tracker', sub: 'Check your scores and activity levels this week.' };
-    if (path.includes('/tasks')) return { title: 'Task Manager', sub: 'Complete assigned tasks to earn bonus XP!' };
-    if (path.includes('/games')) return { title: 'Game Gallery', sub: 'Play interactive games to practice spelling & counting.' };
-    if (path.includes('/badges')) return { title: 'Badge Collection', sub: 'Unlock beautiful badges by completing lessons.' };
-    if (path.includes('/show-and-tell')) return { title: 'Vision AI Show & Tell', sub: 'Upload any object and get fun scientific facts!' };
-    if (path.includes('/streak')) return { title: 'Streak Heatmap', sub: 'Do not break your daily study streak calendar!' };
-    if (path.includes('/profile')) return { title: 'Student Profile', sub: 'Change your nickname or customize your emoji avatar.' };
-    return { title: 'Dashboard Home', sub: 'Welcome back! Ready to learn something new today?' };
-  };
-
-  const header = getHeaderDetails();
-
   if (currentClass < 1 || currentClass > 4) return null;
 
+  const theme = getClassTheme(currentClass);
+  const isHome = location.pathname.endsWith('/home') || location.pathname === '/batch1' || location.pathname === '/batch1/';
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
+
   return (
-    <div className="min-h-screen flex bg-slate-50/50">
+    <div
+      className="min-h-screen relative overflow-hidden flex flex-col"
+      style={{ background: 'linear-gradient(180deg,#5BC9FF 0%,#8ADAFF 34%,#C8F0FF 68%,#E9FAFF 100%)' }}
+    >
       <SessionEndWatcher />
-      {/* Sidebar Navigation */}
-      <Sidebar
-        navItems={navItems}
-        batchColor="amber"
-        logoText="EduAI"
-        logoIcon="sports_esports"
-      />
 
-      {/* Main content wrapper */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header TopBar */}
-        <TopBar 
-          greeting="Good morning,"
-          userName={studentName}
-          subtitle={header.sub}
-          batchColor="amber"
-          userAvatar={studentAvatar}
-          profileHref="/batch1/profile"
+      {/* ── Scene: sun + clouds (behind everything) ── */}
+      <div className="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
+        {/* Sun */}
+        <div
+          className="absolute top-6 right-10 w-20 h-20 rounded-full animate-spin-slow"
+          style={{
+            background: 'radial-gradient(circle at 35% 35%, #FFF6C9, #FFD93B 70%)',
+            boxShadow: '0 0 60px 22px rgba(255,217,59,.45)',
+          }}
         />
-
-        {/* Dynamic page container */}
-        <main className="flex-1 p-8 overflow-y-auto max-w-7xl w-full mx-auto">
-          <Outlet />
-        </main>
+        {/* Clouds */}
+        <div className="absolute top-16 left-0 cloud-drift">
+          <div className="relative w-28 h-8 bg-white/90 rounded-full">
+            <div className="absolute w-12 h-12 bg-white/90 rounded-full -top-6 left-4" />
+            <div className="absolute w-9 h-9 bg-white/90 rounded-full -top-4 left-14" />
+          </div>
+        </div>
+        <div className="absolute top-36 left-0 cloud-drift-rtl opacity-70">
+          <div className="relative w-20 h-6 bg-white rounded-full">
+            <div className="absolute w-9 h-9 bg-white rounded-full -top-4 left-3" />
+            <div className="absolute w-7 h-7 bg-white rounded-full -top-3 left-10" />
+          </div>
+        </div>
+        {/* Sparkles */}
+        <span className="absolute anim-twinkle text-lg" style={{ top: 90, left: '22%' }}>✦</span>
+        <span className="absolute anim-twinkle text-lg" style={{ top: 55, left: '55%', animationDelay: '1.2s' }}>✦</span>
+        <span className="absolute anim-twinkle text-lg" style={{ top: 140, left: '78%', animationDelay: '.6s' }}>✦</span>
       </div>
+
+      {/* ── Minimal header on inner pages: 🏠 + name + logout ── */}
+      {!isHome && (
+        <header className="relative z-10 flex items-center justify-between px-4 py-3 sm:px-6">
+          <Link
+            to="/batch1/home"
+            className="w-14 h-14 sm:w-16 sm:h-16 rounded-3xl bg-white flex items-center justify-center
+                       text-3xl sm:text-4xl transition-transform duration-150 hover:-translate-y-1 active:translate-y-1 select-none"
+            style={{ boxShadow: '0 5px 0 rgba(20,90,140,.18)' }}
+            aria-label="Go Home"
+          >
+            🏠
+          </Link>
+
+          <div className="flex items-center gap-3">
+            <div
+              className="flex items-center gap-2 bg-white rounded-2xl px-4 py-2"
+              style={{ boxShadow: '0 4px 0 rgba(20,90,140,.14)' }}
+            >
+              <span className="text-2xl select-none">{studentAvatar || theme.mascot}</span>
+              <span className="font-display font-black text-sm hidden sm:inline" style={{ color: '#17425F' }}>
+                {studentName}
+              </span>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/70 hover:bg-white border-2 border-white/80
+                         flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+              aria-label="Log out"
+            >
+              <LogOut size={18} />
+            </button>
+          </div>
+        </header>
+      )}
+
+      {/* ── Page content ── */}
+      <main className={`relative z-10 flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 ${isHome ? 'py-4' : 'py-2 pb-10'}`}>
+        <Outlet />
+      </main>
     </div>
   );
 };

@@ -1,9 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { useApp } from '../../context/AppContext';
-import { BookOpen, Star, Sparkles, Loader2, ArrowRight } from 'lucide-react';
-import confetti from 'canvas-confetti';
+import { Loader2 } from 'lucide-react';
+import { getClassTheme } from './theme';
+
+/**
+ * "My Journey" — the syllabus as a winding island trail (Candy-Crush map).
+ * Every NCERT chapter is a level node: gold = done, green pulsing = you are
+ * here (mascot stands on it), white = playable ahead, grey = no games yet.
+ * A treasure chest waits at the end of the book. Tapping a playable node
+ * deep-links into that chapter's games.
+ */
 
 interface ChapterGame {
   gameId: string;
@@ -22,202 +30,241 @@ interface CurriculumChapter {
   completed: boolean;
 }
 
+/* Track geometry */
+const TRACK_W = 620;
+const STEP_Y = 155;
+const TOP_PAD = 80;
+const X_LEFT = 150;
+const X_RIGHT = 470;
+
+const SUBJECT_EMOJI = (s: string) => {
+  const l = s.toLowerCase();
+  if (l.includes('math')) return '📐';
+  if (l.includes('english')) return '📖';
+  return '🌍';
+};
+
 export const Batch1Syllabus: React.FC = () => {
   const navigate = useNavigate();
-  const { currentClass, studentName } = useApp();
+  const { currentClass } = useApp();
   const [chapters, setChapters] = useState<CurriculumChapter[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeSubject, setActiveSubject] = useState<string>('Mathematics');
+  const [activeSubject, setActiveSubject] = useState<string>('');
 
   const isPreReader = currentClass <= 2;
+  const theme = getClassTheme(currentClass);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-
     api.get<CurriculumChapter[]>('/student/curriculum')
-      .then(res => {
-        if (!cancelled) {
-          setChapters(res);
-          // Set active subject to the first subject available if Mathematics isn't there
-          if (res.length > 0) {
-            const subjects = Array.from(new Set(res.map(c => c.subject)));
-            if (!subjects.includes('Mathematics')) {
-              setActiveSubject(subjects[0]);
-            }
-          }
-          setLoading(false);
-        }
+      .then((res) => {
+        if (cancelled) return;
+        setChapters(res);
+        const subjects = Array.from(new Set(res.map((c) => c.subject)));
+        setActiveSubject(subjects.includes('Mathematics') ? 'Mathematics' : (subjects[0] ?? ''));
+        setLoading(false);
       })
-      .catch(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
+      .catch(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
-  // Filter unique subjects
-  const subjects = Array.from(new Set(chapters.map(c => c.subject)));
-  const filteredChapters = chapters.filter(c => c.subject === activeSubject);
+  const subjects = useMemo(() => Array.from(new Set(chapters.map((c) => c.subject))), [chapters]);
+  const trail = useMemo(
+    () => chapters.filter((c) => c.subject === activeSubject).sort((a, b) => a.chapterNum - b.chapterNum),
+    [chapters, activeSubject],
+  );
 
-  const getSubjectColor = (subject: string) => {
-    const lower = subject.toLowerCase();
-    if (lower.includes('math')) return 'bg-amber-400 border-amber-300 text-white';
-    if (lower.includes('english')) return 'bg-sky-400 border-sky-300 text-white';
-    return 'bg-emerald-400 border-emerald-300 text-white';
-  };
+  // "You are here" = the first chapter with games that isn't completed yet.
+  const currentIdx = useMemo(() => {
+    const idx = trail.findIndex((c) => c.games.length > 0 && !c.completed);
+    return idx === -1 ? trail.length - 1 : idx;
+  }, [trail]);
 
-  const getSubjectTabStyle = (subject: string) => {
-    const isActive = activeSubject === subject;
-    const lower = subject.toLowerCase();
-    if (lower.includes('math')) {
-      return isActive 
-        ? 'bg-amber-400 text-white border-amber-400 shadow-md shadow-amber-400/20' 
-        : 'bg-white hover:bg-amber-50 text-amber-700 border-amber-200';
+  const doneCount = trail.filter((c) => c.completed).length;
+
+  /* Node positions: zig-zag down the track */
+  const nodes = trail.map((ch, i) => ({
+    ch,
+    x: i % 2 === 0 ? X_LEFT : X_RIGHT,
+    y: TOP_PAD + i * STEP_Y,
+  }));
+  const trackH = TOP_PAD + Math.max(nodes.length, 1) * STEP_Y + 90;
+
+  /* Smooth S-curve path through the nodes (+ a last hop to the treasure) */
+  const treasure = { x: nodes.length % 2 === 0 ? X_LEFT : X_RIGHT, y: TOP_PAD + nodes.length * STEP_Y };
+  const pathD = useMemo(() => {
+    const pts = [...nodes.map((n) => ({ x: n.x, y: n.y })), treasure];
+    if (pts.length < 2) return '';
+    let d = `M ${pts[0].x} ${pts[0].y}`;
+    for (let i = 1; i < pts.length; i++) {
+      const p0 = pts[i - 1];
+      const p1 = pts[i];
+      const midY = (p0.y + p1.y) / 2;
+      d += ` C ${p0.x} ${midY}, ${p1.x} ${midY}, ${p1.x} ${p1.y}`;
     }
-    if (lower.includes('english')) {
-      return isActive 
-        ? 'bg-sky-400 text-white border-sky-400 shadow-md shadow-sky-400/20' 
-        : 'bg-white hover:bg-sky-50 text-sky-700 border-sky-200';
-    }
-    return isActive 
-      ? 'bg-emerald-400 text-white border-emerald-400 shadow-md shadow-emerald-400/20' 
-      : 'bg-white hover:bg-emerald-50 text-emerald-700 border-emerald-200';
+    return d;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trail]);
+
+  const openChapter = (ch: CurriculumChapter) => {
+    if (ch.games.length === 0) return;
+    navigate(`/batch1/games?chapter=${ch.chapterRef}`);
   };
 
-  const getSubjectEmoji = (subject: string) => {
-    const lower = subject.toLowerCase();
-    if (lower.includes('math')) return '📐';
-    if (lower.includes('english')) return '📖';
-    return '🔬';
-  };
-
-  const completedCount = filteredChapters.filter(c => c.completed).length;
-  const totalCount = filteredChapters.length;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="animate-spin text-white" size={40} />
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-6 select-none anim-fade-up">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="font-display font-black text-2xl tracking-tight text-slate-800 flex items-center gap-2">
-            <span>📚</span>
-            {isPreReader ? 'My Books' : 'My CBSE Syllabus'}
+    <div className="flex flex-col gap-4 select-none anim-fade-up">
+      {/* Title card */}
+      <div
+        className="bg-white rounded-3xl px-6 py-4 flex items-center gap-4"
+        style={{ boxShadow: '0 6px 0 rgba(20,90,140,.14)' }}
+      >
+        <span className="text-4xl">{SUBJECT_EMOJI(activeSubject)}</span>
+        <div className="flex-1">
+          <h1 className="font-display font-black text-xl sm:text-2xl leading-tight" style={{ color: '#17425F' }}>
+            {isPreReader ? 'My Journey' : `${activeSubject} Island`}
           </h1>
           {!isPreReader && (
-            <p className="text-xs text-slate-400 font-bold mt-1">
-              Track your chapters and complete games to collect stars!
+            <p className="text-[11px] font-black tracking-widest" style={{ color: '#6FA3C0' }}>
+              CLASS {currentClass} · {doneCount} OF {trail.length} CHAPTERS DONE
             </p>
           )}
         </div>
-
-        {/* Mascot bubble */}
-        <div className="flex items-center gap-2.5 bg-amber-50/60 border border-amber-200/40 rounded-2xl px-4 py-2 self-start sm:self-center">
-          <span className="text-3xl animate-[bounce_2s_infinite]">🦉</span>
-          <p className="text-xs text-amber-800 font-bold">
-            {completedCount === totalCount && totalCount > 0
-              ? 'Amazing! You finished all chapters! 🏆'
-              : `You completed ${completedCount} of ${totalCount} chapters!`}
-          </p>
-        </div>
+        <span className="text-3xl anim-bob">{theme.mascot}</span>
       </div>
 
-      {/* Subject Selector Tabs */}
+      {/* Subject tabs */}
       {subjects.length > 1 && (
-        <div className="flex gap-3 overflow-x-auto pb-1 select-none scrollbar-none">
-          {subjects.map(subject => (
-            <button
-              key={subject}
-              onClick={() => setActiveSubject(subject)}
-              className={`px-5 py-3 rounded-2xl border-2 font-display font-black text-sm tracking-wide transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-2 ${getSubjectTabStyle(subject)}`}
-              style={{ minHeight: 48 }}
-            >
-              <span className="text-xl">{getSubjectEmoji(subject)}</span>
-              <span>{subject}</span>
-            </button>
-          ))}
+        <div className="flex gap-2.5 overflow-x-auto pb-1">
+          {subjects.map((s) => {
+            const active = s === activeSubject;
+            return (
+              <button
+                key={s}
+                onClick={() => setActiveSubject(s)}
+                className="flex items-center gap-2 rounded-2xl px-5 py-3 font-display font-black text-sm cursor-pointer
+                           transition-transform hover:-translate-y-0.5 active:translate-y-0.5 whitespace-nowrap"
+                style={active
+                  ? { background: theme.accent, color: '#fff', boxShadow: `0 5px 0 ${theme.accentDark}` }
+                  : { background: '#fff', color: '#17425F', boxShadow: '0 5px 0 rgba(20,90,140,.14)' }}
+              >
+                <span className="text-lg">{SUBJECT_EMOJI(s)}</span>
+                {!isPreReader && <span>{s}</span>}
+              </button>
+            );
+          })}
         </div>
       )}
 
-      {/* Chapters list */}
-      {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="animate-spin text-amber-400" size={32} />
-        </div>
-      ) : filteredChapters.length === 0 ? (
-        <div className="bento-card border border-slate-100 bg-white p-12 text-center flex flex-col items-center gap-3">
-          <span className="text-4xl">📖</span>
-          <span className="font-sans font-bold text-xs text-slate-400">No chapters found</span>
+      {/* The trail */}
+      {trail.length === 0 ? (
+        <div className="bg-white/80 rounded-3xl p-12 text-center flex flex-col items-center gap-3"
+             style={{ boxShadow: '0 6px 0 rgba(20,90,140,.12)' }}>
+          <span className="text-5xl">{theme.mascot}</span>
+          <span className="font-display font-black text-base" style={{ color: '#17425F' }}>New adventures coming soon!</span>
         </div>
       ) : (
-        <div className="flex flex-col gap-4">
-          {filteredChapters.map((chapter) => {
-            const themeClass = activeSubject.toLowerCase().includes('math') 
-              ? 'border-amber-100 bg-amber-50/10' 
-              : activeSubject.toLowerCase().includes('english') 
-              ? 'border-sky-100 bg-sky-50/10' 
-              : 'border-emerald-100 bg-emerald-50/10';
+        <div className="overflow-x-auto">
+          <div className="relative mx-auto" style={{ width: TRACK_W, height: trackH }}>
+            {/* Path */}
+            <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${TRACK_W} ${trackH}`} fill="none" aria-hidden="true">
+              <path d={pathD} stroke="#FFFFFF" strokeWidth={26} strokeLinecap="round" opacity={0.75} />
+              <path d={pathD} stroke="#FFC800" strokeWidth={8} strokeLinecap="round" strokeDasharray="2 22" />
+            </svg>
 
-            return (
-              <div
-                key={chapter.chapterRef}
-                className={`bento-card border p-4 sm:p-5 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all hover:shadow-md ${themeClass}`}
-              >
-                {/* Left: Chapter Num & Title */}
-                <div className="flex items-start gap-4">
-                  <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center font-display font-black text-lg select-none shrink-0 ${getSubjectColor(activeSubject)}`}>
-                    {chapter.chapterNum}
-                  </div>
-                  <div>
-                    <h3 className="font-display font-black text-base text-slate-800 leading-snug">
-                      {chapter.title}
-                    </h3>
-                    {chapter.games.length > 0 && !isPreReader && (
-                      <p className="text-[10px] font-bold text-slate-400 mt-1">
-                        Contains {chapter.games.length} learning {chapter.games.length === 1 ? 'game' : 'games'}
-                      </p>
+            {/* Nodes */}
+            {nodes.map(({ ch, x, y }, i) => {
+              const isCurrent = i === currentIdx && ch.games.length > 0 && !ch.completed;
+              const isDone = ch.completed;
+              const playable = ch.games.length > 0;
+              const labelLeft = x === X_LEFT ? x + 64 : undefined;
+              const labelRight = x === X_RIGHT ? TRACK_W - x + 64 : undefined;
+
+              return (
+                <React.Fragment key={ch.chapterRef}>
+                  <button
+                    onClick={() => openChapter(ch)}
+                    disabled={!playable}
+                    className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full flex flex-col items-center justify-center
+                               ${playable ? 'cursor-pointer transition-transform hover:scale-110 active:scale-95' : 'cursor-default'}`}
+                    style={{ left: x, top: y, width: isCurrent ? 96 : 80, height: isCurrent ? 96 : 80 }}
+                    aria-label={`Chapter ${ch.chapterNum}: ${ch.title}`}
+                  >
+                    {isCurrent && (
+                      <>
+                        <span className="absolute -top-[74px] text-4xl anim-bob-big pointer-events-none"
+                              style={{ filter: 'drop-shadow(0 4px 4px rgba(0,0,0,.18))' }}>
+                          {theme.mascot}
+                        </span>
+                        <span className="absolute -top-[102px] whitespace-nowrap rounded-full px-3 py-1 text-[10px] font-black tracking-widest text-white pointer-events-none"
+                              style={{ background: '#17425F' }}>
+                          YOU ARE HERE
+                        </span>
+                      </>
                     )}
-                  </div>
-                </div>
-
-                {/* Right: Stars Rating & Action */}
-                <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto border-t sm:border-t-0 border-slate-100/55 pt-3 sm:pt-0">
-                  {/* Stars */}
-                  {chapter.games.length > 0 ? (
-                    <div className="flex gap-0.5">
-                      {[1, 2, 3].map((n) => (
-                        <Star
-                          key={n}
-                          size={20}
-                          className={n <= chapter.stars ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-100 px-2.5 py-1 rounded-lg">
-                      Read Only
-                    </span>
-                  )}
-
-                  {/* Play Button */}
-                  {chapter.games.length > 0 && (
-                    <button
-                      onClick={() => navigate(`/batch1/games?chapter=${chapter.chapterRef}`)}
-                      className={`h-11 px-4 sm:px-5 rounded-xl font-display font-black text-xs text-white shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all hover:scale-105 active:scale-95 ${getSubjectColor(activeSubject)}`}
-                      style={{ minWidth: 80 }}
+                    <span
+                      className={`rounded-full flex items-center justify-center font-display font-black text-white
+                                  ${isCurrent ? 'w-[88px] h-[88px] text-3xl anim-pulse-ring' : 'w-[72px] h-[72px] text-2xl'}`}
+                      style={
+                        isDone
+                          ? { background: 'linear-gradient(180deg,#FFD53E,#FFB300)', boxShadow: '0 6px 0 #D89700, 0 10px 18px rgba(255,179,0,.4)' }
+                          : isCurrent
+                            ? { background: 'linear-gradient(180deg,#74DE22,#55C400)', boxShadow: '0 7px 0 #3F9C00, 0 12px 22px rgba(85,196,0,.45)' }
+                            : playable
+                              ? { background: '#fff', color: theme.accent, boxShadow: '0 6px 0 rgba(20,90,140,.18)' }
+                              : { background: 'linear-gradient(180deg,#DDE9F2,#C3D5E2)', boxShadow: '0 6px 0 #A8BDCC', color: '#8CA6B8' }
+                      }
                     >
-                      <span>Play</span>
-                      <ArrowRight size={14} strokeWidth={3} />
-                    </button>
+                      {playable ? ch.chapterNum : '🔒'}
+                    </span>
+                    {playable && (
+                      <span className="absolute -bottom-1.5 text-[13px] tracking-wider pointer-events-none"
+                            style={{ textShadow: '0 1px 2px rgba(0,0,0,.2)' }}>
+                        {'⭐'.repeat(ch.stars)}{'☆'.repeat(Math.max(0, 3 - ch.stars))}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Chapter label card beside the node */}
+                  {!isPreReader && (
+                    <div
+                      className="absolute -translate-y-1/2 bg-white rounded-2xl px-4 py-2 max-w-[210px] pointer-events-none"
+                      style={{
+                        top: y,
+                        ...(labelLeft !== undefined ? { left: labelLeft } : { right: labelRight }),
+                        boxShadow: '0 4px 0 rgba(20,90,140,.14)',
+                      }}
+                    >
+                      <b className="block text-[13px] font-display font-black leading-tight" style={{ color: '#17425F' }}>
+                        {ch.title}
+                      </b>
+                      <span className="text-[10px] font-black tracking-wider" style={{ color: '#7BA2BC' }}>
+                        {isDone ? 'DONE!' : playable
+                          ? `${ch.games.length} ${ch.games.length === 1 ? 'GAME' : 'GAMES'}`
+                          : 'COMING SOON'}
+                      </span>
+                    </div>
                   )}
-                </div>
-              </div>
-            );
-          })}
+                </React.Fragment>
+              );
+            })}
+
+            {/* Treasure at the end of the book */}
+            <span
+              className="absolute -translate-x-1/2 -translate-y-1/2 text-6xl anim-wiggle"
+              style={{ left: treasure.x, top: treasure.y, filter: 'drop-shadow(0 5px 6px rgba(0,0,0,.22))' }}
+              aria-label="Treasure — finish every chapter!"
+            >
+              🎁
+            </span>
+          </div>
         </div>
       )}
     </div>

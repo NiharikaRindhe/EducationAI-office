@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { useSearchParams } from 'react-router-dom';
 import { Star, ArrowLeft } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { getClassTheme, getSubjectCardColors } from './theme';
 
 /* ───────────────────────── Types ───────────────────────── */
 
@@ -37,6 +38,13 @@ interface ChapterGroup {
   chapterNum: number;
   chapterTitle: string;
   games: GameItem[];
+}
+
+interface CurriculumChapterLite {
+  chapterRef: string;
+  subject: string;
+  chapterNum: number;
+  title: string;
 }
 
 interface AttemptResponse {
@@ -137,7 +145,10 @@ export const Batch1Games: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [games, setGames] = useState<GameItem[]>([]);
   const [challengeGames, setChallengeGames] = useState<GameItem[]>([]);
+  const [chapterInfo, setChapterInfo] = useState<Map<string, CurriculumChapterLite>>(new Map());
   const [activeGame, setActiveGame] = useState<GameItem | null>(null);
+
+  const theme = getClassTheme(currentClass);
 
   /* ── XP float animation ── */
   const [xpFloat, setXpFloat] = useState<{ amount: number; key: number } | null>(null);
@@ -166,12 +177,15 @@ export const Batch1Games: React.FC = () => {
     let cancelled = false;
     setLoading(true);
 
-    api
-      .get<{ games: GameItem[]; challengeGames: GameItem[] }>('/student/games')
-      .then((res) => {
+    Promise.all([
+      api.get<{ games: GameItem[]; challengeGames: GameItem[] }>('/student/games'),
+      api.get<CurriculumChapterLite[]>('/student/curriculum').catch(() => [] as CurriculumChapterLite[]),
+    ])
+      .then(([res, curriculum]) => {
         if (!cancelled) {
           setGames(res.games);
           setChallengeGames(res.challengeGames ?? []);
+          setChapterInfo(new Map(curriculum.map((c) => [c.chapterRef, c])));
           setLoading(false);
         }
       })
@@ -230,7 +244,7 @@ export const Batch1Games: React.FC = () => {
 
   /* ───────────── Gallery View ───────────── */
 
-  /* Group games by chapter */
+  /* Group games by chapter, enriched with real chapter titles/numbers */
   const groupGamesByChapter = (): ChapterGroup[] => {
     const grouped = new Map<string, GameItem[]>();
     for (const game of games) {
@@ -238,27 +252,92 @@ export const Batch1Games: React.FC = () => {
       if (!grouped.has(key)) grouped.set(key, []);
       grouped.get(key)!.push(game);
     }
-    return Array.from(grouped.entries()).map(([ref, gameList]) => {
-      const first = gameList[0];
-      return {
-        chapterRef: ref,
-        subject: first?.subject || 'Unknown',
-        chapterNum: 0,
-        chapterTitle: first?.chapterRef ? first.chapterRef.split('-').pop() || 'Chapter' : 'Miscellaneous',
-        games: gameList,
-      };
-    }).sort((a, b) => a.subject.localeCompare(b.subject));
+    return Array.from(grouped.entries())
+      .map(([ref, gameList]) => {
+        const info = chapterInfo.get(ref);
+        const first = gameList[0];
+        return {
+          chapterRef: ref,
+          subject: info?.subject || first?.subject || 'Games',
+          chapterNum: info?.chapterNum ?? 0,
+          chapterTitle: info?.title || first?.subject || 'Fun Games',
+          games: gameList,
+        };
+      })
+      .sort((a, b) => a.subject.localeCompare(b.subject) || a.chapterNum - b.chapterNum);
+  };
+
+  /* One juicy island card per game (or challenge) */
+  const renderGameCard = (game: GameItem, isChallenge = false) => {
+    const c = getSubjectCardColors(game.subject);
+    if (game.locked) {
+      return (
+        <div
+          key={game.gameId}
+          className="relative rounded-[28px] p-5 flex flex-col items-center gap-2.5 select-none opacity-80"
+          style={{ background: 'linear-gradient(160deg,#DDE9F2,#C3D5E2)', boxShadow: '0 8px 0 #A8BDCC' }}
+        >
+          <span className="text-6xl leading-none">🔒</span>
+          <span className="font-display font-black text-sm" style={{ color: '#5E7A8C' }}>
+            {isPreReader ? '⭐⭐' : 'Get 2 stars first!'}
+          </span>
+        </div>
+      );
+    }
+    return (
+      <button
+        key={game.gameId}
+        onClick={() => setActiveGame(game)}
+        className="relative rounded-[28px] p-5 pt-6 flex flex-col items-center gap-2.5 overflow-hidden cursor-pointer
+                   select-none transition-transform duration-150 hover:-translate-y-1.5 hover:rotate-[-0.5deg] active:translate-y-0.5"
+        style={{
+          background: `linear-gradient(160deg, ${c.from}, ${c.to})`,
+          boxShadow: `0 8px 0 ${c.shadow}, 0 14px 24px ${c.to}55`,
+        }}
+      >
+        <span
+          className="absolute top-0 left-0 right-0 h-[44%] pointer-events-none"
+          style={{ background: 'linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0))' }}
+          aria-hidden="true"
+        />
+        <span
+          className="absolute top-3 left-4 bg-white/90 rounded-full px-2.5 py-0.5 text-[10px] font-black tracking-wider"
+          style={{ color: c.text }}
+        >
+          {isChallenge ? '🚀 CLASS ' + game.classNum : 'GAME'}
+        </span>
+        <span className="text-6xl leading-none anim-bob" style={{ filter: 'drop-shadow(0 4px 5px rgba(0,0,0,.2))' }}>
+          {game.icon}
+        </span>
+        {!isPreReader && (
+          <span className="font-display font-black text-base text-white text-center leading-tight"
+                style={{ textShadow: '0 2px 3px rgba(0,0,0,.2)' }}>
+            {game.name}
+          </span>
+        )}
+        <span className="text-lg tracking-[3px]" style={{ textShadow: '0 2px 2px rgba(0,0,0,.15)' }}>
+          {'⭐'.repeat(game.stars)}{'☆'.repeat(Math.max(0, 3 - game.stars))}
+        </span>
+        <span
+          className="w-full bg-white rounded-2xl py-3 font-display font-black text-sm tracking-widest text-center
+                     transition-transform active:translate-y-0.5"
+          style={{ color: c.text, boxShadow: '0 4px 0 rgba(0,0,0,.15)' }}
+        >
+          PLAY ▶
+        </span>
+      </button>
+    );
   };
 
   const renderGallery = () => {
     if (loading) {
       return (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="bento-card border border-amber-100/50 flex flex-col gap-4 p-5" style={{ minHeight: 160 }}>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="bg-white/60 rounded-[28px] flex flex-col items-center gap-4 p-6" style={{ minHeight: 190 }}>
               <div className="skeleton-pulse w-16 h-16 rounded-2xl" />
               <div className="skeleton-pulse w-24 h-3 rounded-full" />
-              <div className="skeleton-pulse w-16 h-3 rounded-full" />
+              <div className="skeleton-pulse w-full h-9 rounded-2xl" />
             </div>
           ))}
         </div>
@@ -267,10 +346,11 @@ export const Batch1Games: React.FC = () => {
 
     if (games.length === 0) {
       return (
-        <div className="bento-card border border-dashed border-amber-200 bg-amber-50/30 p-12 text-center flex flex-col items-center gap-4">
-          <span className="text-6xl">🦉</span>
-          <h3 className="font-display font-black text-lg text-amber-900">New games coming soon!</h3>
-          <p className="text-xs text-amber-700">Check back later to play and collect stars.</p>
+        <div className="bg-white/85 rounded-3xl p-12 text-center flex flex-col items-center gap-4"
+             style={{ boxShadow: '0 6px 0 rgba(20,90,140,.12)' }}>
+          <span className="text-6xl anim-bob">{theme.mascot}</span>
+          <h3 className="font-display font-black text-lg" style={{ color: '#17425F' }}>New games coming soon!</h3>
+          <p className="text-xs font-bold" style={{ color: '#7BA2BC' }}>Check back later to play and collect stars.</p>
         </div>
       );
     }
@@ -278,92 +358,69 @@ export const Batch1Games: React.FC = () => {
     const chapters = groupGamesByChapter();
 
     return (
-      <div className="flex flex-col gap-8">
-        {/* Games grouped by chapter */}
-        {chapters.map((chapter) => (
-          <div key={chapter.chapterRef} className="flex flex-col gap-3">
-            {!isPreReader && (
-              <div className="flex items-center gap-2 px-1">
-                <span className="text-lg">📖</span>
-                <h3 className="font-display font-black text-base text-slate-700">{chapter.subject}</h3>
-              </div>
-            )}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-              {chapter.games.map((game) => (
-                <button
-                  key={game.gameId}
-                  disabled={game.locked}
-                  onClick={() => !game.locked && setActiveGame(game)}
-                  className={`bento-card border border-amber-100/50 bg-white flex flex-col items-center justify-center gap-3 p-5 select-none relative overflow-hidden card-bounce-tap cursor-pointer
-                    ${game.locked ? 'opacity-40 cursor-not-allowed' : 'card-interactive'}`}
-                  style={{ minHeight: 140, minWidth: 120, borderRadius: '1.5rem' }}
+      <div className="flex flex-col gap-7">
+        {chapters.map((chapter) => {
+          const chapterStars = chapter.games.reduce((s, g) => s + g.stars, 0);
+          const maxStars = chapter.games.length * 3;
+          return (
+            <div key={chapter.chapterRef} className="flex flex-col gap-4">
+              {/* Chapter header card */}
+              <div className="bg-white rounded-3xl px-5 py-4 flex items-center gap-4"
+                   style={{ boxShadow: '0 5px 0 rgba(20,90,140,.14)' }}>
+                <span
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center font-display font-black text-xl text-white shrink-0"
+                  style={{ background: theme.accent, boxShadow: `0 3px 0 ${theme.accentDark}` }}
                 >
-                  {/* Locked overlay */}
-                  {game.locked && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-white/60 z-10 rounded-3xl">
-                      <span className="text-4xl">🔒</span>
+                  {chapter.chapterNum > 0 ? chapter.chapterNum : '★'}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-display font-black text-base leading-tight truncate" style={{ color: '#17425F' }}>
+                    {chapter.chapterTitle}
+                  </div>
+                  {!isPreReader && (
+                    <div className="text-[10px] font-black tracking-widest" style={{ color: '#7BA2BC' }}>
+                      {chapter.subject.toUpperCase()}
                     </div>
                   )}
+                </div>
+                {/* Star meter */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="w-24 h-3.5 rounded-full overflow-hidden hidden sm:block" style={{ background: '#E4EEF8' }}>
+                    <div className="h-full rounded-full"
+                         style={{ width: `${maxStars > 0 ? (chapterStars / maxStars) * 100 : 0}%`,
+                                  background: 'linear-gradient(90deg,#FFC800,#FFB100)' }} />
+                  </div>
+                  <b className="font-display text-sm" style={{ color: '#17425F' }}>{chapterStars}/{maxStars} ⭐</b>
+                </div>
+              </div>
 
-                  {/* Big icon */}
-                  <span className="text-5xl leading-none">{game.icon}</span>
-
-                  {/* Star rating */}
-                  {!game.locked && (
-                    <div className="flex gap-0.5">
-                      {[1, 2, 3].map((n) => (
-                        <Star
-                          key={n}
-                          size={16}
-                          className={n <= game.stars ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}
-                        />
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Text label – only for early-readers */}
-                  {!isPreReader && (
-                    <h4 className="font-display font-bold text-xs text-slate-700 text-center leading-tight mt-0.5">
-                      {game.name}
-                    </h4>
-                  )}
-
-                  {/* Subject badge */}
-                  {!isPreReader && (
-                    <span className="badge pill-amber text-[8px] font-black">{game.subject}</span>
-                  )}
-                </button>
-              ))}
+              {/* This chapter's games */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+                {chapter.games.map((game) => renderGameCard(game))}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
-        {/* Challenge games – only show if student has mastered skills */}
+        {/* Challenge section — same-skill games one class up */}
         {challengeGames.length > 0 && (
           <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">🚀</span>
-              {!isPreReader && (
-                <h3 className="font-display font-black text-lg text-amber-900">Challenge Section</h3>
-              )}
+            <div className="bg-white rounded-3xl px-5 py-4 flex items-center gap-3"
+                 style={{ boxShadow: '0 5px 0 rgba(20,90,140,.14)' }}>
+              <span className="text-3xl anim-wiggle">🚀</span>
+              <div>
+                <div className="font-display font-black text-base" style={{ color: '#17425F' }}>
+                  {isPreReader ? '🚀⭐' : 'Challenge Zone'}
+                </div>
+                {!isPreReader && (
+                  <div className="text-[10px] font-black tracking-widest" style={{ color: '#7BA2BC' }}>
+                    YOU MASTERED THIS — TRY THE NEXT CLASS!
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-              {challengeGames.map((game) => (
-                <button
-                  key={game.gameId}
-                  onClick={() => !game.locked && setActiveGame(game)}
-                  className={`bento-card border border-amber-100/50 bg-gradient-to-br from-white to-amber-50/30 flex flex-col items-center justify-center gap-3 p-5 select-none cursor-pointer card-bounce-tap
-                    ${game.locked ? 'opacity-40 cursor-not-allowed' : 'card-interactive'}`}
-                  style={{ minHeight: 140, minWidth: 120, borderRadius: '1.5rem' }}
-                >
-                  <span className="text-5xl leading-none">{game.icon}</span>
-                  {!isPreReader && (
-                    <h4 className="font-display font-bold text-xs text-slate-700 text-center leading-tight">
-                      {game.name}
-                    </h4>
-                  )}
-                </button>
-              ))}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+              {challengeGames.map((game) => renderGameCard(game, true))}
             </div>
           </div>
         )}
@@ -407,18 +464,19 @@ export const Batch1Games: React.FC = () => {
 
       {activeGame ? (
         /* ── Active game wrapper ── */
-        <div className="bg-white border border-amber-100 rounded-3xl p-6 md:p-8 shadow-md anim-fade-up">
+        <div className="bg-white rounded-[28px] p-6 md:p-8 anim-fade-up" style={{ boxShadow: '0 8px 0 rgba(20,90,140,.14)' }}>
           {/* Header bar */}
           <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
             <button
               onClick={() => setActiveGame(null)}
-              className="flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-5 py-2.5 shadow-md shadow-amber-400/20 transition-all cursor-pointer"
-              style={{ minHeight: 44, minWidth: 64 }}
+              className="flex items-center justify-center gap-2 text-white font-display font-black text-sm rounded-2xl px-5 py-2.5
+                         transition-transform cursor-pointer hover:-translate-y-0.5 active:translate-y-0.5"
+              style={{ minHeight: 44, minWidth: 64, background: theme.accent, boxShadow: `0 4px 0 ${theme.accentDark}` }}
             >
               <ArrowLeft size={18} strokeWidth={3} />
               {!isPreReader && <span>Back</span>}
             </button>
-            <span className="badge pill-amber text-[10px] font-black">ACTIVE PLAY</span>
+            <span className="text-2xl anim-bob">{theme.mascot}</span>
           </div>
 
           {renderActiveGame()}
