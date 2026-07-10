@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Star, ArrowLeft } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getClassTheme, getSubjectCardColors } from './theme';
+import { QuestEngine } from './QuestEngine';
 
 /* ───────────────────────── Types ───────────────────────── */
 
@@ -440,6 +441,15 @@ export const Batch1Games: React.FC = () => {
         return <LetterTraceEngine game={activeGame} isPreReader={isPreReader} onFinish={submitAttempt} />;
       case 'phonics-pop':
         return <PhonicsPopEngine game={activeGame} numChoices={numChoices} isPreReader={isPreReader} onFinish={submitAttempt} />;
+      case 'quest':
+        return (
+          <QuestEngine
+            game={{ gameId: activeGame.gameId, name: activeGame.name, icon: activeGame.icon, params: activeGame.params as Record<string, any> }}
+            numChoices={numChoices}
+            isPreReader={isPreReader}
+            onFinish={submitAttempt}
+          />
+        );
       default:
         return (
           <div className="text-center py-12 anim-fade-up">
