@@ -290,49 +290,49 @@ export const Batch1Games: React.FC = () => {
             )}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
               {chapter.games.map((game) => (
-          <button
-            key={game.gameId}
-            disabled={game.locked}
-            onClick={() => !game.locked && setActiveGame(game)}
-            className={`bento-card border border-amber-100/50 bg-white flex flex-col items-center justify-center gap-3 p-5 select-none relative overflow-hidden card-bounce-tap cursor-pointer
-              ${game.locked ? 'opacity-40 cursor-not-allowed' : 'card-interactive'}`}
-            style={{ minHeight: 140, minWidth: 120, borderRadius: '1.5rem' }}
-          >
-            {/* Locked overlay */}
-            {game.locked && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white/60 z-10 rounded-3xl">
-                <span className="text-4xl">🔒</span>
-              </div>
-            )}
+                <button
+                  key={game.gameId}
+                  disabled={game.locked}
+                  onClick={() => !game.locked && setActiveGame(game)}
+                  className={`bento-card border border-amber-100/50 bg-white flex flex-col items-center justify-center gap-3 p-5 select-none relative overflow-hidden card-bounce-tap cursor-pointer
+                    ${game.locked ? 'opacity-40 cursor-not-allowed' : 'card-interactive'}`}
+                  style={{ minHeight: 140, minWidth: 120, borderRadius: '1.5rem' }}
+                >
+                  {/* Locked overlay */}
+                  {game.locked && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/60 z-10 rounded-3xl">
+                      <span className="text-4xl">🔒</span>
+                    </div>
+                  )}
 
-            {/* Big icon */}
-            <span className="text-5xl leading-none">{game.icon}</span>
+                  {/* Big icon */}
+                  <span className="text-5xl leading-none">{game.icon}</span>
 
-            {/* Star rating */}
-            {!game.locked && (
-              <div className="flex gap-0.5">
-                {[1, 2, 3].map((n) => (
-                  <Star
-                    key={n}
-                    size={16}
-                    className={n <= game.stars ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}
-                  />
-                ))}
-              </div>
-            )}
+                  {/* Star rating */}
+                  {!game.locked && (
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3].map((n) => (
+                        <Star
+                          key={n}
+                          size={16}
+                          className={n <= game.stars ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}
+                        />
+                      ))}
+                    </div>
+                  )}
 
-            {/* Text label – only for early-readers */}
-            {!isPreReader && (
-              <h4 className="font-display font-bold text-xs text-slate-700 text-center leading-tight mt-0.5">
-                {game.name}
-              </h4>
-            )}
+                  {/* Text label – only for early-readers */}
+                  {!isPreReader && (
+                    <h4 className="font-display font-bold text-xs text-slate-700 text-center leading-tight mt-0.5">
+                      {game.name}
+                    </h4>
+                  )}
 
-            {/* Subject badge */}
-            {!isPreReader && (
-              <span className="badge pill-amber text-[8px] font-black">{game.subject}</span>
-            )}
-              </button>
+                  {/* Subject badge */}
+                  {!isPreReader && (
+                    <span className="badge pill-amber text-[8px] font-black">{game.subject}</span>
+                  )}
+                </button>
               ))}
             </div>
           </div>
