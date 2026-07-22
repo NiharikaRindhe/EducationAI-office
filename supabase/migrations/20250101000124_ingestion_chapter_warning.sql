@@ -1,0 +1,11 @@
+-- ─────────────────────────────────────────────────────────────
+--  Some NCERT books (esp. newer NEP/"Curiosity" series) don't use
+--  the literal word "Chapter N" in headings, so heading-based
+--  chapter detection silently tags 0% of chunks — the book still
+--  ingests and RAG retrieval still works, but every citation shown
+--  to students loses its chapter reference. Surface this instead of
+--  shipping it silently: null = not yet evaluated (old jobs, or
+--  still processing), true/false = whether any chunk got a chapter
+--  tag once the job finished chunking.
+-- ─────────────────────────────────────────────────────────────
+alter table ncert_ingestion_jobs add column chapters_detected boolean;

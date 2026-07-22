@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '../lib/supabase.js';
-import { chatCompletion, ollamaConfigured } from '../lib/ollama.js';
+import { chatCompletion, aiConfigured } from '../lib/ai.js';
 import { logger } from '../lib/logger.js';
 import { addXp, logStreakActivity } from './gamification.service.js';
 
@@ -44,8 +44,14 @@ interface AiScoreResult {
   feedback: string;
 }
 
-async function scoreSubjectiveWithAI(question: QuestionRow, studentAnswer: string, classNum: number, subject: string): Promise<AiScoreResult | null> {
-  if (!(await ollamaConfigured())) return null; // pending manual grading — not an error
+async function scoreSubjectiveWithAI(
+  question: QuestionRow,
+  studentAnswer: string,
+  classNum: number,
+  subject: string,
+  usageContext?: { schoolId: string | null; userId: string },
+): Promise<AiScoreResult | null> {
+  if (!(await aiConfigured('grading'))) return null; // pending manual grading — not an error
 
   try {
     const raw = await chatCompletion(
@@ -59,7 +65,7 @@ async function scoreSubjectiveWithAI(question: QuestionRow, studentAnswer: strin
           content: `QUESTION: ${question.text}\n\nMARKING SCHEME (${question.marks} marks total):\n${question.rubric ?? 'Use general subject knowledge to assess correctness and completeness.'}\n\nSTUDENT'S ANSWER:\n${studentAnswer}`,
         },
       ],
-      { jsonMode: true },
+      { jsonMode: true, tier: 'grading', usageContext },
     );
 
     const parsed = JSON.parse(raw) as { score: number; covered_points: string[]; missing_points: string[]; feedback: string };
@@ -79,12 +85,19 @@ async function scoreSubjectiveWithAI(question: QuestionRow, studentAnswer: strin
 export async function gradeSubmission(examSubmissionId: string) {
   const { data: submission } = await supabaseAdmin
     .from('exam_submissions')
-    .select('id, exam_id, exams(class_num, subject)')
+    .select('id, exam_id, student_id, exams(class_num, subject)')
     .eq('id', examSubmissionId)
     .single();
   if (!submission) return;
 
   const exam = Array.isArray(submission.exams) ? submission.exams[0] : submission.exams;
+
+  const { data: studentProfile } = await supabaseAdmin
+    .from('user_profiles')
+    .select('school_id')
+    .eq('id', submission.student_id)
+    .maybeSingle();
+  const usageContext = { schoolId: studentProfile?.school_id ?? null, userId: submission.student_id as string };
 
   const { data: answers } = await supabaseAdmin
     .from('exam_answers')
@@ -111,7 +124,7 @@ export async function gradeSubmission(examSubmissionId: string) {
     }
 
     if (question.ai_scoring && exam) {
-      const result = await scoreSubjectiveWithAI(question, answer.student_answer, exam.class_num, exam.subject);
+      const result = await scoreSubjectiveWithAI(question, answer.student_answer, exam.class_num, exam.subject, usageContext);
       if (result) {
         await supabaseAdmin
           .from('exam_answers')

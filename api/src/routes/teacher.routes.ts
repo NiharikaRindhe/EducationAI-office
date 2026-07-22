@@ -35,6 +35,18 @@ import {
 } from '../controllers/examReview.controller.js';
 import { recomputeLeaderboardController } from '../controllers/leaderboard.controller.js';
 import { downloadAllAdmitCardsController } from '../controllers/admitCard.controller.js';
+import {
+  getClassPerformanceHeatmapController,
+  getEnglishAssessmentReportController,
+  getTaskCompletionMatrixController,
+  getPtmReportController,
+} from '../controllers/teacherReport.controller.js';
+import {
+  getMyTeacherTimetableController,
+  createExceptionController,
+  getMyTeacherOccurrencesController,
+} from '../controllers/timetable.controller.js';
+import { listLabsController } from '../controllers/lab.controller.js';
 
 export const teacherRouter = Router();
 
@@ -45,6 +57,10 @@ teacherRouter.get('/my-sections', mySectionsController);
 teacherRouter.get('/students', listStudentsController);
 teacherRouter.get('/students/:id', studentDrillDownController);
 teacherRouter.get('/at-risk', atRiskController);
+teacherRouter.get('/timetable', getMyTeacherTimetableController);
+teacherRouter.get('/timetable/occurrences', getMyTeacherOccurrencesController);
+teacherRouter.post('/timetable/:slotId/exceptions', createExceptionController);
+teacherRouter.get('/labs', listLabsController);
 
 teacherRouter.post('/sessions/start', startSessionController);
 teacherRouter.post('/sessions/:id/end', endSessionController);
@@ -78,3 +94,8 @@ teacherRouter.get('/exams/:examId/merit-list', getMeritListController);
 teacherRouter.post('/leaderboard/recompute', recomputeLeaderboardController);
 
 teacherRouter.get('/exams/:examId/admit-cards', downloadAllAdmitCardsController);
+
+teacherRouter.get('/reports/performance', getClassPerformanceHeatmapController);
+teacherRouter.get('/reports/english', getEnglishAssessmentReportController);
+teacherRouter.get('/reports/tasks', getTaskCompletionMatrixController);
+teacherRouter.get('/reports/ptm', getPtmReportController);

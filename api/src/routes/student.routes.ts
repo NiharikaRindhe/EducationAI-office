@@ -31,10 +31,31 @@ import {
   sendMessageController,
 } from '../controllers/chat.controller.js';
 import { rateLimit } from '../middleware/rateLimit.js';
+import {
+  getStudentBadgesController,
+  getStudentStreakCalendarController,
+  getStudentProfileController,
+  updateStudentAvatarController,
+  getDailyChallengesController,
+  listPyqsController,
+  getStudentCurriculumController,
+} from '../controllers/student.controller.js';
+import { listGamesForStudentController, submitGameAttemptController } from '../controllers/games.controller.js';
+import { getMyStudentTimetableController, getMyStudentOccurrencesController } from '../controllers/timetable.controller.js';
 
 export const studentRouter = Router();
 
 studentRouter.use(requireAuth, requireRole('student'));
+
+studentRouter.get('/badges', getStudentBadgesController);
+studentRouter.get('/streak-calendar', getStudentStreakCalendarController);
+studentRouter.get('/profile', getStudentProfileController);
+studentRouter.patch('/profile/avatar', updateStudentAvatarController);
+studentRouter.get('/daily-challenges', getDailyChallengesController);
+studentRouter.get('/pyq', listPyqsController);
+
+studentRouter.get('/games', listGamesForStudentController);
+studentRouter.post('/games/:gameId/attempts', submitGameAttemptController);
 
 studentRouter.get('/sessions/active', activeSessionForStudentController);
 studentRouter.post('/sessions/join', joinSessionController);
@@ -65,6 +86,9 @@ studentRouter.post('/english/submit', submitAttemptController);
 studentRouter.get('/english/progress', getProgressController);
 
 studentRouter.get('/subjects', listMySubjectsController);
+studentRouter.get('/curriculum', getStudentCurriculumController);
+studentRouter.get('/timetable', getMyStudentTimetableController);
+studentRouter.get('/timetable/occurrences', getMyStudentOccurrencesController);
 
 const chatLimiter = rateLimit({ windowMs: 24 * 60 * 60_000, max: 50, keyFn: (req) => `chat:${req.user!.id}` });
 

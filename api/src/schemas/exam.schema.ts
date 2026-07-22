@@ -80,6 +80,9 @@ export const addQuestionBankSchema = z.object({
   correctAnswer: z.string().optional(),
   rubric: z.string().optional(),
   marks: z.number().int().min(1).max(20).default(1),
+  isPyq: z.boolean().default(false),
+  pyqYear: z.number().int().optional(),
+  pyqSource: z.string().optional(),
 });
 
 export type CreateExamInput = z.infer<typeof createExamSchema>;

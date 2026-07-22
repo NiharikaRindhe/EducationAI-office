@@ -2,8 +2,28 @@ import bcrypt from 'bcryptjs';
 import { supabaseAdmin, supabaseAnon } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
 import { generatePassword } from '../lib/credentials.js';
+import { logger } from '../lib/logger.js';
 import type { LoginInput, PinLoginInput, PinRosterQuery } from '../schemas/auth.schema.js';
 import type { Role } from '../types/index.js';
+
+/** Fire-and-forget — powers the School/Super Admin "active logins" panels.
+ *  Never allowed to fail a login just because the log write hiccuped. */
+function recordLoginEvent(userId: string, schoolId: string | null, role: Role, method: 'password' | 'pin'): void {
+  const now = new Date().toISOString();
+  void supabaseAdmin
+    .from('login_events')
+    .insert({ user_id: userId, school_id: schoolId, role, method })
+    .then(({ error }) => {
+      if (error) logger.warn({ error }, 'Failed to record login event');
+    });
+  void supabaseAdmin
+    .from('user_profiles')
+    .update({ last_seen_at: now })
+    .eq('id', userId)
+    .then(({ error }) => {
+      if (error) logger.warn({ error }, 'Failed to update last_seen_at on login');
+    });
+}
 
 export interface LoginResult {
   accessToken: string;
@@ -58,6 +78,8 @@ export async function login({ email, password }: LoginInput): Promise<LoginResul
   const batchId = Array.isArray(profile.student_profiles)
     ? (profile.student_profiles[0]?.batch_id ?? null)
     : ((profile.student_profiles as { batch_id: number } | null)?.batch_id ?? null);
+
+  recordLoginEvent(authData.user.id, profile.school_id as string | null, profile.role as Role, 'password');
 
   return {
     accessToken: authData.session.access_token,
@@ -167,6 +189,8 @@ export async function pinLogin({ schoolCode, studentId, pin }: PinLoginInput): P
       .update({ has_logged_in_ever: true, first_login_at: new Date().toISOString() })
       .eq('id', studentId);
   }
+
+  recordLoginEvent(studentId, schoolId, 'student', 'pin');
 
   return {
     accessToken: authData.session.access_token,

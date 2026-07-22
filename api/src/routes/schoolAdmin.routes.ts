@@ -23,6 +23,23 @@ import {
   addTeachingAssignmentController,
   removeTeachingAssignmentController,
 } from '../controllers/classSection.controller.js';
+import {
+  getPromotionPreviewController,
+  executePromotionController,
+  getClassFeaturesController,
+  updateClassFeaturesController,
+  getPrincipalReportController,
+  getActivityController,
+} from '../controllers/schoolAdminExtras.controller.js';
+import {
+  listTimetableController,
+  createSlotController,
+  updateSlotController,
+  deleteSlotController,
+  createExceptionController,
+  getSchoolOccurrencesController,
+} from '../controllers/timetable.controller.js';
+import { listLabsController, createLabController, updateLabController } from '../controllers/lab.controller.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -53,3 +70,21 @@ schoolAdminRouter.delete('/teaching-assignments/:id', removeTeachingAssignmentCo
 schoolAdminRouter.get('/lab-incharges', listLabInchargesController);
 schoolAdminRouter.post('/lab-incharges', addSingleLabInchargeController);
 schoolAdminRouter.post('/lab-incharges/:id/reset-password', resetLabInchargePasswordController);
+
+schoolAdminRouter.get('/promotion/preview', getPromotionPreviewController);
+schoolAdminRouter.post('/promotion/execute', executePromotionController);
+schoolAdminRouter.get('/features', getClassFeaturesController);
+schoolAdminRouter.post('/features', updateClassFeaturesController);
+schoolAdminRouter.get('/reports/principal', getPrincipalReportController);
+schoolAdminRouter.get('/activity', getActivityController);
+
+schoolAdminRouter.get('/labs', listLabsController);
+schoolAdminRouter.post('/labs', createLabController);
+schoolAdminRouter.patch('/labs/:id', updateLabController);
+
+schoolAdminRouter.get('/timetable', listTimetableController);
+schoolAdminRouter.post('/timetable', createSlotController);
+schoolAdminRouter.patch('/timetable/:id', updateSlotController);
+schoolAdminRouter.delete('/timetable/:id', deleteSlotController);
+schoolAdminRouter.post('/timetable/:slotId/exceptions', createExceptionController);
+schoolAdminRouter.get('/timetable/occurrences', getSchoolOccurrencesController);

@@ -20,7 +20,7 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
 
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('user_profiles')
-      .select('role, school_id, is_active')
+      .select('role, school_id, is_active, last_seen_at')
       .eq('id', authData.user.id)
       .single();
 
@@ -34,10 +34,25 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
       schoolId: profile.school_id as string | null,
     };
     req.accessToken = token;
+    touchLastSeen(authData.user.id, profile.last_seen_at as string | null);
     next();
   } catch (err) {
     next(err);
   }
+}
+
+const LAST_SEEN_THROTTLE_MS = 5 * 60_000;
+
+/** Fire-and-forget heartbeat, throttled to once per 5 min per user — cheap
+ *  enough to run on the request path without a DB write on every call.
+ *  Powers the "active now" panels on the School/Super Admin dashboards. */
+function touchLastSeen(userId: string, lastSeenAt: string | null): void {
+  if (lastSeenAt && Date.now() - new Date(lastSeenAt).getTime() < LAST_SEEN_THROTTLE_MS) return;
+  void supabaseAdmin
+    .from('user_profiles')
+    .update({ last_seen_at: new Date().toISOString() })
+    .eq('id', userId)
+    .then(() => {});
 }
 
 export function requireRole(...roles: Role[]) {

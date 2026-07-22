@@ -44,8 +44,8 @@ export async function getHistoryController(req: Request, res: Response, next: Ne
 
 export async function sendMessageController(req: Request, res: Response, next: NextFunction) {
   try {
-    const { text } = sendMessageSchema.parse(req.body);
-    res.json(await chatService.sendMessage(req.user!.id, requireId(req), text));
+    const { text, imageBase64 } = sendMessageSchema.parse(req.body);
+    res.json(await chatService.sendMessage(req.user!.id, requireId(req), text, imageBase64));
   } catch (err) {
     next(err);
   }

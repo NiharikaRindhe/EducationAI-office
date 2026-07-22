@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
-import { chatCompletion, ollamaConfigured } from '../lib/ollama.js';
+import { chatCompletion, aiConfigured } from '../lib/ai.js';
 import { addXp, logStreakActivity } from './gamification.service.js';
 import type { EnglishItemsQuery, SubmitEnglishAttemptInput } from '../schemas/english.schema.js';
 
@@ -20,7 +20,7 @@ function normalize(s: string): string {
 const WORD_TYPES = new Set(['word_repeat', 'word_see_say']);
 
 async function scoreWord(target: string, transcript: string): Promise<{ result: 'correct' | 'close' | 'incorrect'; feedback: string }> {
-  if (!(await ollamaConfigured())) {
+  if (!(await aiConfigured())) {
     const isMatch = normalize(target) === normalize(transcript);
     return { result: isMatch ? 'correct' : 'incorrect', feedback: isMatch ? 'Well done!' : "Let's try that word again!" };
   }
@@ -57,7 +57,7 @@ function heuristicSentenceScore(target: string, transcript: string): SentenceSco
 }
 
 async function scoreSentence(target: string, transcript: string, classNum: number, wpm: number | null): Promise<SentenceScore> {
-  if (!(await ollamaConfigured())) return heuristicSentenceScore(target, transcript);
+  if (!(await aiConfigured())) return heuristicSentenceScore(target, transcript);
 
   try {
     const raw = await chatCompletion(

@@ -20,6 +20,9 @@ export async function addToBank(teacherId: string, schoolId: string, input: AddQ
       marks: input.marks,
       source: 'teacher',
       created_by: teacherId,
+      is_pyq: input.isPyq ?? false,
+      pyq_year: input.pyqYear ?? null,
+      pyq_source: input.pyqSource ?? null,
     })
     .select()
     .single();
@@ -44,5 +47,31 @@ export async function listBank(
 
   const { data, error } = await query.order('created_at', { ascending: false });
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to list question bank', error.message);
+  return data;
+}
+
+export async function listPyqsForStudent(
+  studentId: string,
+  filters: { subject?: string; year?: number; marks?: number } = {},
+) {
+  const { data: sp, error: spError } = await supabaseAdmin
+    .from('student_profiles')
+    .select('class_num')
+    .eq('user_id', studentId)
+    .single();
+  if (spError || !sp) throw new ApiError('NOT_FOUND', 'Student profile not found');
+
+  let query = supabaseAdmin
+    .from('question_bank')
+    .select('*')
+    .eq('is_pyq', true)
+    .eq('class_num', sp.class_num);
+
+  if (filters.subject) query = query.eq('subject', filters.subject);
+  if (filters.year) query = query.eq('pyq_year', filters.year);
+  if (filters.marks) query = query.eq('marks', filters.marks);
+
+  const { data, error } = await query.order('pyq_year', { ascending: false }).order('created_at', { ascending: false });
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to load PYQs', error.message);
   return data;
 }
