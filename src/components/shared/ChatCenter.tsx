@@ -211,8 +211,15 @@ export const ChatCenter: React.FC<{ accent: Accent }> = ({ accent }) => {
                       <div className="flex flex-wrap gap-2">
                         {msg.returned_images.map((img, i) => (
                           <a key={i} href={img.url} target="_blank" rel="noreferrer"
-                            className="flex items-center gap-1 text-[9px] font-bold text-slate-500 hover:text-slate-700 bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg">
-                            <ImageIcon size={10} /> {img.caption ?? 'Diagram'}
+                            className="block w-40 overflow-hidden rounded-xl border border-slate-100 bg-slate-50 hover:border-slate-200 transition-colors">
+                            <img src={img.url} alt={img.caption ?? 'Textbook diagram'} loading="lazy"
+                              className="w-full h-28 object-contain bg-white" />
+                            <span className="flex items-center gap-1 text-[9px] font-bold text-slate-500 px-2 py-1.5">
+                              <ImageIcon size={10} className="shrink-0" />
+                              <span className="truncate">
+                                {img.caption ?? 'Diagram'}{img.page ? ` · Pg${img.page}` : ''}
+                              </span>
+                            </span>
                           </a>
                         ))}
                       </div>
