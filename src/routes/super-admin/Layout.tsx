@@ -5,7 +5,12 @@ import { TopBar } from '../../components/shared/TopBar';
 
 export const SuperAdminLayout: React.FC = () => {
   const navItems: NavItem[] = [
+    { href: '/super-admin/overview', label: 'Overview', iconName: 'dashboard' },
     { href: '/super-admin/schools', label: 'Schools', iconName: 'apartment' },
+    { href: '/super-admin/content', label: 'Content Portal', iconName: 'upload_file' },
+    { href: '/super-admin/ai-console', label: 'AI Console', iconName: 'smart_toy' },
+    { href: '/super-admin/tickets', label: 'Support Tickets', iconName: 'confirmation_number' },
+    { href: '/super-admin/audit-log', label: 'Audit Log', iconName: 'history' },
   ];
 
   return (

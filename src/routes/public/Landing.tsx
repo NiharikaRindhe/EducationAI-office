@@ -16,8 +16,8 @@ export const Landing: React.FC = () => {
     const timer = setInterval(() => {
       currentStep++;
       setStats({
-        grades: Math.min(Math.round((12 / steps) * currentStep), 12),
-        batches: Math.min(Math.round((4 / steps) * currentStep), 4),
+        grades: Math.min(Math.round((10 / steps) * currentStep), 10),
+        batches: Math.min(Math.round((3 / steps) * currentStep), 3),
         games: Math.min(Math.round((16 / steps) * currentStep), 16),
         ncert: Math.min(Math.round((100 / steps) * currentStep), 100),
       });
@@ -70,20 +70,6 @@ export const Landing: React.FC = () => {
       features: ['📋 Board Prep countdown', '🗺️ Interactive Concept Maps', '🍅 Pomodoro Focus Timer', '⚡ CBSE HOTS Challenges'],
       stats: 'March 2026 Target Board',
       link: '/batch3/home'
-    },
-    {
-      id: 4,
-      name: 'Batch 4',
-      grades: 'Class 11–12',
-      tagline: 'Entrance & Career Paths',
-      desc: 'Advanced "Pro Mode" workspace tailored for JEE & NEET aspirants, incorporating rank predictors, topic weightage models, and AI planners.',
-      color: 'slate',
-      accentBg: 'bg-purple-600',
-      textColor: 'text-purple-600',
-      gradient: 'from-slate-700 to-purple-600',
-      features: ['🎯 JEE/NEET Stream switch', '📊 Rank Predictor model', '📅 AI Study Planner calendar', '🎓 Career Path recommendations'],
-      stats: 'JEE/NEET Competitive Focus',
-      link: '/batch4/home'
     }
   ];
 
@@ -144,7 +130,7 @@ export const Landing: React.FC = () => {
           </h1>
 
           <p className="font-sans text-lg text-slate-500 max-w-2xl anim-fade-up" style={{ animationDelay: '0.2s' }}>
-            An adaptive, B2B education system for Indian classrooms. Delivering gamified journeys for Class 1-4, rigorous NCERT studies for Class 5-10, and high-performance JEE/NEET analytics for Class 11-12.
+            An adaptive, B2B education system for Indian classrooms. Delivering gamified journeys for Class 1–4, structured NCERT foundations for Class 5–8, and rigorous board-exam preparation for Class 9–10.
           </p>
 
           {/* CTA Row */}
@@ -290,13 +276,13 @@ export const Landing: React.FC = () => {
         {/* Batch Showcase Section */}
         <section id="batches" className="w-full pt-16 flex flex-col gap-12">
           <div className="text-center flex flex-col gap-2">
-            <h2 className="font-display font-bold text-3xl md:text-4xl text-slate-900">One Platform. Four Worlds.</h2>
+            <h2 className="font-display font-bold text-3xl md:text-4xl text-slate-900">One Platform. Three Worlds.</h2>
             <p className="font-sans text-slate-400 text-sm max-w-xl mx-auto">
               Tailored workspaces engineered with progressive maturity to grow with the student.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {batchesData.map((batch) => (
               <div key={batch.id} className="bento-card relative overflow-hidden group border border-slate-100 shadow-md card-interactive flex flex-col justify-between gap-6 p-8 min-h-[300px]">
                 {/* Decorative gradient blob behind */}
@@ -308,7 +294,7 @@ export const Landing: React.FC = () => {
                     <h3 className="font-display font-bold text-2xl text-slate-900">{batch.grades}</h3>
                     <p className={`font-sans font-semibold text-xs ${batch.textColor} mt-0.5`}>{batch.tagline}</p>
                   </div>
-                  <span className="text-2xl select-none">{batch.id === 1 ? '🎮' : batch.id === 2 ? '💬' : batch.id === 3 ? '🗺️' : '🎯'}</span>
+                  <span className="text-2xl select-none">{batch.id === 1 ? '🎮' : batch.id === 2 ? '💬' : '🗺️'}</span>
                 </div>
 
                 <p className="font-sans text-sm text-slate-500 leading-relaxed pr-6">{batch.desc}</p>
@@ -417,7 +403,6 @@ export const Landing: React.FC = () => {
               <Link to="/batch1/home" className="hover:text-slate-400">Class 1-4</Link>
               <Link to="/batch2/home" className="hover:text-slate-400">Class 5-8</Link>
               <Link to="/batch3/home" className="hover:text-slate-400">Class 9-10</Link>
-              <Link to="/batch4/home" className="hover:text-slate-400">Class 11-12</Link>
             </div>
           </div>
         </div>

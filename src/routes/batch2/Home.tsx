@@ -1,25 +1,95 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { Flame, Star, Trophy, BookOpen, Compass, ChevronRight, MessageSquare, Clock } from 'lucide-react';
+import { Flame, Star, Trophy, BookOpen, Compass, ChevronRight, MessageSquare, Clock, Loader2, Zap, Award } from 'lucide-react';
 import { TodayPanel } from '../../components/shared/TodayPanel';
+import { api } from '../../lib/api';
+
+interface SubjectProgress {
+  name: string;
+  emoji?: string;
+  progress: number;
+  current_chapter?: string;
+}
+
+interface LeaderboardUser {
+  rank: number;
+  fullName: string;
+  avatar: string;
+  xp: number;
+}
+
+interface DailyChallengeItem {
+  id: string;
+  title: string;
+  xp_reward: number;
+  completed: boolean;
+}
 
 export const Batch2Home: React.FC = () => {
   const navigate = useNavigate();
   const { studentName, studentAvatar, studentXP, studentStreak } = useApp();
 
-  const subjects = [
-    { name: 'Mathematics', progress: 78, color: 'bg-indigo-600', current: 'Ch 4 Linear Equations' },
-    { name: 'Science', progress: 64, color: 'bg-indigo-500', current: 'Ch 5 Cell Structure' },
-    { name: 'English', progress: 91, color: 'bg-violet-500', current: 'Ch 6 Novel: The Lost Key' },
-    { name: 'Social Science', progress: 83, color: 'bg-purple-600', current: 'Ch 3 French Revolution' }
+  const [subjects, setSubjects] = useState<SubjectProgress[] | null>(null);
+  const [challenges, setChallenges] = useState<DailyChallengeItem[] | null>(null);
+  const [leaderboard, setLeaderboard] = useState<{ top3: LeaderboardUser[]; myRank: number } | null>(null);
+
+  // Fallbacks if API is empty or fails
+  const mockSubjects: SubjectProgress[] = [
+    { name: 'Mathematics', progress: 78, current_chapter: 'Ch 4 Linear Equations', emoji: '📐' },
+    { name: 'Science', progress: 64, current_chapter: 'Ch 5 Cell Structure', emoji: '🔬' },
+    { name: 'English', progress: 91, current_chapter: 'Ch 6 Novel: The Lost Key', emoji: '📖' },
+    { name: 'Social Science', progress: 83, current_chapter: 'Ch 3 French Revolution', emoji: '🗺️' }
   ];
 
-  const leaderboardTop3 = [
-    { rank: 1, name: 'Aisha', xp: 4890, avatar: '🦋', change: 'up' },
-    { rank: 2, name: 'Dev (You)', xp: studentXP, avatar: studentAvatar, change: 'same' },
-    { rank: 3, name: 'Arjun', xp: 3820, avatar: '🦁', change: 'down' }
+  const mockLeaderboard = [
+    { rank: 1, fullName: 'Aisha', xp: 4890, avatar: '🦋' },
+    { rank: 2, fullName: `${studentName} (You)`, xp: studentXP, avatar: studentAvatar },
+    { rank: 3, fullName: 'Arjun', xp: 3820, avatar: '🦁' }
   ];
+
+  useEffect(() => {
+    // 1. Subjects progress
+    api.get<string[]>('/student/subjects')
+      .then(res => {
+        if (res.length > 0) {
+          const mapped = res.map(name => {
+            const mock = mockSubjects.find(m => m.name.toLowerCase().includes(name.toLowerCase()) || name.toLowerCase().includes(m.name.toLowerCase()));
+            return {
+              name,
+              progress: mock ? mock.progress : 50,
+              current_chapter: mock ? mock.current_chapter : 'Explore Topics',
+              emoji: mock ? mock.emoji : undefined
+            };
+          });
+          setSubjects(mapped);
+        } else {
+          setSubjects(null);
+        }
+      })
+      .catch(() => setSubjects(null));
+
+    // 2. Daily challenges (top 3)
+    api.get<DailyChallengeItem[]>('/student/daily-challenges')
+      .then(res => setChallenges(res.slice(0, 3)))
+      .catch(() => setChallenges(null));
+
+    // 3. Leaderboard
+    api.get<{ users: { rank: number; full_name: string; avatar: string; xp: number }[]; myRank: number }>('/student/leaderboard', { batchId: 2, period: 'weekly' })
+      .then(res => {
+        const top3 = res.users.slice(0, 3).map(u => ({
+          rank: u.rank,
+          fullName: u.full_name,
+          avatar: u.avatar,
+          xp: u.xp
+        }));
+        setLeaderboard({ top3, myRank: res.myRank });
+      })
+      .catch(() => setLeaderboard(null));
+  }, [studentName, studentAvatar, studentXP]);
+
+  const displaySubjects = subjects || mockSubjects;
+  const displayLeaderboard = leaderboard?.top3 || mockLeaderboard;
 
   return (
     <div className="flex flex-col gap-6 select-none anim-fade-up">
@@ -62,7 +132,7 @@ export const Batch2Home: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {subjects.map((sub, idx) => (
+              {displaySubjects.map((sub, idx) => (
                 <div 
                   key={idx}
                   className="p-4 bg-slate-50/50 border border-slate-100 rounded-2xl flex flex-col justify-between gap-4 card-interactive"
@@ -70,10 +140,10 @@ export const Batch2Home: React.FC = () => {
                   <div className="flex justify-between items-start">
                     <div>
                       <h4 className="font-display font-bold text-sm text-slate-800">{sub.name}</h4>
-                      <span className="text-[10px] text-slate-400 font-medium mt-0.5 block">{sub.current}</span>
+                      <span className="text-[10px] text-slate-400 font-medium mt-0.5 block">{sub.current_chapter ?? 'Explore Topics'}</span>
                     </div>
                     <span className="text-xl">
-                      {sub.name.includes('Math') ? '📐' : sub.name.includes('Science') ? '🔬' : sub.name.includes('English') ? '📖' : '🗺️'}
+                      {sub.emoji ?? (sub.name.includes('Math') ? '📐' : sub.name.includes('Science') ? '🔬' : sub.name.includes('English') ? '📖' : '🗺️')}
                     </span>
                   </div>
                   
@@ -83,7 +153,7 @@ export const Batch2Home: React.FC = () => {
                       <span>{sub.progress}%</span>
                     </div>
                     <div className="progress-bar">
-                      <div className={`progress-fill ${sub.color}`} style={{ width: `${sub.progress}%` }}></div>
+                      <div className={`progress-fill bg-indigo-600`} style={{ width: `${sub.progress}%` }}></div>
                     </div>
                   </div>
 
@@ -100,31 +170,38 @@ export const Batch2Home: React.FC = () => {
           </div>
         </div>
 
-        {/* Right column: leaderboard, exam tracker & chat snippet */}
+        {/* Right column: daily challenges & leaderboard */}
         <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
-          {/* Upcoming Exam Card */}
-          <div className="bento-card border border-indigo-100 bg-white p-5 flex flex-col gap-4">
+          {/* Daily challenges mini-widget */}
+          <div className="bento-card border border-indigo-100 bg-white p-5 flex flex-col gap-3">
             <div className="flex justify-between items-center">
-              <span className="font-display font-bold text-xs text-slate-700">Upcoming Test</span>
-              <span className="badge pill-rose text-[9px] font-bold">CBSE Pattern</span>
-            </div>
-            
-            <div className="flex items-center gap-3.5 select-none bg-slate-50 border border-slate-100 p-3 rounded-2xl">
-              <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-100 text-rose-500 flex items-center justify-center">
-                <Clock size={18} />
-              </div>
-              <div>
-                <span className="font-sans font-bold text-xs text-slate-700 block">Term Algebra Quiz</span>
-                <span className="text-[9px] text-slate-400 font-medium block mt-0.5">Duration: 30 mins · Class 7</span>
-              </div>
+              <span className="font-display font-bold text-xs text-slate-700">Daily Challenges</span>
+              <Link to="/batch2/daily-challenges" className="text-[10px] font-bold text-indigo-600 hover:underline">
+                View All
+              </Link>
             </div>
 
-            <Link 
-              to="/batch2/exams"
-              className="py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-sans font-bold text-xs rounded-xl text-center shadow-md shadow-indigo-600/10"
-            >
-              Enter Exam Room
-            </Link>
+            <div className="flex flex-col gap-2 font-sans text-xs">
+              {challenges === null ? (
+                <div className="flex justify-center py-2"><Loader2 size={14} className="animate-spin text-indigo-500" /></div>
+              ) : challenges.length === 0 ? (
+                <p className="text-[10px] text-slate-400">All caught up for today! 🎉</p>
+              ) : (
+                challenges.map(ch => (
+                  <div key={ch.id} className="p-2.5 bg-slate-50 rounded-xl flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 truncate">
+                      <span className={`w-2 h-2 rounded-full ${ch.completed ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                      <span className={`truncate ${ch.completed ? 'line-through text-slate-400' : 'text-slate-700 font-medium'}`}>
+                        {ch.title}
+                      </span>
+                    </div>
+                    <span className="shrink-0 text-[8px] font-black bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full">
+                      +{ch.xp_reward} XP
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
 
           {/* Leaderboard snippet */}
@@ -137,11 +214,11 @@ export const Batch2Home: React.FC = () => {
             </div>
 
             <div className="flex flex-col gap-2 font-sans text-xs">
-              {leaderboardTop3.map((usr) => (
+              {displayLeaderboard.map((usr) => (
                 <div 
                   key={usr.rank}
                   className={`p-2 px-3 rounded-xl flex items-center justify-between border ${
-                    usr.name.includes('You') 
+                    usr.fullName.includes('You') || usr.fullName.toLowerCase().includes(studentName.toLowerCase())
                       ? 'bg-indigo-50/50 border-indigo-100/50 font-bold' 
                       : 'bg-slate-50/50 border-slate-100'
                   }`}
@@ -149,16 +226,18 @@ export const Batch2Home: React.FC = () => {
                   <div className="flex items-center gap-2.5">
                     <span className="font-display font-black text-slate-400 w-4 block text-center">#{usr.rank}</span>
                     <span className="text-lg">{usr.avatar}</span>
-                    <span className="text-slate-700 truncate max-w-[100px]">{usr.name}</span>
+                    <span className="text-slate-700 truncate max-w-[100px]">{usr.fullName}</span>
                   </div>
                   <div className="flex items-center gap-2 text-slate-400 font-bold text-[10px]">
                     <span>{usr.xp} XP</span>
-                    <span className={usr.change === 'up' ? 'text-emerald-500' : usr.change === 'down' ? 'text-red-500' : 'text-slate-400'}>
-                      {usr.change === 'up' ? '▲' : usr.change === 'down' ? '▼' : '●'}
-                    </span>
                   </div>
                 </div>
               ))}
+              {leaderboard && leaderboard.myRank > 3 && (
+                <div className="p-2 px-3 rounded-xl bg-indigo-50/30 border border-indigo-100 text-center font-bold text-[10px] text-indigo-600">
+                  Your Current Rank: #{leaderboard.myRank}
+                </div>
+              )}
             </div>
           </div>
         </div>

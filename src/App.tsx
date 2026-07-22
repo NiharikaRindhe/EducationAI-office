@@ -16,15 +16,10 @@ import { Batch1Layout } from './routes/batch1/Layout';
 import { Batch1Home } from './routes/batch1/Home';
 import { Batch1Stories } from './routes/batch1/Stories';
 import { Batch1Exams } from './routes/batch1/Exams';
-import { Batch1Progress } from './routes/batch1/Progress';
 import { Batch1Tasks } from './routes/batch1/Tasks';
 import { Batch1Games } from './routes/batch1/Games';
-import {
-  Batch1Badges,
-  Batch1ShowAndTell,
-  Batch1Streak,
-  Batch1Profile
-} from './routes/batch1/MinorPages';
+import { Batch1MyStuff } from './routes/batch1/MyStuff';
+import { Batch1Syllabus } from './routes/batch1/Syllabus';
 
 // Import Batch 2 Pages
 import { Batch2Layout } from './routes/batch2/Layout';
@@ -62,15 +57,28 @@ import {
   Batch3Profile
 } from './routes/batch3/MinorPages';
 
+// Import Super Admin Pages
+import { SuperAdminLayout } from './routes/super-admin/Layout';
+import { SuperAdminSchools } from './routes/super-admin/Schools';
+import { SuperAdminContentPortal } from './routes/super-admin/ContentPortal';
+import { SuperAdminOverview } from './routes/super-admin/Overview';
+import { SuperAdminAiConsole } from './routes/super-admin/AiConsole';
+import { SuperAdminTickets } from './routes/super-admin/Tickets';
+import { SuperAdminSchoolDetail } from './routes/super-admin/SchoolDetail';
+import { SuperAdminAuditLog } from './routes/super-admin/AuditLog';
+
 // Import Teacher Pages
 import { TeacherLayout } from './routes/teacher/Layout';
 import { TeacherDashboard } from './routes/teacher/Dashboard';
 import { TeacherLiveSession } from './routes/teacher/LiveSession';
+import { TeacherTimetable } from './routes/teacher/Timetable';
 import { TeacherStudents } from './routes/teacher/Students';
 import { TeacherAssignTasks } from './routes/teacher/AssignTasks';
 import { TeacherCreateExam } from './routes/teacher/CreateExam';
 import { TeacherExamReview } from './routes/teacher/ExamReview';
 import { TeacherReports } from './routes/teacher/Reports';
+import { TeacherQuestionBank } from './routes/teacher/QuestionBank';
+import { TeacherTickets } from './routes/teacher/Tickets';
 
 // Import School Admin Pages
 import { SchoolAdminLayout } from './routes/school-admin/Layout';
@@ -79,10 +87,12 @@ import { SchoolAdminClassesSections } from './routes/school-admin/ClassesSection
 import { SchoolAdminStudents } from './routes/school-admin/Students';
 import { SchoolAdminTeachers } from './routes/school-admin/Teachers';
 import { SchoolAdminLabIncharges } from './routes/school-admin/LabIncharges';
-
-// Import Super Admin Pages
-import { SuperAdminLayout } from './routes/super-admin/Layout';
-import { SuperAdminSchools } from './routes/super-admin/Schools';
+import { SchoolAdminLabs } from './routes/school-admin/Labs';
+import { SchoolAdminTimetable } from './routes/school-admin/Timetable';
+import { SchoolAdminFeatureToggles } from './routes/school-admin/FeatureToggles';
+import { SchoolAdminPrincipalReport } from './routes/school-admin/PrincipalReport';
+import { SchoolAdminPromotion } from './routes/school-admin/Promotion';
+import { SchoolAdminTickets } from './routes/school-admin/Tickets';
 
 // Import Lab In-charge Pages
 import { LabInchargeLayout } from './routes/lab-incharge/Layout';
@@ -118,13 +128,10 @@ function App() {
               <Route path="home" element={<Batch1Home />} />
               <Route path="stories" element={<Batch1Stories />} />
               <Route path="exams" element={<Batch1Exams />} />
-              <Route path="progress" element={<Batch1Progress />} />
               <Route path="tasks" element={<Batch1Tasks />} />
               <Route path="games" element={<Batch1Games />} />
-              <Route path="badges" element={<Batch1Badges />} />
-              <Route path="show-and-tell" element={<Batch1ShowAndTell />} />
-              <Route path="streak" element={<Batch1Streak />} />
-              <Route path="profile" element={<Batch1Profile />} />
+              <Route path="my-stuff" element={<Batch1MyStuff />} />
+              <Route path="syllabus" element={<Batch1Syllabus />} />
             </Route>
 
             {/* Student Batch 2 (Class 5-8) Dashboard Routes */}
@@ -189,11 +196,14 @@ function App() {
               <Route index element={<Navigate to="/teacher/dashboard" replace />} />
               <Route path="dashboard" element={<TeacherDashboard />} />
               <Route path="live-session" element={<TeacherLiveSession />} />
+              <Route path="timetable" element={<TeacherTimetable />} />
               <Route path="students" element={<TeacherStudents />} />
               <Route path="assign-tasks" element={<TeacherAssignTasks />} />
               <Route path="create-exam" element={<TeacherCreateExam />} />
               <Route path="exams/:examId/review" element={<TeacherExamReview />} />
               <Route path="reports" element={<TeacherReports />} />
+              <Route path="question-bank" element={<TeacherQuestionBank />} />
+              <Route path="tickets" element={<TeacherTickets />} />
             </Route>
 
             {/* School Admin Portal Routes */}
@@ -211,6 +221,12 @@ function App() {
               <Route path="students" element={<SchoolAdminStudents />} />
               <Route path="teachers" element={<SchoolAdminTeachers />} />
               <Route path="lab-incharges" element={<SchoolAdminLabIncharges />} />
+              <Route path="labs" element={<SchoolAdminLabs />} />
+              <Route path="timetable" element={<SchoolAdminTimetable />} />
+              <Route path="feature-toggles" element={<SchoolAdminFeatureToggles />} />
+              <Route path="principal-report" element={<SchoolAdminPrincipalReport />} />
+              <Route path="promotion" element={<SchoolAdminPromotion />} />
+              <Route path="tickets" element={<SchoolAdminTickets />} />
             </Route>
 
             {/* Super Admin Portal Routes */}
@@ -222,9 +238,15 @@ function App() {
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Navigate to="/super-admin/schools" replace />} />
-              <Route path="dashboard" element={<Navigate to="/super-admin/schools" replace />} />
+              <Route index element={<Navigate to="/super-admin/overview" replace />} />
+              <Route path="dashboard" element={<Navigate to="/super-admin/overview" replace />} />
+              <Route path="overview" element={<SuperAdminOverview />} />
               <Route path="schools" element={<SuperAdminSchools />} />
+              <Route path="schools/:schoolId" element={<SuperAdminSchoolDetail />} />
+              <Route path="content" element={<SuperAdminContentPortal />} />
+              <Route path="ai-console" element={<SuperAdminAiConsole />} />
+              <Route path="tickets" element={<SuperAdminTickets />} />
+              <Route path="audit-log" element={<SuperAdminAuditLog />} />
             </Route>
 
             {/* Lab In-charge Portal Routes */}

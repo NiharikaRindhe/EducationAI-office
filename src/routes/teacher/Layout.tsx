@@ -11,15 +11,19 @@ export const TeacherLayout: React.FC = () => {
   const navItems: NavItem[] = [
     { href: '/teacher/dashboard', label: 'Dashboard', iconName: 'dashboard' },
     { href: '/teacher/live-session', label: 'Live Session', iconName: 'cast_for_education' },
+    { href: '/teacher/timetable', label: 'Timetable', iconName: 'calendar_month' },
     { href: '/teacher/students', label: 'Students', iconName: 'people' },
     { href: '/teacher/assign-tasks', label: 'Assign Tasks', iconName: 'assignment_add' },
     { href: '/teacher/create-exam', label: 'Create Exam', iconName: 'edit_note' },
-    { href: '/teacher/reports', label: 'Reports & Analytics', iconName: 'analytics' }
+    { href: '/teacher/question-bank', label: 'Question Bank', iconName: 'library_books' },
+    { href: '/teacher/reports', label: 'Reports & Analytics', iconName: 'analytics' },
+    { href: '/teacher/tickets', label: 'Report an Issue', iconName: 'confirmation_number' }
   ];
 
   const getHeaderDetails = () => {
     const path = location.pathname;
     if (path.includes('/live-session')) return { title: 'Live Session', sub: 'Start a lab period for one of your sections — students join and Batch 1 PIN login unlocks.' };
+    if (path.includes('/timetable')) return { title: 'My Timetable', sub: 'Your weekly lab periods — reschedule or cancel if the lab is unavailable.' };
     if (path.includes('/students')) return { title: 'Students Directory', sub: 'Monitor student analytics, streaks, and drill down into individual profiles.' };
     if (path.includes('/assign-tasks')) return { title: 'Assign New Task', sub: 'Create assignments for your sections — the same task to many sections, or different ones per section.' };
     if (path.includes('/create-exam')) return { title: 'Exam Builder Workspace', sub: 'Build customized quizzes using question types or NCERT question banks.' };

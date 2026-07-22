@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
 import { Search, ChevronDown, ChevronUp, Check, Play, BookOpen, MessageSquare } from 'lucide-react';
 
 interface Chapter {
@@ -15,7 +14,6 @@ interface Unit {
 }
 
 export const Batch2Subjects: React.FC = () => {
-  const { exams } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'Maths' | 'Science' | 'English'>('Maths');
   const [expandedUnits, setExpandedUnits] = useState<Record<string, boolean>>({

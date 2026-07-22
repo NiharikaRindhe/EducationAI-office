@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
 import { useSearchParams } from 'react-router-dom';
 import { Star, ArrowLeft } from 'lucide-react';
@@ -140,6 +141,7 @@ function starsForPhonicsPop(mistakes: number): number {
 
 export const Batch1Games: React.FC = () => {
   const { currentClass, incrementXP } = useApp();
+  const { refreshUser } = useAuth();
   const [searchParams] = useSearchParams();
 
   /* ── Loading state ── */
@@ -212,9 +214,10 @@ export const Batch1Games: React.FC = () => {
           { stars, score },
         );
 
-        /* Show XP float */
+        /* Show XP float; the award is server-side, so pull the fresh
+           profile rather than double-counting with a local bump. */
         if (res.xpGained > 0) {
-          incrementXP(res.xpGained);
+          void refreshUser();
           setXpFloat({ amount: res.xpGained, key: Date.now() });
           setTimeout(() => setXpFloat(null), 1600);
         }
@@ -240,7 +243,7 @@ export const Batch1Games: React.FC = () => {
         );
       }
     },
-    [incrementXP],
+    [incrementXP, refreshUser],
   );
 
   /* ───────────── Gallery View ───────────── */

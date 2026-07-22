@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Radio, Hand, Loader2, ArrowRight, ClipboardList, FileEdit } from 'lucide-react';
+import { Radio, Hand, Loader2, ArrowRight, ClipboardList, FileEdit, MonitorSmartphone, Ban, CalendarClock } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 
 // The first real answer to "what should I do this period?" — surfaces the
@@ -36,6 +36,27 @@ interface ExamListItem {
   state: 'upcoming' | 'open' | 'submitted' | 'closed';
 }
 
+interface Occurrence {
+  date: string;
+  periodNo: number;
+  startsAt: string;
+  endsAt: string;
+  subject: string;
+  teacherName: string | null;
+  labName: string | null;
+  status: 'scheduled' | 'cancelled' | 'rescheduled_out' | 'rescheduled_in';
+  reason?: string | null;
+  movedTo?: { date: string; periodNo: number } | null;
+  movedFrom?: string | null;
+}
+
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const shortTime = (t: string) => t.slice(0, 5);
+
 const teacherName = (s: ActiveSession): string => {
   const up = s.teacher_profiles?.user_profiles;
   if (!up) return 'your teacher';
@@ -50,6 +71,7 @@ export const TodayPanel: React.FC<{ accent: Accent; tasksHref: string; examsHref
   const [isJoining, setIsJoining] = useState(false);
   const [tasks, setTasks] = useState<TaskAssignment[] | null>(null);
   const [exams, setExams] = useState<ExamListItem[] | null>(null);
+  const [periods, setPeriods] = useState<Occurrence[] | null>(null);
   const pollRef = useRef<number | null>(null);
 
   const pollSession = useCallback(async () => {
@@ -73,6 +95,12 @@ export const TodayPanel: React.FC<{ accent: Accent; tasksHref: string; examsHref
       try {
         setExams(await api.get<ExamListItem[]>('/student/exams'));
       } catch { /* same */ }
+    })();
+    void (async () => {
+      try {
+        const today = todayStr();
+        setPeriods(await api.get<Occurrence[]>('/student/timetable/occurrences', { from: today, to: today }));
+      } catch { setPeriods([]); }
     })();
 
     pollRef.current = window.setInterval(() => void pollSession(), 15_000);
@@ -107,8 +135,52 @@ export const TodayPanel: React.FC<{ accent: Accent; tasksHref: string; examsHref
   const pendingTasks = (tasks ?? []).filter((t) => t.status !== 'completed').slice(0, 3);
   const openExams = (exams ?? []).filter((e) => e.state === 'open');
 
+  const todaysPeriods = (periods ?? []).filter((p) => p.status !== 'rescheduled_out');
+
   return (
     <div className="flex flex-col gap-4">
+      {/* Today's lab periods — driven by the school's timetable, including any rescheduling */}
+      {periods !== null && todaysPeriods.length > 0 && (
+        <div className="bento-card border border-slate-100 bg-white p-5 flex flex-col gap-3">
+          <h3 className="font-display font-bold text-sm text-slate-800 flex items-center gap-2">
+            <CalendarClock size={15} className={a.ring} /> Today's Lab Periods
+          </h3>
+          <div className="flex flex-col gap-2">
+            {todaysPeriods.map((p, i) => (
+              <div
+                key={i}
+                className={`flex items-center justify-between gap-3 rounded-xl px-3.5 py-2.5 border ${
+                  p.status === 'cancelled' ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-slate-50 border-slate-100'
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="font-display font-black text-slate-400 text-xs w-6 text-center shrink-0">P{p.periodNo}</span>
+                  <div className="min-w-0">
+                    <span className={`block text-xs font-bold truncate ${p.status === 'cancelled' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+                      {p.subject}
+                    </span>
+                    <span className="block text-[10px] text-slate-400 truncate">
+                      {shortTime(p.startsAt)}–{shortTime(p.endsAt)}
+                      {p.labName ? ` · ${p.labName}` : ''}
+                      {p.teacherName ? ` · ${p.teacherName}` : ''}
+                    </span>
+                  </div>
+                </div>
+                {p.status === 'cancelled' ? (
+                  <span className="flex items-center gap-1 text-[9px] font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded-full shrink-0">
+                    <Ban size={10} /> Cancelled
+                  </span>
+                ) : p.status === 'rescheduled_in' ? (
+                  <span className="flex items-center gap-1 text-[9px] font-bold text-amber-700 bg-amber-50 px-2 py-1 rounded-full shrink-0">
+                    <MonitorSmartphone size={10} /> Moved here
+                  </span>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Live session banner */}
       {session && (
         <div className={`rounded-3xl p-5 border flex items-center justify-between gap-4 ${a.soft}`}>

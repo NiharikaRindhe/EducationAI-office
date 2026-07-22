@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useApp } from '../../context/AppContext';
 import { ChevronDown, Check, Star, ArrowRight, BookOpen, Clock } from 'lucide-react';
 
 export const Batch3BoardPrep: React.FC = () => {

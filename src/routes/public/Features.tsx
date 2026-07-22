@@ -34,17 +34,17 @@ export const Features: React.FC = () => {
     },
     {
       icon: '🎯',
-      title: 'JEE & NEET Prep',
+      title: 'Board Exam Readiness',
       gradient: 'from-rose-500 to-pink-600',
-      pills: ['Mock Tests', 'Rank Predictor', 'Topic Weightage'],
-      desc: 'Dedicated "Pro Mode" workspace for Class 11-12. Practice entrance exam patterns, estimate ranks, and log study times.'
+      pills: ['Board Countdown', 'PYQ Papers', 'Concept Maps'],
+      desc: 'Class 9–10 students prepare with past-year papers, chapter concept maps, Pomodoro focus sessions, and a live countdown to boards.'
     },
     {
-      icon: '👨‍👩‍👧',
-      title: 'Parent Connect',
+      icon: '🏫',
+      title: 'Live Lab Sessions',
       gradient: 'from-violet-500 to-purple-600',
-      pills: ['Weekly Reports', 'WhatsApp Share', 'Teacher Messaging'],
-      desc: 'Empower parents with immediate insights. High-contrast report cards can be shared to family circles in one tap.'
+      pills: ['One-tap PIN Login', 'Raise Hand', 'Session Control'],
+      desc: 'Teachers start a class session and the whole lab logs in — Class 1–4 with just a name and PIN. Sessions end centrally so no account is left open.'
     }
   ];
 
