@@ -1,0 +1,268 @@
+# ═════════════════════════════════════════════════════════════
+#  EduAI — Production Docker Compose
+#  Brings up the full school-server stack on a single box:
+#    • Supabase self-hosted (Postgres + pgvector, GoTrue, PostgREST,
+#      Realtime, Storage, Studio)
+#    • EduAI Node API
+#    • Ollama (local LLM: mxbai-embed-large for embeddings,
+#      llama3.2 for chat — pull only the models needed)
+#    • Nginx (reverse proxy / TLS termination)
+#
+#  Usage:
+#    1. Copy .env.example → .env and fill in secrets.
+#    2. docker compose up -d
+#    3. On first boot: docker compose exec api npm run seed:super-admin
+#    4. Access Studio at http://localhost:8000 to run migrations.
+#
+#  All data lives in named Docker volumes so it survives restarts.
+# ═════════════════════════════════════════════════════════════
+
+version: "3.9"
+
+# ─── Shared environment loaded from .env ─────────────────────
+x-db-env: &db-env
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  POSTGRES_DB: postgres
+  POSTGRES_USER: postgres
+
+services:
+
+  # ── Postgres + pgvector ────────────────────────────────────
+  db:
+    image: supabase/postgres:15.6.1.143
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      <<: *db-env
+      POSTGRES_HOST: /var/run/postgresql
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      # Mount migrations so Studio can apply them on first boot
+      - ./supabase/migrations:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:5432:5432"   # local-only; Nginx/API reach via internal network
+
+  # ── Supabase Auth (GoTrue) ─────────────────────────────────
+  auth:
+    image: supabase/gotrue:v2.158.2
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      GOTRUE_SITE_URL: ${SITE_URL}
+      GOTRUE_URI_ALLOW_LIST: ${SITE_URL}
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_MAILER_AUTOCONFIRM: "true"  # no real email in school lab
+      API_EXTERNAL_URL: ${API_EXTERNAL_URL}
+    ports:
+      - "127.0.0.1:9999:9999"
+
+  # ── Supabase PostgREST ─────────────────────────────────────
+  rest:
+    image: postgrest/postgrest:v12.2.3
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  # ── Supabase Realtime ──────────────────────────────────────
+  realtime:
+    image: supabase/realtime:v2.30.34
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 4000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: supabase_admin
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: postgres
+      JWT_SECRET: ${JWT_SECRET}
+      REPLICATION_MODE: RLS
+      REPLICATION_POLL_INTERVAL: 100
+      SECURE_CHANNELS: "true"
+      SLOT_NAME: supabase_realtime_rls
+    ports:
+      - "127.0.0.1:4000:4000"
+
+  # ── Supabase Storage ───────────────────────────────────────
+  storage:
+    image: supabase/storage-api:v1.11.13
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ANON_KEY: ${SUPABASE_ANON_KEY}
+      SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      POSTGREST_URL: http://rest:3000
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      FILE_SIZE_LIMIT: 52428800    # 50 MB — matches NCERT PDF limit
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: local
+      GLOBAL_S3_BUCKET: stub
+    volumes:
+      - storage_data:/var/lib/storage
+    ports:
+      - "127.0.0.1:5000:5000"
+
+  # ── Supabase Studio (DB admin UI) ─────────────────────────
+  studio:
+    image: supabase/studio:20240729-ce42139
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_REST_URL: ${API_EXTERNAL_URL}/rest/v1/
+      STUDIO_PG_META_URL: http://meta:8080
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+    ports:
+      - "127.0.0.1:3333:3000"
+
+  # ── Supabase Kong (API gateway) ────────────────────────────
+  kong:
+    image: kong:2.8.1
+    restart: unless-stopped
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl
+    volumes:
+      - ./supabase/kong.yml:/var/lib/kong/kong.yml:ro
+    ports:
+      - "8000:8000"    # HTTP  — Studio + PostgREST + Auth accessible here
+      - "8443:8443"    # HTTPS (if TLS cert is mounted)
+
+  # ── pg-meta (Studio needs this) ──────────────────────────
+  meta:
+    image: supabase/postgres-meta:v0.83.2
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: db
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: postgres
+      PG_META_DB_USER: supabase_admin
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  # ── EduAI Node API ─────────────────────────────────────────
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      auth:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      FRONTEND_URL: ${SITE_URL}
+      OLLAMA_URL: http://ollama:11434
+    ports:
+      - "127.0.0.1:3001:3001"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/health | grep -q ok || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ── Ollama (local LLM — embeddings + chat) ─────────────────
+  ollama:
+    image: ollama/ollama:0.3.12
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "127.0.0.1:11434:11434"
+    # GPU support: uncomment the deploy block if the school server has an NVIDIA GPU
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  # ── Ollama model bootstrap ──────────────────────────────────
+  # Pulls required models on first boot; exits immediately after.
+  ollama-pull:
+    image: ollama/ollama:0.3.12
+    restart: "no"
+    depends_on:
+      - ollama
+    entrypoint: >
+      sh -c "
+        sleep 5 &&
+        ollama pull mxbai-embed-large &&
+        ollama pull llama3.2
+      "
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    volumes:
+      - ollama_data:/root/.ollama
+
+  # ── Nginx (reverse proxy) ──────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # Mount TLS certs here when available (e.g., Let's Encrypt via certbot)
+      - ./nginx/certs:/etc/nginx/certs:ro
+      # Serve the built frontend static files
+      - ./dist:/usr/share/nginx/html:ro
+
+# ─── Named volumes ────────────────────────────────────────────
+volumes:
+  db_data:
+  storage_data:
+  ollama_data:
