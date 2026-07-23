@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { createChatSessionSchema, sendMessageSchema } from '../schemas/chat.schema.js';
+import { createChatSessionSchema, renameChatSessionSchema, sendMessageSchema } from '../schemas/chat.schema.js';
 import * as chatService from '../services/chat.service.js';
 import { ApiError } from '../lib/errors.js';
 
@@ -46,6 +46,24 @@ export async function sendMessageController(req: Request, res: Response, next: N
   try {
     const { text, imageBase64 } = sendMessageSchema.parse(req.body);
     res.json(await chatService.sendMessage(req.user!.id, requireId(req), text, imageBase64));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function renameSessionController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const input = renameChatSessionSchema.parse(req.body);
+    res.json(await chatService.renameSession(req.user!.id, requireId(req), input));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteSessionController(req: Request, res: Response, next: NextFunction) {
+  try {
+    await chatService.deleteSession(req.user!.id, requireId(req));
+    res.status(204).end();
   } catch (err) {
     next(err);
   }

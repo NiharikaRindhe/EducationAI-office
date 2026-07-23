@@ -25,6 +25,16 @@ export const env = {
   // Without it, everything runs on the local Ollama daemon as before.
   cloudAiBaseUrl: process.env.CLOUD_AI_BASE_URL ?? '',
   cloudAiApiKey: process.env.CLOUD_AI_API_KEY ?? '',
+  // CLOUD_AI_API_KEY may be a comma-separated list — some free-tier providers
+  // (Ollama Cloud included) rate-limit per key/account, not per app, so
+  // several free keys round-robinned go further than one. lib/ai.ts rotates
+  // to the next key on a 429/quota response instead of failing the request.
+  get cloudAiApiKeys(): string[] {
+    return this.cloudAiApiKey
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean);
+  },
 
   // Per-task model tiers (see lib/ai.ts): the tutor optimizes for speed and
   // volume; grading/question-gen are rare, async, and accuracy-critical;

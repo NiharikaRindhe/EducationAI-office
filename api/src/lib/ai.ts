@@ -63,7 +63,23 @@ export async function isTierEnabled(tier: ModelTier): Promise<boolean> {
 }
 
 function cloudConfigured(): boolean {
-  return Boolean(env.cloudAiApiKey && env.cloudAiBaseUrl);
+  return Boolean(env.cloudAiApiKeys.length && env.cloudAiBaseUrl);
+}
+
+// Sticky rotation, not round-robin-per-request: stay on a key until IT hits a
+// limit, then move on and stay there. Module-level because Node keeps one
+// instance of this module per process — the same daemon serves every
+// request, so "the account we're currently spending down" is process state,
+// not per-request state.
+let currentKeyIndex = 0;
+
+function isRateLimitOrQuotaError(status: number, body: string): boolean {
+  if (status === 429 || status === 402) return true;
+  // Some providers (Ollama Cloud's subscription gate included) return 400/403
+  // for "out of quota" / "needs upgrade" rather than a clean 429 — those are
+  // exactly the case another key might still have room for, so text-sniff
+  // the body rather than only trusting the status code.
+  return /rate.?limit|quota|requires a subscription|too many requests/i.test(body);
 }
 
 let daemonReachable: boolean | null = null;
@@ -121,34 +137,51 @@ async function cloudChatCompletion(messages: ChatMessage[], opts: ChatOpts): Pro
     ...(opts.jsonMode ? { response_format: { type: 'json_object' } } : {}),
   };
 
-  const response = await fetch(`${env.cloudAiBaseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${env.cloudAiApiKey}`,
-    },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(120_000),
-  });
+  const keys = env.cloudAiApiKeys;
+  let lastError: Error | null = null;
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    logger.error({ status: response.status, body: text }, 'Cloud AI chat request failed');
-    throw new Error(`Cloud AI chat request failed: ${response.status}`);
+  for (let attempt = 0; attempt < keys.length; attempt++) {
+    const keyIndex = (currentKeyIndex + attempt) % keys.length;
+    const response = await fetch(`${env.cloudAiBaseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${keys[keyIndex]}`,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(120_000),
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      if (isRateLimitOrQuotaError(response.status, text) && attempt < keys.length - 1) {
+        logger.warn(
+          { status: response.status, keyIndex, keysAvailable: keys.length },
+          'Cloud AI key hit its limit — rotating to the next key',
+        );
+        currentKeyIndex = (keyIndex + 1) % keys.length;
+        continue;
+      }
+      logger.error({ status: response.status, body: text }, 'Cloud AI chat request failed');
+      lastError = new Error(`Cloud AI chat request failed: ${response.status}`);
+      break;
+    }
+
+    currentKeyIndex = keyIndex; // this key worked — stay on it next call
+    const data = (await response.json()) as {
+      choices?: { message?: { content?: string } }[];
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
+    };
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error('Cloud AI returned no content');
+
+    if (opts.usageContext) {
+      logAiUsage(opts.usageContext, tier, 'cloud', model, data.usage?.prompt_tokens ?? 0, data.usage?.completion_tokens ?? 0);
+    }
+    return content;
   }
 
-  const data = (await response.json()) as {
-    choices?: { message?: { content?: string } }[];
-    usage?: { prompt_tokens?: number; completion_tokens?: number };
-  };
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error('Cloud AI returned no content');
-
-  if (opts.usageContext) {
-    logAiUsage(opts.usageContext, tier, 'cloud', model, data.usage?.prompt_tokens ?? 0, data.usage?.completion_tokens ?? 0);
-  }
-
-  return content;
+  throw lastError ?? new Error('All cloud AI keys are rate-limited or over quota');
 }
 
 async function ollamaChatCompletion(messages: ChatMessage[], opts: ChatOpts): Promise<string> {

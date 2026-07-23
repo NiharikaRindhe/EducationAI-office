@@ -29,6 +29,8 @@ import {
   listSessionsController,
   getHistoryController,
   sendMessageController,
+  renameSessionController,
+  deleteSessionController,
 } from '../controllers/chat.controller.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import {
@@ -94,5 +96,7 @@ const chatLimiter = rateLimit({ windowMs: 24 * 60 * 60_000, max: 50, keyFn: (req
 
 studentRouter.post('/chat/sessions', createSessionController);
 studentRouter.get('/chat/sessions', listSessionsController);
+studentRouter.patch('/chat/sessions/:id', renameSessionController);
+studentRouter.delete('/chat/sessions/:id', deleteSessionController);
 studentRouter.get('/chat/sessions/:id/history', getHistoryController);
 studentRouter.post('/chat/sessions/:id/message', chatLimiter, sendMessageController);

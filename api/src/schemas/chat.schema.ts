@@ -8,6 +8,10 @@ export const createChatSessionSchema = z.object({
   subject: z.string().min(1),
 });
 
+export const renameChatSessionSchema = z.object({
+  title: z.string().trim().min(1, 'Title cannot be empty').max(80, 'Keep it under 80 characters'),
+});
+
 // A message needs text, a photo (vision doubt-solving: student snaps a
 // textbook problem/diagram), or both. ~5.6M base64 chars ≈ a 4MB image.
 export const sendMessageSchema = z
@@ -25,3 +29,4 @@ export const sendMessageSchema = z
 
 export type CreateChatSessionInput = z.infer<typeof createChatSessionSchema>;
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
+export type RenameChatSessionInput = z.infer<typeof renameChatSessionSchema>;
