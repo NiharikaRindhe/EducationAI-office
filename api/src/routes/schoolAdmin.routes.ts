@@ -40,8 +40,17 @@ import {
   getSchoolOccurrencesController,
 } from '../controllers/timetable.controller.js';
 import { listLabsController, createLabController, updateLabController } from '../controllers/lab.controller.js';
+import {
+  listSchoolIngestionJobsController,
+  uploadSchoolNcertPdfController,
+  retrySchoolIngestionJobController,
+  deleteSchoolIngestionJobController,
+} from '../controllers/schoolContent.controller.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+// PDFs run far larger than the CSV/XLSX imports above — same 150MB ceiling
+// as the Super Admin's NCERT upload (see superAdmin.routes.ts).
+const pdfUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 150 * 1024 * 1024 } });
 
 export const schoolAdminRouter = Router();
 
@@ -62,6 +71,12 @@ schoolAdminRouter.post('/class-sections', addSectionController);
 schoolAdminRouter.patch('/class-sections/:id', updateSectionController);
 
 schoolAdminRouter.get('/subjects', listClassSubjectsController);
+
+// ── Content library (own school's supplementary books) ────────
+schoolAdminRouter.get('/ncert/jobs', listSchoolIngestionJobsController);
+schoolAdminRouter.post('/ncert/upload', pdfUpload.single('file'), uploadSchoolNcertPdfController);
+schoolAdminRouter.post('/ncert/jobs/:id/retry', retrySchoolIngestionJobController);
+schoolAdminRouter.delete('/ncert/jobs/:id', deleteSchoolIngestionJobController);
 
 schoolAdminRouter.get('/teaching-assignments', listTeachingAssignmentsController);
 schoolAdminRouter.post('/teaching-assignments', addTeachingAssignmentController);

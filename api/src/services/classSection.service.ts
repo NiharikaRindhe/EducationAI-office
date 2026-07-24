@@ -141,6 +141,25 @@ export async function listClassSubjects() {
   return data;
 }
 
+export async function addClassSubject(classNum: number, subject: string) {
+  const { data, error } = await supabaseAdmin
+    .from('class_subjects')
+    .upsert({ class_num: classNum, subject, has_exams: true }, { onConflict: 'class_num,subject', ignoreDuplicates: true })
+    .select('class_num, subject, has_exams')
+    .maybeSingle();
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to add subject', error.message);
+  return data ?? { class_num: classNum, subject, has_exams: true };
+}
+
+export async function removeClassSubject(classNum: number, subject: string) {
+  const { error } = await supabaseAdmin
+    .from('class_subjects')
+    .delete()
+    .eq('class_num', classNum)
+    .eq('subject', subject);
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to remove subject', error.message);
+}
+
 // ─────────────────────────────────────────────────────────────
 //  TEACHING ASSIGNMENTS (teacher x section x subject)
 // ─────────────────────────────────────────────────────────────

@@ -19,7 +19,7 @@ interface QuestionBankItem {
   scope: 'global' | 'school';
 }
 
-const SUBJECT_WHITELIST = ['Mathematics', 'Science', 'English', 'Social Science', 'Hindi'];
+const SUBJECT_WHITELIST = ['English', 'Mathematics', 'Science', 'World Around Us', 'Social Science', 'ICT'];
 const TYPE_OPTIONS = [
   { value: 'mcq', label: 'Multiple Choice' },
   { value: 'true_false', label: 'True/False' },

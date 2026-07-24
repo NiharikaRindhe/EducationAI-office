@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { api, ApiClientError, setAccessToken, getAccessToken } from '../lib/api';
+import { api, ApiClientError, setAccessToken, getAccessToken, setUnauthorizedHandler } from '../lib/api';
 
 export type Role = 'student' | 'teacher' | 'school_admin' | 'lab_incharge' | 'super_admin';
 
@@ -62,6 +62,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     refreshUser().finally(() => setIsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // api.ts can't reach into React state directly — it calls this whenever
+  // ANY request (not just the once-on-load check above) comes back 401, so a
+  // token that dies mid-session drops the user back to logged-out too,
+  // instead of leaving whatever page they were on stuck showing a raw error.
+  useEffect(() => {
+    setUnauthorizedHandler(() => setUser(null));
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {

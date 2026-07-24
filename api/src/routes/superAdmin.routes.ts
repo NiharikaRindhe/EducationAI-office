@@ -26,11 +26,21 @@ import {
   uploadNcertPdfController,
   updateIngestionJobStatusController,
   retryIngestionJobController,
+  deleteIngestionJobController,
 } from '../controllers/superAdminContent.controller.js';
+import {
+  listClassSubjectsController,
+  addClassSubjectController,
+  removeClassSubjectController,
+} from '../controllers/classSection.controller.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB — NCERT PDFs can be large
+  // Real NCERT PDFs routinely exceed 50MB once diagrams/maps are embedded
+  // (e.g. a genuine Class 9 Social Science book is ~66MB) — 50MB rejected
+  // legitimate uploads outright. 150MB gives real books headroom while still
+  // being a bounded, sane ceiling (buffered in memory via memoryStorage()).
+  limits: { fileSize: 150 * 1024 * 1024 },
 });
 
 export const superAdminRouter = Router();
@@ -57,6 +67,11 @@ superAdminRouter.get('/ai/settings', getAiSettingsController);
 superAdminRouter.patch('/ai/settings', updateAiSettingsController);
 superAdminRouter.get('/ai/usage', getAiUsageController);
 
+// ── Class → Subject whitelist ──────────────────────────────────
+superAdminRouter.get('/class-subjects', listClassSubjectsController);
+superAdminRouter.post('/class-subjects', addClassSubjectController);
+superAdminRouter.delete('/class-subjects/:classNum/:subject', removeClassSubjectController);
+
 // ── Global question bank ─────────────────────────────────────
 superAdminRouter.get('/question-bank', listGlobalQuestionBankController);
 superAdminRouter.post('/question-bank', addGlobalQuestionController);
@@ -74,4 +89,5 @@ superAdminRouter.post('/ncert/upload', upload.single('file'), uploadNcertPdfCont
 superAdminRouter.patch('/ncert/jobs/:id/status', updateIngestionJobStatusController);
 // Re-queue a failed/finished job — the worker re-runs it idempotently
 superAdminRouter.post('/ncert/jobs/:id/retry', retryIngestionJobController);
+superAdminRouter.delete('/ncert/jobs/:id', deleteIngestionJobController);
 

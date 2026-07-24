@@ -108,7 +108,7 @@ const PyqCard: React.FC<{ item: PYQItem; accent: Accent; showRubric: boolean }> 
   );
 };
 
-const SUBJECTS = ['All', 'Mathematics', 'Science', 'English', 'Social Science', 'Hindi'];
+const SUBJECTS = ['All', 'English', 'Mathematics', 'Science', 'World Around Us', 'Social Science', 'ICT'];
 
 export const PyqBrowser: React.FC<{
   accent: Accent;

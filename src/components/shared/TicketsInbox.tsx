@@ -73,9 +73,12 @@ interface TicketsInboxProps {
   showSchoolFilter: boolean;
   /** Restrict "raise a ticket" to a specific school (school admin/teacher/student) vs. optional (super admin). */
   fixedSchool: boolean;
+  /** Pre-fills and opens the "raise a ticket" form on mount — e.g. arriving
+   *  from the Content Library after hitting the per-subject upload limit. */
+  initialDraft?: { category: Category; subject: string; body: string };
 }
 
-export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTriage, canEscalate, showSchoolFilter, fixedSchool }) => {
+export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTriage, canEscalate, showSchoolFilter, fixedSchool, initialDraft }) => {
   const ACCENTS = {
     rose: { btn: 'bg-rose-600 hover:bg-rose-700', text: 'text-rose-600', ring: 'focus:border-rose-400', chip: 'bg-rose-50 text-rose-600' },
     slate: { btn: 'bg-slate-800 hover:bg-slate-900', text: 'text-slate-800', ring: 'focus:border-slate-400', chip: 'bg-slate-100 text-slate-700' },
@@ -93,10 +96,10 @@ export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTria
   const [selected, setSelected] = useState<TicketDetail | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
 
-  const [showRaiseForm, setShowRaiseForm] = useState(false);
-  const [newCategory, setNewCategory] = useState<Category>('other');
-  const [newSubject, setNewSubject] = useState('');
-  const [newBody, setNewBody] = useState('');
+  const [showRaiseForm, setShowRaiseForm] = useState(Boolean(initialDraft));
+  const [newCategory, setNewCategory] = useState<Category>(initialDraft?.category ?? 'other');
+  const [newSubject, setNewSubject] = useState(initialDraft?.subject ?? '');
+  const [newBody, setNewBody] = useState(initialDraft?.body ?? '');
   const [newPriority, setNewPriority] = useState<Priority>('normal');
   const [newSchoolId, setNewSchoolId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);

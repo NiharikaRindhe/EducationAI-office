@@ -15,6 +15,7 @@ type Mode = 'password' | 'pin-setup' | 'pin-roster' | 'pin-pad';
 const REDIRECT_MESSAGES: Record<string, string> = {
   idle: "You were signed out after a period of inactivity — sign in again to continue.",
   'session-ended': 'Your teacher ended the class session, so you were signed out. Sign in again once class starts.',
+  'token-expired': 'Your session expired — sign in again to continue.',
 };
 
 export const Login: React.FC = () => {
@@ -25,7 +26,15 @@ export const Login: React.FC = () => {
   const [mode, setMode] = useState<Mode>('password');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const redirectReason = (location.state as { reason?: string } | null)?.reason;
+  // A mid-session 401 (lib/api.ts) can't navigate here with router state the
+  // way idle/session-ended logout do — it just clears the user, and the
+  // route guard lands here plainly. This flag is the one-shot substitute.
+  const [sessionExpiredFlag] = useState(() => {
+    const flagged = sessionStorage.getItem('eduai_login_reason');
+    if (flagged) sessionStorage.removeItem('eduai_login_reason');
+    return flagged;
+  });
+  const redirectReason = (location.state as { reason?: string } | null)?.reason ?? sessionExpiredFlag ?? undefined;
   const redirectMessage = redirectReason ? REDIRECT_MESSAGES[redirectReason] : undefined;
 
   // Password mode

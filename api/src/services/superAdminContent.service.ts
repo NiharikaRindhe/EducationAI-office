@@ -2,6 +2,7 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
 import { tryEmbedText } from '../lib/ai.js';
 import { extractPdf, parseChapterMap } from '../lib/pdfExtract.js';
+import { requireWhitelistedSubject } from '../lib/classSubjects.js';
 import { parse } from 'csv-parse/sync';
 import ExcelJS from 'exceljs';
 import { z } from 'zod';
@@ -223,6 +224,9 @@ export async function createIngestionJob(
     originalFilename: string;
     storagePath: string;
     chapterMap?: unknown;
+    /** Set only for a School Admin's own upload. Omitted/null = platform-wide
+     *  book (Super Admin upload), visible to every school — unchanged behavior. */
+    schoolId?: string | null;
   },
 ) {
   const { data, error } = await supabaseAdmin
@@ -234,6 +238,7 @@ export async function createIngestionJob(
       original_filename: input.originalFilename,
       storage_path: input.storagePath,
       chapter_map: input.chapterMap ?? null,
+      school_id: input.schoolId ?? null,
       status: 'queued',
       uploaded_by: superAdminId,
     })
@@ -244,18 +249,95 @@ export async function createIngestionJob(
   return data;
 }
 
-export async function listIngestionJobs(filters: { classNum?: number; subject?: string; status?: string } = {}) {
+export async function listIngestionJobs(
+  filters: { classNum?: number; subject?: string; status?: string; schoolId?: string } = {},
+) {
   let query = supabaseAdmin
     .from('ncert_ingestion_jobs')
-    .select('id, class_num, subject, book_title, original_filename, status, total_pages, chunks_created, chunks_embedded, error_message, chapters_detected, uploaded_by, created_at, updated_at');
+    // schools(name): only resolves for a school-uploaded job (school_id set) —
+    // lets the Super Admin's merged view tell "platform" and school uploads
+    // apart, since both now live in the same table.
+    .select('id, class_num, subject, book_title, original_filename, status, total_pages, chunks_created, chunks_embedded, error_message, chapters_detected, uploaded_by, school_id, created_at, updated_at, schools(name)');
 
   if (filters.classNum !== undefined) query = query.eq('class_num', filters.classNum);
   if (filters.subject) query = query.eq('subject', filters.subject);
   if (filters.status) query = query.eq('status', filters.status);
+  if (filters.schoolId) query = query.eq('school_id', filters.schoolId);
 
   const { data, error } = await query.order('created_at', { ascending: false });
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to list ingestion jobs', error.message);
   return data ?? [];
+}
+
+/** School Admin's own-upload quota, per (class, subject) — keeps their
+ *  supplementary library small and curated; more than a couple of competing
+ *  books for one subject muddies retrieval instead of improving it. A failed
+ *  upload doesn't count against the quota (it never produced usable content). */
+export const SCHOOL_UPLOAD_LIMIT_PER_SUBJECT = 2;
+
+export async function countSchoolUploads(schoolId: string, classNum: number, subject: string) {
+  const { count, error } = await supabaseAdmin
+    .from('ncert_ingestion_jobs')
+    .select('id', { count: 'exact', head: true })
+    .eq('school_id', schoolId)
+    .eq('class_num', classNum)
+    .eq('subject', subject)
+    .neq('status', 'error');
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to count uploaded books', error.message);
+  return count ?? 0;
+}
+
+/** Validates + queues a School Admin's own PDF upload: subject must be
+ *  whitelisted for the class, and the school must be under its quota for
+ *  that (class, subject) pair. */
+export async function createSchoolIngestionJob(
+  schoolAdminId: string,
+  schoolId: string,
+  input: {
+    classNum: number;
+    subject: string;
+    bookTitle: string;
+    originalFilename: string;
+    pdfBuffer: Buffer;
+    chapterMap?: unknown;
+  },
+) {
+  await requireWhitelistedSubject(input.classNum, input.subject);
+
+  const existing = await countSchoolUploads(schoolId, input.classNum, input.subject);
+  if (existing >= SCHOOL_UPLOAD_LIMIT_PER_SUBJECT) {
+    throw new ApiError(
+      'VALIDATION_ERROR',
+      `Your school already has ${existing} uploaded book${existing === 1 ? '' : 's'} for Class ${input.classNum} ${input.subject} (limit ${SCHOOL_UPLOAD_LIMIT_PER_SUBJECT}). Raise a support ticket if you need to add more.`,
+    );
+  }
+
+  const storagePath = `pdfs/school-${schoolId}/class-${input.classNum}/${input.subject.replace(/\s+/g, '_')}/${Date.now()}_${input.originalFilename}`;
+  await uploadPdfToStorage(storagePath, input.pdfBuffer);
+
+  return createIngestionJob(schoolAdminId, {
+    classNum: input.classNum,
+    subject: input.subject,
+    bookTitle: input.bookTitle,
+    originalFilename: input.originalFilename,
+    storagePath,
+    chapterMap: input.chapterMap,
+    schoolId,
+  });
+}
+
+/** Throws NOT_FOUND if the job doesn't exist or isn't owned by this school —
+ *  the ownership check a School Admin's retry/delete must pass before acting
+ *  on a job id (never leaks whether a job owned by ANOTHER school exists). */
+export async function requireJobOwnedBySchool(jobId: string, schoolId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('ncert_ingestion_jobs')
+    .select('id')
+    .eq('id', jobId)
+    .eq('school_id', schoolId)
+    .maybeSingle();
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to verify job ownership', error.message);
+  if (!data) throw new ApiError('NOT_FOUND', 'Ingestion job not found');
 }
 
 export async function updateIngestionJobStatus(
@@ -325,7 +407,7 @@ export async function runIngestionPipeline(jobId: string) {
   try {
     const { data: job, error: jobError } = await supabaseAdmin
       .from('ncert_ingestion_jobs')
-      .select('id, class_num, subject, book_title, storage_path, chapter_map')
+      .select('id, class_num, subject, book_title, storage_path, chapter_map, school_id')
       .eq('id', jobId)
       .single();
     if (jobError || !job) throw new Error('Ingestion job not found');
@@ -345,18 +427,26 @@ export async function runIngestionPipeline(jobId: string) {
 
     // Idempotency: this book's previous rows go away before re-insert, so a
     // re-upload of a corrected PDF (or a crash-retry) can never duplicate.
-    await supabaseAdmin
+    // school_id is part of the match too — two different schools (or a
+    // school and the platform library) can otherwise share the same
+    // (class, subject, book_title) and must never delete each other's rows.
+    let deleteChunks = supabaseAdmin
       .from('text_chunks')
       .delete()
       .eq('class_num', job.class_num)
       .eq('subject', job.subject)
       .eq('book_title', job.book_title);
-    await supabaseAdmin
+    deleteChunks = job.school_id ? deleteChunks.eq('school_id', job.school_id) : deleteChunks.is('school_id', null);
+    await deleteChunks;
+
+    let deleteImages = supabaseAdmin
       .from('book_images')
       .delete()
       .eq('class_num', job.class_num)
       .eq('subject', job.subject)
       .eq('book_title', job.book_title);
+    deleteImages = job.school_id ? deleteImages.eq('school_id', job.school_id) : deleteImages.is('school_id', null);
+    await deleteImages;
 
     await updateIngestionJobStatus(jobId, {
       status: 'embedding',
@@ -374,6 +464,7 @@ export async function runIngestionPipeline(jobId: string) {
         class_num: job.class_num,
         subject: job.subject,
         book_title: job.book_title,
+        school_id: job.school_id,
         chapter_num: chunk.chapterNum,
         chapter_title: chunk.chapterTitle,
         page_num: chunk.pageNum,
@@ -412,6 +503,7 @@ export async function runIngestionPipeline(jobId: string) {
         class_num: job.class_num,
         subject: job.subject,
         book_title: job.book_title,
+        school_id: job.school_id,
         chapter_num: fig.chapterNum,
         chapter_title: fig.chapterTitle,
         page_num: fig.pageNum,
@@ -438,6 +530,55 @@ export async function runIngestionPipeline(jobId: string) {
     await updateIngestionJobStatus(jobId, { status: 'error', errorMessage: message }).catch(() => {});
     throw err;
   }
+}
+
+/** Deletes a book entirely: the ingestion job row, every indexed chunk/image
+ *  for it, and the original PDF + extracted figures from Storage. Uses the
+ *  same (class_num, subject, book_title) delete key the pipeline itself uses
+ *  for idempotent re-runs, so this can never leave orphaned chunks behind. */
+export async function deleteIngestionJob(jobId: string) {
+  const { data: job, error: jobError } = await supabaseAdmin
+    .from('ncert_ingestion_jobs')
+    .select('id, class_num, subject, book_title, storage_path, status, school_id')
+    .eq('id', jobId)
+    .maybeSingle();
+  if (jobError) throw new ApiError('INTERNAL_ERROR', 'Failed to load ingestion job', jobError.message);
+  if (!job) throw new ApiError('NOT_FOUND', 'Ingestion job not found');
+  if (job.status === 'chunking' || job.status === 'embedding') {
+    throw new ApiError('VALIDATION_ERROR', 'Cannot delete a job that is currently being processed');
+  }
+
+  // school_id is part of the match — see the matching comment in
+  // runIngestionPipeline's idempotent delete for why.
+  let deleteChunks = supabaseAdmin
+    .from('text_chunks')
+    .delete()
+    .eq('class_num', job.class_num)
+    .eq('subject', job.subject)
+    .eq('book_title', job.book_title);
+  deleteChunks = job.school_id ? deleteChunks.eq('school_id', job.school_id) : deleteChunks.is('school_id', null);
+  await deleteChunks;
+
+  let deleteImages = supabaseAdmin
+    .from('book_images')
+    .delete()
+    .eq('class_num', job.class_num)
+    .eq('subject', job.subject)
+    .eq('book_title', job.book_title);
+  deleteImages = job.school_id ? deleteImages.eq('school_id', job.school_id) : deleteImages.is('school_id', null);
+  await deleteImages;
+
+  if (job.storage_path) {
+    await supabaseAdmin.storage.from(NCERT_BUCKET).remove([job.storage_path]);
+  }
+  const { data: figureFiles } = await supabaseAdmin.storage.from(NCERT_BUCKET).list(`figures/${jobId}`);
+  if (figureFiles && figureFiles.length > 0) {
+    await supabaseAdmin.storage.from(NCERT_BUCKET).remove(figureFiles.map((f) => `figures/${jobId}/${f.name}`));
+  }
+
+  const { error } = await supabaseAdmin.from('ncert_ingestion_jobs').delete().eq('id', jobId);
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to delete ingestion job', error.message);
+  return { deleted: true };
 }
 
 /** Re-queue a finished/failed job — the worker re-runs it idempotently. */

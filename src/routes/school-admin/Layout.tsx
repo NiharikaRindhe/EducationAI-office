@@ -13,6 +13,7 @@ export const SchoolAdminLayout: React.FC = () => {
     { href: '/school-admin/teachers', label: 'Teachers', iconName: 'school' },
     { href: '/school-admin/labs', label: 'Labs', iconName: 'science' },
     { href: '/school-admin/timetable', label: 'Timetable', iconName: 'calendar_month' },
+    { href: '/school-admin/content', label: 'Content Library', iconName: 'menu_book' },
     { href: '/school-admin/lab-incharges', label: 'Lab In-charges', iconName: 'support_agent' },
     { href: '/school-admin/feature-toggles', label: 'Feature Toggles', iconName: 'toggle_on' },
     { href: '/school-admin/principal-report', label: 'Principal Report', iconName: 'summarize' },
@@ -27,6 +28,7 @@ export const SchoolAdminLayout: React.FC = () => {
     if (path.includes('/teachers')) return { title: 'Teachers', sub: 'Add teachers, reset passwords, then map them to sections on the Classes page.' };
     if (path.includes('/labs')) return { title: 'Labs', sub: 'Register your computer labs — the timetable schedules sections into these.' };
     if (path.includes('/timetable')) return { title: 'Timetable', sub: 'Build the weekly lab-period grid per section.' };
+    if (path.includes('/content')) return { title: 'Content Library', sub: "Upload supplementary books for your school's own AI tutor." };
     if (path.includes('/lab-incharges')) return { title: 'Lab In-charges', sub: 'Add lab in-charges who can reset logins without touching grades.' };
     if (path.includes('/tickets')) return { title: 'Support Tickets', sub: 'Resolve reported issues, or escalate to the Super Admin.' };
     return { title: 'School Admin', sub: 'Set up and manage your school on EduAI.' };

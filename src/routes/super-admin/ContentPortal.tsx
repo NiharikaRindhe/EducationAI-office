@@ -15,6 +15,8 @@ interface Job {
   error_message?: string;
   chapters_detected?: boolean | null;
   created_at: string;
+  school_id: string | null;
+  schools: { name: string } | null;
 }
 
 interface QuestionItem {
@@ -30,7 +32,16 @@ interface QuestionItem {
   pyq_year?: number;
 }
 
-const SUBJECTS_LIST = ['Mathematics', 'Science', 'English', 'Social Science', 'Hindi', 'World Around Us'];
+// The finalized book-hierarchy subject list — the only subjects the platform
+// teaches. Hindi/Sanskrit/Arts/Physical Education are intentionally excluded.
+// Must match MASTER_SUBJECTS in api/src/schemas/superAdmin.schema.ts.
+const SUBJECTS_LIST = ['English', 'Mathematics', 'Science', 'World Around Us', 'Social Science', 'ICT'];
+
+interface ClassSubjectRow {
+  class_num: number;
+  subject: string;
+  has_exams: boolean;
+}
 
 const inputCls =
   'w-full px-3 py-2 text-[13px] text-slate-800 bg-white border border-slate-300 rounded-lg outline-none transition-colors focus:border-slate-500 focus:ring-2 focus:ring-slate-100 placeholder:text-slate-400';
@@ -45,7 +56,13 @@ const STATUS_BADGES: Record<Job['status'], { label: string; cls: string }> = {
 };
 
 export const SuperAdminContentPortal: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'library' | 'questions'>('library');
+  const [activeTab, setActiveTab] = useState<'library' | 'questions' | 'subjects'>('library');
+
+  // Class → Subject whitelist
+  const [classSubjects, setClassSubjects] = useState<ClassSubjectRow[] | null>(null);
+  const [addSubjectValue, setAddSubjectValue] = useState<Record<number, string>>({});
+  const [subjectsBusy, setSubjectsBusy] = useState<string | null>(null);
+  const [subjectsError, setSubjectsError] = useState('');
 
   // Library
   const [jobs, setJobs] = useState<Job[] | null>(null);
@@ -58,6 +75,8 @@ export const SuperAdminContentPortal: React.FC = () => {
   const [uploadMsg, setUploadMsg] = useState('');
   const [uploadError, setUploadError] = useState('');
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [deleteJobTarget, setDeleteJobTarget] = useState<Job | null>(null);
+  const [deletingJob, setDeletingJob] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Question bank
@@ -134,6 +153,21 @@ export const SuperAdminContentPortal: React.FC = () => {
     }
   };
 
+  const confirmDeleteJob = async () => {
+    if (!deleteJobTarget) return;
+    setDeletingJob(true);
+    try {
+      await api.delete(`/super-admin/ncert/jobs/${deleteJobTarget.id}`);
+      setDeleteJobTarget(null);
+      fetchJobs();
+    } catch (err) {
+      setUploadError(err instanceof ApiClientError ? err.message : 'Delete failed');
+      setDeleteJobTarget(null);
+    } finally {
+      setDeletingJob(false);
+    }
+  };
+
   const handleBulkImport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!csvFile) return;
@@ -164,6 +198,44 @@ export const SuperAdminContentPortal: React.FC = () => {
     }
   };
 
+  const fetchClassSubjects = () => {
+    api.get<ClassSubjectRow[]>('/super-admin/class-subjects').then(setClassSubjects).catch(() => setClassSubjects([]));
+  };
+
+  useEffect(() => {
+    if (activeTab === 'subjects' && classSubjects === null) fetchClassSubjects();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  const handleAddSubject = async (classNum: number) => {
+    const subject = addSubjectValue[classNum];
+    if (!subject) return;
+    setSubjectsBusy(`add-${classNum}`);
+    setSubjectsError('');
+    try {
+      await api.post('/super-admin/class-subjects', { classNum, subject });
+      setAddSubjectValue((p) => ({ ...p, [classNum]: '' }));
+      fetchClassSubjects();
+    } catch (err) {
+      setSubjectsError(err instanceof ApiClientError ? err.message : 'Failed to add subject');
+    } finally {
+      setSubjectsBusy(null);
+    }
+  };
+
+  const handleRemoveSubject = async (classNum: number, subject: string) => {
+    setSubjectsBusy(`${classNum}-${subject}`);
+    setSubjectsError('');
+    try {
+      await api.delete(`/super-admin/class-subjects/${classNum}/${encodeURIComponent(subject)}`);
+      fetchClassSubjects();
+    } catch (err) {
+      setSubjectsError(err instanceof ApiClientError ? err.message : 'Failed to remove subject');
+    } finally {
+      setSubjectsBusy(null);
+    }
+  };
+
   const visibleJobs = (jobs ?? []).filter((j) => !classFilterLib || String(j.class_num) === classFilterLib);
 
   return (
@@ -173,6 +245,7 @@ export const SuperAdminContentPortal: React.FC = () => {
         {([
           { id: 'library', label: 'Book Library' },
           { id: 'questions', label: 'Global Question Bank' },
+          { id: 'subjects', label: 'Class Subjects' },
         ] as const).map((tab) => (
           <button
             key={tab.id}
@@ -193,7 +266,7 @@ export const SuperAdminContentPortal: React.FC = () => {
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
               <div className="px-5 py-4 border-b border-slate-100">
                 <h2 className="text-[14px] font-semibold text-slate-800">Upload a book</h2>
-                <p className="text-[12px] text-slate-400 mt-0.5">PDF up to 50 MB. Content is extracted, chunked, and indexed for the AI tutor.</p>
+                <p className="text-[12px] text-slate-400 mt-0.5">PDF up to 150 MB. Content is extracted, chunked, and indexed for the AI tutor.</p>
               </div>
 
               <form onSubmit={handleUpload} className="p-5 flex flex-col gap-4">
@@ -290,7 +363,7 @@ export const SuperAdminContentPortal: React.FC = () => {
                   <table className="w-full">
                     <thead>
                       <tr className="bg-slate-50 text-left">
-                        {['Book', 'Class', 'Subject', 'Indexing', 'Status', ''].map((h) => (
+                        {['Book', 'Class', 'Subject', 'Source', 'Indexing', 'Status', ''].map((h) => (
                           <th key={h} className="px-4 py-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
@@ -307,6 +380,15 @@ export const SuperAdminContentPortal: React.FC = () => {
                             </td>
                             <td className="px-4 py-3 text-[13px] text-slate-700 whitespace-nowrap">Class {job.class_num}</td>
                             <td className="px-4 py-3 text-[13px] text-slate-700 whitespace-nowrap">{job.subject}</td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {job.school_id ? (
+                                <span className="inline-flex text-[11px] font-semibold px-2 py-1 rounded-md bg-indigo-50 text-indigo-700" title="Uploaded by a school admin — only visible to that school's students">
+                                  {job.schools?.name ?? 'School'}
+                                </span>
+                              ) : (
+                                <span className="inline-flex text-[11px] font-semibold px-2 py-1 rounded-md bg-slate-100 text-slate-600">Platform</span>
+                              )}
+                            </td>
                             <td className="px-4 py-3 min-w-[140px]">
                               <div className="flex items-center gap-2">
                                 <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
@@ -335,16 +417,27 @@ export const SuperAdminContentPortal: React.FC = () => {
                               )}
                             </td>
                             <td className="px-4 py-3 text-right whitespace-nowrap">
-                              {(job.status === 'error' || job.status === 'done') && (
-                                <button
-                                  onClick={() => void handleRetry(job)}
-                                  disabled={retryingId === job.id}
-                                  className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-100 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-                                  title="Re-run extraction and indexing for this book"
-                                >
-                                  {retryingId === job.id ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />} Re-process
-                                </button>
-                              )}
+                              <div className="inline-flex items-center gap-1">
+                                {(job.status === 'error' || job.status === 'done') && (
+                                  <button
+                                    onClick={() => void handleRetry(job)}
+                                    disabled={retryingId === job.id}
+                                    className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-100 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                                    title="Re-run extraction and indexing for this book"
+                                  >
+                                    {retryingId === job.id ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />} Re-process
+                                  </button>
+                                )}
+                                {job.status !== 'chunking' && job.status !== 'embedding' && (
+                                  <button
+                                    onClick={() => setDeleteJobTarget(job)}
+                                    className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-400 hover:text-rose-600 hover:bg-rose-50 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                                    title="Delete this book, its PDF, and everything indexed from it"
+                                  >
+                                    <Trash2 size={12} /> Delete
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -356,7 +449,7 @@ export const SuperAdminContentPortal: React.FC = () => {
             </div>
           </div>
         </div>
-      ) : (
+      ) : activeTab === 'questions' ? (
         <div className="flex flex-col gap-5">
           {qError && (
             <div className="bg-rose-50 border border-rose-200 text-rose-700 text-[13px] rounded-lg px-4 py-3 flex items-center gap-2">
@@ -463,6 +556,72 @@ export const SuperAdminContentPortal: React.FC = () => {
             )}
           </div>
         </div>
+      ) : (
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
+          <div className="px-5 py-4 border-b border-slate-100">
+            <h2 className="text-[14px] font-semibold text-slate-800">Class → Subject whitelist</h2>
+            <p className="text-[12px] text-slate-400 mt-0.5">
+              Controls which subjects are valid for tasks, exams, chat scope, and teaching assignments in each class. Only the finalized subject list can be assigned.
+            </p>
+          </div>
+
+          {subjectsError && (
+            <div className="mx-5 mt-4 bg-rose-50 border border-rose-200 text-rose-700 text-[13px] rounded-lg px-4 py-3 flex items-center gap-2">
+              <AlertCircle size={15} className="shrink-0" /> {subjectsError}
+            </div>
+          )}
+
+          {classSubjects === null ? (
+            <div className="flex justify-center py-16"><Loader2 className="animate-spin text-slate-400" /></div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {Array.from({ length: 10 }, (_, i) => i + 1).map((classNum) => {
+                const assigned = classSubjects.filter((cs) => cs.class_num === classNum).map((cs) => cs.subject);
+                const available = SUBJECTS_LIST.filter((s) => !assigned.includes(s));
+                return (
+                  <div key={classNum} className="px-5 py-4 flex items-center gap-4 flex-wrap">
+                    <span className="text-[13px] font-semibold text-slate-700 w-20 shrink-0">Class {classNum}</span>
+                    <div className="flex items-center gap-2 flex-wrap flex-1">
+                      {assigned.length === 0 && <span className="text-[12px] text-slate-400 italic">No subjects yet</span>}
+                      {assigned.map((subject) => (
+                        <span key={subject} className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 text-[12px] font-medium pl-2.5 pr-1.5 py-1 rounded-full">
+                          {subject}
+                          <button
+                            onClick={() => void handleRemoveSubject(classNum, subject)}
+                            disabled={subjectsBusy === `${classNum}-${subject}`}
+                            className="text-slate-400 hover:text-rose-600 cursor-pointer disabled:opacity-50 leading-none"
+                            title={`Remove ${subject} from Class ${classNum}`}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    {available.length > 0 && (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <select
+                          value={addSubjectValue[classNum] ?? ''}
+                          onChange={(e) => setAddSubjectValue((p) => ({ ...p, [classNum]: e.target.value }))}
+                          className="px-2.5 py-1.5 text-[12px] bg-white border border-slate-300 rounded-lg outline-none cursor-pointer"
+                        >
+                          <option value="">+ Add subject…</option>
+                          {available.map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                        <button
+                          onClick={() => void handleAddSubject(classNum)}
+                          disabled={!addSubjectValue[classNum] || subjectsBusy === `add-${classNum}`}
+                          className="text-[12px] font-semibold text-white bg-slate-900 hover:bg-slate-800 px-3 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Delete confirmation */}
@@ -476,6 +635,27 @@ export const SuperAdminContentPortal: React.FC = () => {
               <button onClick={() => setDeleteTarget(null)} className="text-[13px] font-semibold text-slate-500 hover:text-slate-700 px-4 py-2 rounded-lg cursor-pointer">Cancel</button>
               <button onClick={() => void confirmDeleteQuestion()} className="bg-rose-600 hover:bg-rose-700 text-white text-[13px] font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer">
                 Delete question
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete book confirmation */}
+      {deleteJobTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px] px-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+            <h3 className="text-[15px] font-semibold text-slate-800">Delete this book?</h3>
+            <p className="text-[13px] text-slate-500 mt-2">"{deleteJobTarget.book_title}" (Class {deleteJobTarget.class_num}, {deleteJobTarget.subject})</p>
+            <p className="text-[12px] text-slate-400 mt-2">The PDF, every indexed chunk, and every extracted diagram from this book will be permanently removed — the AI tutor will no longer be able to answer from it. This cannot be undone.</p>
+            <div className="flex items-center justify-end gap-3 mt-5">
+              <button onClick={() => setDeleteJobTarget(null)} disabled={deletingJob} className="text-[13px] font-semibold text-slate-500 hover:text-slate-700 px-4 py-2 rounded-lg cursor-pointer disabled:opacity-50">Cancel</button>
+              <button
+                onClick={() => void confirmDeleteJob()}
+                disabled={deletingJob}
+                className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white text-[13px] font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {deletingJob && <Loader2 size={14} className="animate-spin" />} Delete book
               </button>
             </div>
           </div>

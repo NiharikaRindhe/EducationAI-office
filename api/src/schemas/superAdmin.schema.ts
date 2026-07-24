@@ -66,3 +66,12 @@ export const auditLogQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(365).default(30),
   limit: z.coerce.number().int().min(1).max(500).default(200),
 });
+
+// The finalized book-hierarchy subject list — the only subjects the platform
+// teaches. Hindi/Sanskrit/Arts/Physical Education are intentionally excluded.
+export const MASTER_SUBJECTS = ['English', 'Mathematics', 'Science', 'World Around Us', 'Social Science', 'ICT'] as const;
+
+export const addClassSubjectSchema = z.object({
+  classNum: z.coerce.number().int().min(1).max(10),
+  subject: z.enum(MASTER_SUBJECTS),
+});

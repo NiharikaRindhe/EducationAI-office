@@ -15,28 +15,20 @@ insert into class_subjects (class_num, subject, has_exams) values
   (2, 'English', true), (2, 'Mathematics', true),
   -- Class 3
   (3, 'English', true), (3, 'Mathematics', true), (3, 'World Around Us', true),
-  (3, 'Arts', false), (3, 'Physical Education', false),
   -- Class 4
   (4, 'English', true), (4, 'Mathematics', true), (4, 'World Around Us', true),
-  (4, 'Arts', false), (4, 'Physical Education', false),
   -- Class 5
   (5, 'English', true), (5, 'Mathematics', true), (5, 'World Around Us', true),
-  (5, 'Arts', false), (5, 'Physical Education', false),
   -- Class 6
   (6, 'English', true), (6, 'Mathematics', true), (6, 'Science', true), (6, 'Social Science', true),
-  (6, 'Arts', false), (6, 'Physical Education', false),
   -- Class 7
   (7, 'English', true), (7, 'Mathematics', true), (7, 'Science', true), (7, 'Social Science', true),
-  (7, 'Arts', false), (7, 'Physical Education', false),
   -- Class 8
   (8, 'English', true), (8, 'Mathematics', true), (8, 'Science', true), (8, 'Social Science', true),
-  (8, 'Arts', false), (8, 'Physical Education', false),
   -- Class 9
-  (9, 'English', true), (9, 'Mathematics', true), (9, 'Science', true), (9, 'Social Science', true),
-  (9, 'Arts', false), (9, 'Physical Education', false),
-  -- Class 10 (no Arts at Class 10, per the matrix)
-  (10, 'English', true), (10, 'Mathematics', true), (10, 'Science', true), (10, 'Social Science', true),
-  (10, 'Physical Education', false)
+  (9, 'English', true), (9, 'Mathematics', true), (9, 'Science', true), (9, 'Social Science', true), (9, 'ICT', true),
+  -- Class 10
+  (10, 'English', true), (10, 'Mathematics', true), (10, 'Science', true), (10, 'Social Science', true)
 on conflict (class_num, subject) do nothing;
 
 -- ─────────────────────────────────────────────────────────────

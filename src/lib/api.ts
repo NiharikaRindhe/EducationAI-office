@@ -25,6 +25,26 @@ export function getAccessToken() {
   return accessToken;
 }
 
+// AuthContext only checks the token once, on app load — a token that dies
+// mid-session (expiry, or the local Supabase instance restarting with a
+// fresh auth store) used to surface as a raw "Invalid or expired token"
+// error on whatever request hit it next, leaving the page stuck instead of
+// returning the student to login. Any authenticated request that gets a 401
+// now clears the dead token and notifies whoever's listening (AuthContext),
+// so the existing !user -> redirect-to-login route guard just handles it.
+type UnauthorizedHandler = () => void;
+let onUnauthorized: UnauthorizedHandler | null = null;
+
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
+  onUnauthorized = handler;
+}
+
+function handleSessionExpired() {
+  sessionStorage.setItem('eduai_login_reason', 'token-expired');
+  setAccessToken(null);
+  onUnauthorized?.();
+}
+
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
@@ -44,9 +64,10 @@ function buildUrl(path: string, query?: RequestOptions['query']): string {
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const wasAuthenticated = !options.skipAuth && Boolean(accessToken);
   const headers: Record<string, string> = {};
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
-  if (!options.skipAuth && accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  if (wasAuthenticated) headers.Authorization = `Bearer ${accessToken}`;
 
   const res = await fetch(buildUrl(path, options.query), {
     method: options.method ?? 'GET',
@@ -60,6 +81,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const payload = isJson ? await res.json().catch(() => null) : null;
 
   if (!res.ok) {
+    // Only a 401 on a request that WAS carrying a token means "your session
+    // died" — skipAuth calls (login itself) return 401 for wrong credentials,
+    // which is a normal login-form error, not a reason to log anyone out.
+    if (res.status === 401 && wasAuthenticated) handleSessionExpired();
     const err = payload?.error;
     throw new ApiClientError(err?.code ?? 'UNKNOWN', err?.message ?? res.statusText, res.status, err?.details);
   }
@@ -79,6 +104,7 @@ export const api = {
     const headers: Record<string, string> = {};
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
     const res = await fetch(buildUrl(path), { headers });
+    if (res.status === 401 && accessToken) handleSessionExpired();
     if (!res.ok) throw new ApiClientError('DOWNLOAD_FAILED', res.statusText, res.status);
     return res.blob();
   },
@@ -91,6 +117,7 @@ export const api = {
     const headers: Record<string, string> = {};
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
     const res = await fetch(buildUrl(path), { method: 'POST', headers, body: formData });
+    if (res.status === 401 && accessToken) handleSessionExpired();
     const payload = await res.json().catch(() => null);
     if (!res.ok) {
       const err = payload?.error;

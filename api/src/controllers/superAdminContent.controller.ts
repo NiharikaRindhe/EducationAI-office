@@ -181,6 +181,17 @@ export async function uploadNcertPdfController(req: Request, res: Response, next
   }
 }
 
+export async function deleteIngestionJobController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    if (!id) throw new ApiError('VALIDATION_ERROR', 'Missing job id');
+    await contentService.deleteIngestionJob(id);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function retryIngestionJobController(req: Request, res: Response, next: NextFunction) {
   try {
     const { id } = req.params;

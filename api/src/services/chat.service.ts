@@ -1,17 +1,8 @@
 import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
 import { chatCompletion, embedText, aiConfigured } from '../lib/ai.js';
+import { requireWhitelistedSubject } from '../lib/classSubjects.js';
 import type { CreateChatSessionInput, RenameChatSessionInput } from '../schemas/chat.schema.js';
-
-async function requireWhitelistedSubject(classNum: number, subject: string) {
-  const { data } = await supabaseAdmin
-    .from('class_subjects')
-    .select('subject')
-    .eq('class_num', classNum)
-    .eq('subject', subject)
-    .maybeSingle();
-  if (!data) throw new ApiError('SUBJECT_NOT_WHITELISTED', `${subject} is not offered for Class ${classNum}`);
-}
 
 /** Powers the subject picker in Chat/Notes — the same class_subjects
  *  whitelist every task/exam/chat validates against, scoped to this
@@ -224,24 +215,32 @@ export async function sendMessage(studentId: string, sessionId: string, text: st
 
   const queryEmbedding = await embedText(retrievalQuery);
 
+  // A student's own school may have uploaded supplementary books (see
+  // school-admin content uploads) — those only ever surface for that same
+  // school's students, alongside the platform-wide (school_id null) library.
+  const matchSchoolId = studentProfile?.school_id ?? null;
+
   const [textResult, imageResult, crossSubjectResult] = await Promise.all([
     supabaseAdmin.rpc('search_text_chunks', {
       query_embedding: queryEmbedding,
       match_class: session.class_num,
       match_subject: session.subject,
       match_count: 8,
+      match_school_id: matchSchoolId,
     }),
     supabaseAdmin.rpc('search_book_images', {
       query_embedding: queryEmbedding,
       match_class: session.class_num,
       match_subject: session.subject,
       match_count: 6,
+      match_school_id: matchSchoolId,
     }),
     supabaseAdmin.rpc('search_text_chunks_cross_subject', {
       query_embedding: queryEmbedding,
       match_class: session.class_num,
       exclude_subject: session.subject,
       match_count: 1,
+      match_school_id: matchSchoolId,
     }),
   ]);
 
