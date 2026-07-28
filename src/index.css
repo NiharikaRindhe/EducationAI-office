@@ -1,5 +1,136 @@
 @import "tailwindcss";
 
+@layer base {
+  html {
+    color-scheme: light;
+    background: #f8fafc;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    color: #0f172a;
+    background:
+      radial-gradient(circle at 88% 2%, rgba(99, 102, 241, 0.05), transparent 26rem),
+      #f8fafc;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  :focus-visible {
+    outline: 3px solid rgba(99, 102, 241, 0.22);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .portal-page-header {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgb(226 232 240 / 0.9);
+    border-radius: 1.25rem;
+    padding: 1.5rem;
+    background:
+      radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.09), transparent 20rem),
+      linear-gradient(135deg, rgba(255,255,255,0.98), rgba(248,250,252,0.95));
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 14px 40px rgba(15, 23, 42, 0.04);
+  }
+
+  .portal-eyebrow {
+    color: #6366f1;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  .portal-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .portal-metric {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.75rem;
+    border: 1px solid rgb(226 232 240 / 0.85);
+    border-radius: 0.9rem;
+    padding: 0.85rem;
+    background: rgba(255, 255, 255, 0.78);
+  }
+
+  .portal-panel {
+    overflow: hidden;
+    border: 1px solid rgb(226 232 240 / 0.92);
+    border-radius: 1rem;
+    background: white;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.025), 0 8px 24px rgba(15, 23, 42, 0.025);
+  }
+
+  .portal-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    border: 1px solid rgb(226 232 240 / 0.92);
+    border-radius: 1rem;
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.025);
+  }
+
+  .portal-table thead {
+    background: #f8fafc;
+  }
+
+  .portal-table th {
+    height: 2.9rem;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .portal-table tbody tr {
+    transition: background-color 150ms ease, box-shadow 150ms ease;
+  }
+
+  .portal-table tbody tr:hover {
+    background: #f8fafc;
+    box-shadow: inset 3px 0 0 #6366f1;
+  }
+
+  @media (min-width: 640px) {
+    .portal-metrics-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .portal-metrics-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
 @theme {
   --color-batch-1-amber: #F59E0B;
   --color-batch-1-orange: #F97316;
@@ -261,6 +392,34 @@
   filter: blur(80px);
   z-index: 0;
   opacity: 0.6;
+}
+
+/* ── Embedded Class 9-10 science labs ──────────────────────────
+   The Physics / Chemistry / Biology labs were built as standalone
+   full-screen apps: their roots size to the viewport (h-screen /
+   w-screen) and they hardcode their own Inter font stacks. Embedding
+   them in the dashboard means sizing them to the content area instead
+   of the window, so their internal left/right panels scroll inside the
+   lab rather than pushing the page around, and normalising their fonts
+   onto the app's. Done here, scoped to .lab-embed, so the lab source
+   files stay byte-identical to upstream and remain diffable. */
+.lab-embed {
+  height: 100%;
+  min-height: 0;
+}
+.lab-embed .h-screen { height: 100% !important; }
+.lab-embed .min-h-screen { min-height: 100% !important; }
+.lab-embed .w-screen { width: 100% !important; }
+
+/* Beats the labs' inline fontFamily styles so all three share the app's
+   typography. Monospace (equations, telemetry readouts) is preserved. */
+.lab-embed,
+.lab-embed * {
+  font-family: var(--font-sans) !important;
+}
+.lab-embed .font-mono,
+.lab-embed .font-mono * {
+  font-family: var(--font-mono) !important;
 }
 
 /* Base custom scrollbar */

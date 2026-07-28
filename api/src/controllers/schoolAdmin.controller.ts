@@ -7,12 +7,7 @@ import {
   addSingleLabInchargeSchema,
   importScopeSchema,
 } from '../schemas/schoolAdmin.schema.js';
-
-function requireSchoolId(req: Request): string {
-  const schoolId = req.user?.schoolId;
-  if (!schoolId) throw new ApiError('FORBIDDEN', 'No school associated with this account');
-  return schoolId;
-}
+import { requireSchoolId } from '../lib/httpParams.js';
 
 export async function importStudentsController(req: Request, res: Response, next: NextFunction) {
   try {

@@ -1,8 +1,8 @@
 import type { Request, Response, NextFunction } from 'express';
-import { ApiError } from '../lib/errors.js';
 import * as schoolAdminService from '../services/schoolAdmin.service.js';
 import * as classSectionService from '../services/classSection.service.js';
 import * as liveSessionService from '../services/liveSession.service.js';
+import { requireSchoolId } from '../lib/httpParams.js';
 
 // The Lab In-charge portal deliberately reuses the same read/reset service
 // functions School Admin uses — it's the same data, just a narrower set of
@@ -10,12 +10,6 @@ import * as liveSessionService from '../services/liveSession.service.js';
 // editing, nothing exam/task/grade-related). Scoping which controllers get
 // wired to this router is what enforces "no grade access", not a separate
 // permission check.
-
-function requireSchoolId(req: Request): string {
-  const schoolId = req.user?.schoolId;
-  if (!schoolId) throw new ApiError('FORBIDDEN', 'No school associated with this account');
-  return schoolId;
-}
 
 export async function listStudentsController(req: Request, res: Response, next: NextFunction) {
   try {

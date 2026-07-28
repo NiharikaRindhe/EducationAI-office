@@ -24,7 +24,7 @@ If either is missing, copy the matching `.env.example` and fill in the values (f
 
 ## Running the app
 
-Four things need to be running. Open a separate terminal for each of the two `npm run dev` commands (Docker Desktop and Ollama run as background apps/services).
+Five things need to be running. Open a separate terminal for each of the three `npm run dev*` commands (Docker Desktop and Ollama run as background apps/services).
 
 **1. Docker Desktop** — make sure it's running (Supabase runs in containers).
 
@@ -41,7 +41,23 @@ npm run dev
 ```
 → listens on **http://localhost:4000**
 
-**4. The frontend** (from the repo root, separate terminal):
+**4. The background worker** (in `api/`, separate terminal):
+```bash
+cd api
+npm run dev:worker
+```
+→ health on **http://localhost:4100**
+
+This runs NCERT PDF ingestion plus the streak/leaderboard cron jobs. It is a
+**separate process from the API on purpose**: ingestion is a long synchronous
+block, so running it inside the API froze every in-flight student request until
+a book finished processing.
+
+You only need it if you're uploading books or testing the cron jobs — the API
+serves everything else fine without it, uploads just sit in `queued` until a
+worker is running.
+
+**5. The frontend** (from the repo root, separate terminal):
 ```bash
 npm run dev
 ```
@@ -67,6 +83,23 @@ Chat/grading/vision can run against this same local daemon (`OLLAMA_CHAT_MODEL` 
 | Supabase REST/Auth | http://127.0.0.1:54321 |
 | Mailpit (dev email inbox) | http://127.0.0.1:54324 |
 
+## Local test credentials
+
+> ⚠️ **Local development only.** These accounts live in your local Supabase database and must never be reused in production. Change the super admin password after first login on any real deployment.
+
+| Role | Email | Password | Lands on |
+|---|---|---|---|
+| Super Admin | `admin@eduai.local` | `ChangeMe-Now-1` | `/super-admin/schools` |
+| School Admin | `e2e-admin@eduai.local` | `Admin-Demo-2026` | `/school-admin/dashboard` |
+| Teacher (Mr. Rao) | `mr.rao.5d2a15@sps.delhi.01.eduai.local` | `Teacher-Demo-2026` | `/teacher/dashboard` |
+| Student (Dev Kumar) | `dev.kumar.c43f1a@sps.delhi.01.eduai.local` | `2uBUAVW3` | student batch home |
+
+The demo school code is **`SPS-DELHI-01`**. These come from `npm run seed:super-admin`; schools, admins, teachers, and students beyond that are created through the app itself (Super Admin creates schools; School Admin imports teachers/students).
+
+**Class 1–4 PIN login:** young students don't type emails — they use the **CLASS 1–4 (PIN)** tab on the login page (school code → class → section → tap their name → 4-digit PIN). This only works while their teacher has a live class session running.
+
+> **Login fails with "Something went wrong — please try again"?** That means the frontend can't reach the backend — check the API (step 3 above) is actually running.
+
 ## Other commands
 
 **Frontend** (repo root):
@@ -88,9 +121,11 @@ npm run seed:school-admin  # seed a School Admin account
 
 ## Stopping
 
-- `Ctrl+C` both `npm run dev` processes
+- `Ctrl+C` each `npm run dev` / `npm run dev:worker` process
 - `npx supabase stop` to stop the local Supabase containers
 
 ## Production deployment
 
 A separate, fully containerized stack (Supabase + API + Ollama + Nginx) is defined in `docker-compose.yml` for deploying to a real school server — copy `.env.example` to `.env` at the repo root, fill in every value, then `docker compose up -d`. This is a different path from the local dev workflow above (which uses the Supabase CLI directly, not the bundled Supabase containers in `docker-compose.yml`).
+
+The frontend static build (`./dist`, mounted into Nginx) is produced separately with `npm run build` — before building for a real deployment, set a root `.env` with `VITE_API_URL=https://yourschool.example/api` and `VITE_SUPABASE_PUBLIC_URL=https://yourschool.example/supabase` (Nginx's `/supabase/` location proxies this straight to Kong) so the Class 9-10 lab diagrams and other Supabase Storage assets resolve correctly.

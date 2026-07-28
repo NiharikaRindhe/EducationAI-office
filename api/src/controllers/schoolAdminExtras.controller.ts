@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import * as promotionService from '../services/promotion.service.js';
 import * as extrasService from '../services/schoolAdminExtras.service.js';
-import { ApiError } from '../lib/errors.js';
+import { requireSchoolId } from '../lib/httpParams.js';
 import { z } from 'zod';
 
 const updateFeaturesSchema = z.object({
@@ -9,11 +9,6 @@ const updateFeaturesSchema = z.object({
   aiChatEnabled: z.boolean(),
   leaderboardEnabled: z.boolean(),
 });
-
-function requireSchoolId(req: Request): string {
-  if (!req.user?.schoolId) throw new ApiError('FORBIDDEN', 'No school associated with this account');
-  return req.user.schoolId;
-}
 
 export async function getPromotionPreviewController(req: Request, res: Response, next: NextFunction) {
   try {

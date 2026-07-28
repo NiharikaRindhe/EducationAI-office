@@ -7,12 +7,7 @@ import {
   addTeachingAssignmentSchema,
 } from '../schemas/schoolAdmin.schema.js';
 import { addClassSubjectSchema } from '../schemas/superAdmin.schema.js';
-
-function requireSchoolId(req: Request): string {
-  const schoolId = req.user?.schoolId;
-  if (!schoolId) throw new ApiError('FORBIDDEN', 'No school associated with this account');
-  return schoolId;
-}
+import { requireSchoolId } from '../lib/httpParams.js';
 
 export async function listSectionsController(req: Request, res: Response, next: NextFunction) {
   try {

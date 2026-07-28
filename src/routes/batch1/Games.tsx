@@ -7,6 +7,10 @@ import { Star, ArrowLeft } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getClassTheme, getSubjectCardColors } from './theme';
 import { QuestEngine } from './QuestEngine';
+import { NumberHopEngine } from './games/NumberHopEngine';
+import { NumberSlideEngine } from './games/NumberSlideEngine';
+import { WordBuildEngine } from './games/WordBuildEngine';
+import { FractionPieEngine } from './games/FractionPieEngine';
 
 /* ───────────────────────── Types ───────────────────────── */
 
@@ -16,6 +20,10 @@ interface GameParams {
   letters?: string[];
   case?: 'upper' | 'lower';
   pairs?: { emoji: string; letter: string }[];
+  startLevel?: number;
+  startSize?: number;
+  words?: { sentence: string; answer: string; emoji: string; distractors: string[] }[];
+  challenges?: { num: number; den: number }[];
 }
 
 interface GameItem {
@@ -444,6 +452,38 @@ export const Batch1Games: React.FC = () => {
         return <LetterTraceEngine game={activeGame} isPreReader={isPreReader} onFinish={submitAttempt} />;
       case 'phonics-pop':
         return <PhonicsPopEngine game={activeGame} numChoices={numChoices} isPreReader={isPreReader} onFinish={submitAttempt} />;
+      case 'number-hop':
+        return (
+          <NumberHopEngine
+            game={{ gameId: activeGame.gameId, name: activeGame.name, icon: activeGame.icon, params: { startLevel: activeGame.params.startLevel } }}
+            isPreReader={isPreReader}
+            onFinish={submitAttempt}
+          />
+        );
+      case 'number-slide':
+        return (
+          <NumberSlideEngine
+            game={{ gameId: activeGame.gameId, name: activeGame.name, icon: activeGame.icon, params: { startSize: activeGame.params.startSize } }}
+            isPreReader={isPreReader}
+            onFinish={submitAttempt}
+          />
+        );
+      case 'word-build':
+        return (
+          <WordBuildEngine
+            game={{ gameId: activeGame.gameId, name: activeGame.name, icon: activeGame.icon, params: { words: activeGame.params.words } }}
+            isPreReader={isPreReader}
+            onFinish={submitAttempt}
+          />
+        );
+      case 'fraction-pie':
+        return (
+          <FractionPieEngine
+            game={{ gameId: activeGame.gameId, name: activeGame.name, icon: activeGame.icon, params: { challenges: activeGame.params.challenges } }}
+            isPreReader={isPreReader}
+            onFinish={submitAttempt}
+          />
+        );
       case 'quest':
         return (
           <QuestEngine

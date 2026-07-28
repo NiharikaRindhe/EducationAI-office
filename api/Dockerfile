@@ -30,8 +30,20 @@ USER eduai
 # The Node API listens on this port (matches env.port / PORT env var)
 EXPOSE 3001
 
-# Healthcheck so Docker Compose / Nginx knows when the API is ready
+# One image, two entrypoints: `node dist/index.js` (API, the default below) and
+# `node dist/worker.js` (background jobs — see src/worker.ts). HEALTH_PORT lets
+# the same healthcheck serve both, since the worker's health server binds
+# WORKER_PORT rather than PORT.
+ENV HEALTH_PORT=3001
+
+# Must be set: lib/logger.ts only attaches the pino-pretty transport outside
+# production, and pino-pretty is a devDependency stripped by `npm prune` above
+# — so an image run without this crashes on the first log line. Defaulting it
+# here means the image is correct standalone, not only under compose.
+ENV NODE_ENV=production
+
+# Healthcheck so Docker Compose / Nginx knows when the process is ready
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
-  CMD wget -qO- http://localhost:3001/health | grep -q '"status":"ok"' || exit 1
+  CMD wget -qO- "http://localhost:${HEALTH_PORT}/health" | grep -q '"status":"ok"' || exit 1
 
 CMD ["node", "dist/index.js"]

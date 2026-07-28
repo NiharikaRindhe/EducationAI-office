@@ -43,6 +43,7 @@ import {
   getStudentCurriculumController,
 } from '../controllers/student.controller.js';
 import { listGamesForStudentController, submitGameAttemptController } from '../controllers/games.controller.js';
+import { craftCompoundController, freeReactController } from '../controllers/chemistryLab.controller.js';
 import { getMyStudentTimetableController, getMyStudentOccurrencesController } from '../controllers/timetable.controller.js';
 
 export const studentRouter = Router();
@@ -58,6 +59,12 @@ studentRouter.get('/pyq', listPyqsController);
 
 studentRouter.get('/games', listGamesForStudentController);
 studentRouter.post('/games/:gameId/attempts', submitGameAttemptController);
+
+// Paths mirror the original EducationAI-Games-master FastAPI endpoints so the
+// ported Chemistry Lab UI calls them with only its base-URL constant changed.
+const chemistryLimiter = rateLimit({ windowMs: 60 * 60_000, max: 40, keyFn: (req) => `chem:${req.user!.id}` });
+studentRouter.post('/chemistry/craft_compound', chemistryLimiter, craftCompoundController);
+studentRouter.post('/chemistry/free_react', chemistryLimiter, freeReactController);
 
 studentRouter.get('/sessions/active', activeSessionForStudentController);
 studentRouter.post('/sessions/join', joinSessionController);

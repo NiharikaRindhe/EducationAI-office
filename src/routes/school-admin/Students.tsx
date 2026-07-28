@@ -2,9 +2,11 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   UploadCloud, Loader2, Download, Plus, AlertCircle, Printer, KeyRound,
   Search, X, Users, ChevronLeft, ChevronRight, ChevronUp, ChevronDown,
+  UserCheck, UserRoundX, Sparkles,
 } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 import { printCredentialSlips } from '../../lib/printSlips';
+import { MetricCard, PortalPageHeader } from '../../components/shared/PortalPageHeader';
 
 interface StudentRow {
   id: string;
@@ -138,6 +140,9 @@ export const SchoolAdminStudents: React.FC = () => {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const loggedInCount = students.filter((s) => s.has_logged_in_ever).length;
+  const neverLoggedInCount = students.length - loggedInCount;
+  const totalXp = students.reduce((sum, s) => sum + (sp(s)?.xp ?? 0), 0);
 
   useEffect(() => { setPage(1); }, [searchQuery, classFilter, sectionFilter, statusFilter]);
   useEffect(() => { setSectionFilter(''); }, [classFilter]);
@@ -246,6 +251,28 @@ export const SchoolAdminStudents: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-5">
+      <PortalPageHeader
+        eyebrow="People management"
+        title="Student directory"
+        description="Manage enrolment, login readiness and student access from one reliable workspace."
+        actions={(
+          <>
+            <button onClick={() => setShowImport(true)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[13px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
+              <UploadCloud size={15} /> Import roster
+            </button>
+            <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-slate-800">
+              <Plus size={15} /> Add student
+            </button>
+          </>
+        )}
+      >
+        <div className="portal-metrics-grid">
+          <MetricCard label="Total students" value={students.length} hint="enrolled" icon={<Users size={18} />} />
+          <MetricCard label="Login ready" value={loggedInCount} hint={`${students.length ? Math.round((loggedInCount / students.length) * 100) : 0}% activated`} icon={<UserCheck size={18} />} tone="emerald" />
+          <MetricCard label="Needs activation" value={neverLoggedInCount} hint="never signed in" icon={<UserRoundX size={18} />} tone="amber" />
+          <MetricCard label="Learning activity" value={totalXp.toLocaleString('en-IN')} hint="total XP" icon={<Sparkles size={18} />} tone="indigo" />
+        </div>
+      </PortalPageHeader>
       {error && (
         <div className="bg-rose-50 border border-rose-200 text-rose-700 text-[13px] rounded-lg px-4 py-3 flex items-center gap-2">
           <AlertCircle size={15} /> {error}
@@ -294,7 +321,7 @@ export const SchoolAdminStudents: React.FC = () => {
       )}
 
       {/* Toolbar */}
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="portal-toolbar">
         <div className="relative max-w-xs flex-1 min-w-[200px]">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -318,24 +345,13 @@ export const SchoolAdminStudents: React.FC = () => {
           <option value="never">Never logged in</option>
         </select>
 
-        <div className="flex items-center gap-2 ml-auto">
-          <button
-            onClick={() => setShowImport(true)}
-            className="inline-flex items-center gap-2 text-[13px] font-semibold text-slate-600 border border-slate-300 hover:bg-slate-50 px-4 py-2 rounded-lg transition-colors cursor-pointer"
-          >
-            <UploadCloud size={15} /> Import CSV/XLSX
-          </button>
-          <button
-            onClick={() => setShowAdd(true)}
-            className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-[13px] font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer"
-          >
-            <Plus size={15} /> Add student
-          </button>
+        <div className="ml-auto rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
+          {filtered.length} result{filtered.length === 1 ? '' : 's'}
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="portal-panel">
         {isLoading ? (
           <div className="flex justify-center py-16"><Loader2 className="animate-spin text-slate-400" /></div>
         ) : pageRows.length === 0 ? (
@@ -346,7 +362,7 @@ export const SchoolAdminStudents: React.FC = () => {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="portal-table w-full">
                 <thead>
                   <tr className="bg-slate-50 text-left text-[11px] text-slate-500">
                     <th className="px-4 py-3 whitespace-nowrap"><SortHeader label="Student" k="name" /></th>

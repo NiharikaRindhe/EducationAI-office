@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, AlertCircle, Upload, FileText, RotateCcw, Search, BookOpen, Trash2, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertCircle, Upload, FileText, RotateCcw, Search, BookOpen, Trash2, CheckCircle2, AlertTriangle, Database, Clock3, CircleAlert } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
+import { MetricCard, PortalPageHeader } from '../../components/shared/PortalPageHeader';
 
 interface Job {
   id: string;
@@ -237,11 +238,27 @@ export const SuperAdminContentPortal: React.FC = () => {
   };
 
   const visibleJobs = (jobs ?? []).filter((j) => !classFilterLib || String(j.class_num) === classFilterLib);
+  const readyJobs = (jobs ?? []).filter((job) => job.status === 'done').length;
+  const processingJobs = (jobs ?? []).filter((job) => ['queued', 'chunking', 'embedding'].includes(job.status)).length;
+  const failedJobs = (jobs ?? []).filter((job) => job.status === 'error').length;
 
   return (
     <div className="flex flex-col gap-5">
+      <PortalPageHeader
+        eyebrow="Knowledge operations"
+        title="Content intelligence hub"
+        description="Upload trusted curriculum content, monitor indexing health and govern the question bank used across every school."
+      >
+        <div className="portal-metrics-grid">
+          <MetricCard label="Books" value={(jobs ?? []).length} hint="in library" icon={<BookOpen size={18} />} />
+          <MetricCard label="AI ready" value={readyJobs} hint="fully indexed" icon={<Database size={18} />} tone="emerald" />
+          <MetricCard label="Processing" value={processingJobs} hint="in pipeline" icon={<Clock3 size={18} />} tone="sky" />
+          <MetricCard label="Needs attention" value={failedJobs} hint="failed jobs" icon={<CircleAlert size={18} />} tone={failedJobs ? 'rose' : 'slate'} />
+        </div>
+      </PortalPageHeader>
+
       {/* Tabs */}
-      <div className="border-b border-slate-200 flex gap-6">
+      <div className="inline-flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
         {([
           { id: 'library', label: 'Book Library' },
           { id: 'questions', label: 'Global Question Bank' },
@@ -250,8 +267,8 @@ export const SuperAdminContentPortal: React.FC = () => {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`pb-3 -mb-px text-[13px] font-semibold transition-colors cursor-pointer border-b-2 ${
-              activeTab === tab.id ? 'text-slate-900 border-slate-900' : 'text-slate-400 border-transparent hover:text-slate-600'
+            className={`whitespace-nowrap rounded-lg px-4 py-2 text-[13px] font-semibold transition-colors cursor-pointer ${
+              activeTab === tab.id ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
             }`}
           >
             {tab.label}
@@ -263,13 +280,18 @@ export const SuperAdminContentPortal: React.FC = () => {
         <div className="grid grid-cols-12 gap-5 items-start">
           {/* Upload panel */}
           <div className="col-span-12 xl:col-span-4">
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
+            <div className="portal-panel">
               <div className="px-5 py-4 border-b border-slate-100">
-                <h2 className="text-[14px] font-semibold text-slate-800">Upload a book</h2>
-                <p className="text-[12px] text-slate-400 mt-0.5">PDF up to 150 MB. Content is extracted, chunked, and indexed for the AI tutor.</p>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-950 text-white"><Upload size={17} /></div>
+                  <div>
+                    <h2 className="text-[15px] font-semibold text-slate-900">Upload curriculum book</h2>
+                    <p className="text-[12px] text-slate-400 mt-0.5">PDF up to 150 MB · automatically prepared for the AI tutor.</p>
+                  </div>
+                </div>
               </div>
 
-              <form onSubmit={handleUpload} className="p-5 flex flex-col gap-4">
+              <form onSubmit={handleUpload} className="p-5 flex flex-col gap-5">
                 {uploadMsg && (
                   <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-[13px] rounded-lg px-4 py-3 flex items-center gap-2">
                     <CheckCircle2 size={15} className="shrink-0" /> {uploadMsg}
@@ -303,8 +325,8 @@ export const SuperAdminContentPortal: React.FC = () => {
 
                 <div>
                   <label className={labelCls}>PDF file <span className="text-rose-500">*</span></label>
-                  <label className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-lg px-4 py-6 cursor-pointer transition-colors ${
-                    selectedFile ? 'border-slate-400 bg-slate-50' : 'border-slate-200 hover:border-slate-400 hover:bg-slate-50'
+                  <label className={`flex min-h-36 flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl px-4 py-6 cursor-pointer transition-colors ${
+                    selectedFile ? 'border-indigo-300 bg-indigo-50/50' : 'border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/30'
                   }`}>
                     <input ref={fileInputRef} type="file" accept=".pdf" className="hidden" onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)} />
                     {selectedFile ? (
@@ -325,7 +347,7 @@ export const SuperAdminContentPortal: React.FC = () => {
                 <button
                   type="submit"
                   disabled={uploading || !selectedFile}
-                  className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-[13px] font-semibold px-4 py-2.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-2 bg-slate-950 hover:bg-slate-800 text-white text-[13px] font-semibold px-4 py-3 rounded-xl shadow-sm transition-colors cursor-pointer disabled:opacity-50"
                 >
                   {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} Upload &amp; process
                 </button>
@@ -335,7 +357,7 @@ export const SuperAdminContentPortal: React.FC = () => {
 
           {/* Books table */}
           <div className="col-span-12 xl:col-span-8">
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+            <div className="portal-panel">
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
                 <div>
                   <h2 className="text-[14px] font-semibold text-slate-800">Library</h2>
@@ -360,7 +382,7 @@ export const SuperAdminContentPortal: React.FC = () => {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="portal-table w-full">
                     <thead>
                       <tr className="bg-slate-50 text-left">
                         {['Book', 'Class', 'Subject', 'Source', 'Indexing', 'Status', ''].map((h) => (

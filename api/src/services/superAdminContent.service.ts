@@ -359,6 +359,19 @@ export async function updateIngestionJobStatus(
   if (!existing) throw new ApiError('NOT_FOUND', 'Ingestion job not found');
 
   const updatePayload: Record<string, unknown> = { status: update.status };
+
+  // Lock lifecycle. Every progress checkpoint doubles as the worker's
+  // heartbeat: while a job is being worked on, `locked_at` keeps moving
+  // forward so requeue_stale_ingestion_jobs() can tell "still running" from
+  // "the worker died holding this". Once it reaches a terminal state the lock
+  // is released, so a retry can claim it cleanly.
+  if (update.status === 'chunking' || update.status === 'embedding') {
+    updatePayload.locked_at = new Date().toISOString();
+  } else {
+    updatePayload.locked_at = null;
+    updatePayload.locked_by = null;
+  }
+
   if (update.totalPages !== undefined) updatePayload.total_pages = update.totalPages;
   if (update.chunksCreated !== undefined) updatePayload.chunks_created = update.chunksCreated;
   if (update.chunksEmbedded !== undefined) updatePayload.chunks_embedded = update.chunksEmbedded;

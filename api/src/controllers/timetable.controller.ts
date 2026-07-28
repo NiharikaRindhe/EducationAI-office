@@ -2,11 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import * as timetableService from '../services/timetable.service.js';
 import { createSlotSchema, updateSlotSchema, createExceptionSchema } from '../schemas/timetable.schema.js';
 import { ApiError } from '../lib/errors.js';
-
-function requireSchoolId(req: Request): string {
-  if (!req.user?.schoolId) throw new ApiError('FORBIDDEN', 'No school associated with this account');
-  return req.user.schoolId;
-}
+import { requireSchoolId } from '../lib/httpParams.js';
 
 function requireDateRange(req: Request): { fromDate: string; toDate: string } {
   const fromDate = typeof req.query.from === 'string' ? req.query.from : undefined;

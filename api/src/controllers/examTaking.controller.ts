@@ -1,13 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { saveAnswerSchema, proctorEventSchema } from '../schemas/exam.schema.js';
 import * as examTakingService from '../services/examTaking.service.js';
-import { ApiError } from '../lib/errors.js';
-
-function requireId(req: Request, name = 'id'): string {
-  const value = req.params[name];
-  if (!value) throw new ApiError('VALIDATION_ERROR', `Missing ${name} in path`);
-  return value;
-}
+import { requireId } from '../lib/httpParams.js';
 
 export async function listExamsForStudentController(req: Request, res: Response, next: NextFunction) {
   try {

@@ -17,8 +17,6 @@
 #  All data lives in named Docker volumes so it survives restarts.
 # ═════════════════════════════════════════════════════════════
 
-version: "3.9"
-
 # ─── Shared environment loaded from .env ─────────────────────
 x-db-env: &db-env
   POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -45,6 +43,44 @@ services:
       - ./supabase/migrations:/docker-entrypoint-initdb.d:ro
     ports:
       - "127.0.0.1:5432:5432"   # local-only; Nginx/API reach via internal network
+    # Postgres is the one service that must never be OOM-killed — it holds
+    # every school's data and the pgvector index RAG reads on every question.
+    mem_limit: ${DB_MEM_LIMIT:-2g}
+    shm_size: 256mb   # default 64m is tight for parallel/vector query workspaces
+
+  # ── Nightly database backup ────────────────────────────────
+  # Until now every school's data lived in one Docker volume with no copy
+  # anywhere: a disk failure, or a single `docker compose down -v`, was total
+  # unrecoverable loss of their students, exams and history. This is the
+  # cheapest insurance available and needs no extra image.
+  #
+  # ./backups is a bind mount SO THAT the dumps land outside Docker's volume
+  # store — a backup that a stray `down -v` deletes along with the database is
+  # not a backup. Ship these off-box (rsync/S3/cron) for real durability.
+  db-backup:
+    image: supabase/postgres:15.6.1.143
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    entrypoint: >
+      sh -c '
+        while true; do
+          ts=$$(date +%Y%m%d-%H%M%S);
+          if pg_dump -h db -U postgres -d postgres -Fc -f /backups/eduai-$$ts.dump; then
+            echo "[db-backup] wrote eduai-$$ts.dump";
+          else
+            echo "[db-backup] FAILED at $$ts" >&2;
+            rm -f /backups/eduai-$$ts.dump;
+          fi;
+          find /backups -name "eduai-*.dump" -mtime +${BACKUP_RETENTION_DAYS:-14} -delete;
+          sleep ${BACKUP_INTERVAL_SECONDS:-86400};
+        done
+      '
 
   # ── Supabase Auth (GoTrue) ─────────────────────────────────
   auth:
@@ -122,7 +158,11 @@ services:
       POSTGREST_URL: http://rest:3000
       PGRST_JWT_SECRET: ${JWT_SECRET}
       DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:5432/postgres
-      FILE_SIZE_LIMIT: 52428800    # 50 MB — matches NCERT PDF limit
+      # 150 MB — must match multer's limit (api/routes/superAdmin.routes.ts)
+      # and nginx's client_max_body_size. When this was left at 50 MB a real
+      # NCERT book (a Class 9 Social Science PDF is ~66 MB) passed nginx and
+      # multer, then failed here at the last step with an opaque storage error.
+      FILE_SIZE_LIMIT: 157286400
       STORAGE_BACKEND: file
       FILE_STORAGE_BACKEND_PATH: /var/lib/storage
       TENANT_ID: stub
@@ -182,6 +222,8 @@ services:
       - "127.0.0.1:8080:8080"
 
   # ── EduAI Node API ─────────────────────────────────────────
+  # Stateless: no background jobs, no local state. Safe to restart or run
+  # behind a load balancer with several replicas (see nginx/nginx.conf).
   api:
     build:
       context: ./api
@@ -195,6 +237,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
+      HEALTH_PORT: 3001
       SUPABASE_URL: http://kong:8000
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
@@ -203,9 +246,60 @@ services:
       OLLAMA_URL: http://ollama:11434
     ports:
       - "127.0.0.1:3001:3001"
+    # SIGTERM → drain in-flight requests (src/index.ts) before the container
+    # dies, so a redeploy doesn't reset a student's exam submission mid-flight.
+    stop_grace_period: 20s
+    mem_limit: ${API_MEM_LIMIT:-1g}
+    cpus: ${API_CPUS:-1.0}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3001/health | grep -q ok || exit 1"]
       interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ── EduAI background worker ────────────────────────────────
+  # Same image, different entrypoint. Owns NCERT ingestion (PDF → chunks →
+  # embeddings) and the streak/leaderboard cron jobs.
+  #
+  # This exists because ingestion is a long SYNCHRONOUS block: run inside the
+  # API it froze the event loop, so one book upload stalled every student's
+  # chat and exam request until it finished. Out here it can take as long as
+  # it needs without touching student-facing latency.
+  #
+  # Keep this at exactly ONE replica. Ingestion itself is safe to run
+  # concurrently (jobs are claimed atomically — migration 20250101000130),
+  # but the cron jobs are not: a second worker would double-fire them.
+  worker:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    command: ["node", "dist/worker.js"]
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      auth:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      WORKER_PORT: 3002
+      HEALTH_PORT: 3002
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      FRONTEND_URL: ${SITE_URL}
+      OLLAMA_URL: http://ollama:11434
+    # Long: finishes the book it's mid-way through rather than abandoning it
+    # for the stale-lock sweep to restart from scratch 15 minutes later.
+    stop_grace_period: 120s
+    # Roomier than the API on purpose — MuPDF's WASM heap holds whole pages of
+    # an image-heavy textbook while extracting.
+    mem_limit: ${WORKER_MEM_LIMIT:-2g}
+    cpus: ${WORKER_CPUS:-2.0}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3002/health | grep -q ok || exit 1"]
+      interval: 30s
       timeout: 5s
       retries: 5
 
@@ -213,10 +307,29 @@ services:
   ollama:
     image: ollama/ollama:0.3.12
     restart: unless-stopped
+    environment:
+      # THE concurrency lever for RAG. Every chat message embeds its query
+      # before retrieval can run, so embeddings sit on the critical path of
+      # every single student question. Ollama defaults to serialising
+      # requests per model — with a full lab asking questions at once that
+      # turns into a queue, and the last student in it waits for all the
+      # others. Raise with available CPU/RAM; each parallel slot costs its
+      # own KV-cache allocation.
+      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-4}
+      # Embeddings (mxbai-embed-large) and the chat fallback model must be
+      # able to stay resident together, or Ollama evicts and reloads one on
+      # every alternating request — seconds of stall each time.
+      OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-2}
+      # Keep models warm between lab periods; a cold load is a multi-second
+      # first-question penalty for whoever asks first.
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-30m}
     volumes:
       - ollama_data:/root/.ollama
     ports:
       - "127.0.0.1:11434:11434"
+    # Generous by default: model weights + one KV cache per parallel slot.
+    # Tune to the box — too low here means OOM-killed mid-answer.
+    mem_limit: ${OLLAMA_MEM_LIMIT:-8g}
     # GPU support: uncomment the deploy block if the school server has an NVIDIA GPU
     # deploy:
     #   resources:

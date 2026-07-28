@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { lazy } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 import { AuthProvider } from './context/AuthContext';
@@ -43,6 +43,21 @@ import { Batch3Layout } from './routes/batch3/Layout';
 import { Batch3Home } from './routes/batch3/Home';
 import { Batch3BoardPrep } from './routes/batch3/BoardPrep';
 import { Batch3ConceptMap } from './routes/batch3/ConceptMap';
+import { Batch3ScienceLabs } from './routes/batch3/ScienceLabs';
+/* Class 9-10 science labs — ported from EducationAI-Games-master. They render
+   inside Batch3Layout so the dashboard sidebar/topbar stay in place; the
+   .lab-embed rules in index.css size their viewport-based roots to the content
+   area. Lazy-loaded so the simulation/diagram code stays out of the main
+   bundle for students who never open a lab. */
+const BioHub = lazy(() => import('./routes/batch3/labs/Biology/BioHub'));
+const BiologyModule = lazy(() => import('./routes/batch3/labs/Biology/BiologyModule'));
+const ChemistryLab = lazy(() => import('./routes/batch3/labs/Chemistry/Lab/Lab'));
+const PeriodicTable = lazy(() => import('./routes/batch3/labs/Chemistry/PeriodicTable'));
+const TeacherQuestionBuilder = lazy(() => import('./routes/batch3/labs/Chemistry/Lab/TeacherQuestionBuilder'));
+const PhysicsHub = lazy(() => import('./routes/batch3/labs/Physics/PhysicsHub/PhysicsHub'));
+const PhysicsLab = lazy(() => import('./routes/batch3/labs/Physics/PhysicsLab'));
+const FrictionSimulator = lazy(() => import('./routes/batch3/labs/Physics/FrictionSimulator/FrictionSimulator'));
+const SoundWaveTank = lazy(() => import('./routes/batch3/labs/Physics/SoundWave/SoundWaveTank'));
 import { Batch3Pomodoro } from './routes/batch3/Pomodoro';
 import { Batch3Tasks } from './routes/batch3/Tasks';
 import { Batch3Leaderboard } from './routes/batch3/Leaderboard';
@@ -183,6 +198,23 @@ function App() {
               <Route path="leaderboard" element={<Batch3Leaderboard />} />
               <Route path="streak" element={<Batch3Streak />} />
               <Route path="profile" element={<Batch3Profile />} />
+
+              {/* Class 9-10 science labs. Rendered inside this layout so the
+                  dashboard sidebar/topbar stay put; Batch3Layout gives lab
+                  routes a full-bleed, fixed-height content area. */}
+              <Route path="labs" element={<Batch3ScienceLabs />} />
+              {/* Biology */}
+              <Route path="labs/biology" element={<BioHub />} />
+              <Route path="labs/biology/diagram-hub" element={<BiologyModule />} />
+              {/* Chemistry */}
+              <Route path="labs/chemistry" element={<ChemistryLab />} />
+              <Route path="labs/chemistry/periodic-table" element={<PeriodicTable />} />
+              <Route path="labs/chemistry/teacher" element={<TeacherQuestionBuilder />} />
+              {/* Physics */}
+              <Route path="labs/physics" element={<PhysicsHub />} />
+              <Route path="labs/physics/motion" element={<PhysicsLab />} />
+              <Route path="labs/physics/friction" element={<FrictionSimulator />} />
+              <Route path="labs/physics/sound" element={<SoundWaveTank />} />
             </Route>
 
             {/* Teacher Portal Routes */}

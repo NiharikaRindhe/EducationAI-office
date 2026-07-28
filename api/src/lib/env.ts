@@ -9,6 +9,9 @@ function required(name: string): string {
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: Number(process.env.PORT ?? 4000),
+  // Health-check port for the background worker process (src/worker.ts).
+  // Separate from PORT so worker and API can share one .env on one host.
+  workerPort: Number(process.env.WORKER_PORT ?? 4100),
   frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:5173',
 
   supabaseUrl: required('SUPABASE_URL'),

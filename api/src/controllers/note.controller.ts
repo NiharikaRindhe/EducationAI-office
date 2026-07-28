@@ -2,12 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { createNoteSchema, updateNoteSchema } from '../schemas/note.schema.js';
 import * as noteService from '../services/note.service.js';
 import { ApiError } from '../lib/errors.js';
-
-function requireId(req: Request): string {
-  const value = req.params.id;
-  if (!value) throw new ApiError('VALIDATION_ERROR', 'Missing note id');
-  return value;
-}
+import { requireId } from '../lib/httpParams.js';
 
 export async function createNoteController(req: Request, res: Response, next: NextFunction) {
   try {

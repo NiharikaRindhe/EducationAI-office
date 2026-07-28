@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import {
-  ChevronDown, ChevronRight, LogOut,
+  ChevronDown, ChevronRight, LogOut, PanelLeftClose, PanelLeftOpen,
   BookOpen, Trophy, Calendar, CheckSquare,
   Gamepad, Award, Camera, ShieldAlert,
   Users, ClipboardList, PenTool, BarChart3,
@@ -23,11 +23,20 @@ interface SidebarProps {
   batchColor: 'amber' | 'indigo' | 'sky' | 'slate' | 'emerald' | 'teacher' | 'schoolAdmin' | 'superAdmin' | 'labIncharge';
   logoText: string;
   logoIcon: string; // Material symbol name
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
 }
 
 const REAL_AUTH_PORTALS = new Set(['teacher', 'schoolAdmin', 'superAdmin', 'labIncharge']);
 
-export const Sidebar: React.FC<SidebarProps> = ({ navItems, batchColor, logoText, logoIcon }) => {
+export const Sidebar: React.FC<SidebarProps> = ({
+  navItems,
+  batchColor,
+  logoText,
+  logoIcon,
+  collapsed = false,
+  onCollapsedChange,
+}) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { studentName, studentAvatar, studentXP, studentStreak } = useApp();
@@ -125,14 +134,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, batchColor, logoText
   };
 
   return (
-    <aside className={`w-60 shrink-0 h-screen sticky top-0 flex flex-col justify-between p-6 ${currentTheme.sidebarBg} select-none`}>
-      <div className="flex flex-col gap-8 overflow-y-auto pr-1">
+    <aside className={`${collapsed ? 'w-[76px] px-3' : 'w-60 px-6'} relative shrink-0 h-screen sticky top-0 flex flex-col justify-between py-6 ${currentTheme.sidebarBg} select-none transition-[width,padding] duration-300 ease-out`}>
+      {onCollapsedChange && (
+        <button
+          type="button"
+          onClick={() => onCollapsedChange(!collapsed)}
+          aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+          title={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+          className="absolute -right-3 top-7 z-50 flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md transition hover:text-sky-600"
+        >
+          {collapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+        </button>
+      )}
+      <div className={`flex flex-col gap-8 overflow-y-auto ${collapsed ? '' : 'pr-1'}`}>
         {/* Brand Logo */}
-        <Link to="/" className="flex items-center gap-3">
+        <Link to="/" className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`} title={collapsed ? logoText : undefined}>
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-display font-bold text-lg ${currentTheme.logoBg}`}>
             {logoText.charAt(0)}
           </div>
-          <div>
+          <div className={collapsed ? 'hidden' : ''}>
             <span className="font-display font-bold text-lg text-slate-800 block leading-tight">{logoText}</span>
             <span className="text-[10px] text-slate-400 font-label-caps tracking-wider block">K-12 PORTAL</span>
           </div>
@@ -150,31 +170,33 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, batchColor, logoText
               <div key={item.label} className="w-full">
                 {hasChildren ? (
                   <button
+                    title={collapsed ? item.label : undefined}
                     onClick={() => toggleSubnav(item.label)}
-                    className={`w-full flex items-center justify-between py-3 px-4 rounded-xl font-sans text-sm font-semibold transition-all cursor-pointer ${
+                    className={`w-full flex items-center ${collapsed ? 'justify-center px-2' : 'justify-between px-4'} py-3 rounded-xl font-sans text-sm font-semibold transition-all cursor-pointer ${
                       isActive ? currentTheme.activeItem : currentTheme.hoverItem
                     }`}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className={`flex items-center ${collapsed ? '' : 'gap-3'}`}>
                       <span className="material-symbols-outlined text-lg">{item.iconName}</span>
-                      <span>{item.label}</span>
+                      {!collapsed && <span>{item.label}</span>}
                     </div>
-                    {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    {!collapsed && (isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />)}
                   </button>
                 ) : (
                   <Link
                     to={item.href}
-                    className={`flex items-center gap-3 py-3 px-4 rounded-xl font-sans text-sm font-semibold transition-all ${
+                    title={collapsed ? item.label : undefined}
+                    className={`flex items-center ${collapsed ? 'justify-center px-2' : 'gap-3 px-4'} py-3 rounded-xl font-sans text-sm font-semibold transition-all ${
                       isActive ? currentTheme.activeItem : currentTheme.hoverItem
                     }`}
                   >
                     <span className="material-symbols-outlined text-lg">{item.iconName}</span>
-                    <span>{item.label}</span>
+                    {!collapsed && <span>{item.label}</span>}
                   </Link>
                 )}
 
                 {/* Sub-navigation items */}
-                {hasChildren && isExpanded && (
+                {hasChildren && isExpanded && !collapsed && (
                   <div className="pl-8 mt-1.5 flex flex-col gap-1">
                     {item.children?.map((sub) => {
                       const isSubActive = location.pathname === sub.href;
@@ -202,18 +224,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, batchColor, logoText
       </div>
 
       {/* Sidebar Footer with Avatar & Log Out */}
-      <div className="pt-4 border-t border-slate-200/50 flex flex-col gap-4">
+      <div className={`pt-4 border-t border-slate-200/50 flex flex-col gap-4 ${collapsed ? 'items-center' : ''}`}>
         {/* User preview for students */}
         {!REAL_AUTH_PORTALS.has(batchColor) && (
-          <div className="flex items-center justify-between p-2.5 rounded-2xl bg-white/50 border border-white/80 shadow-xs">
+          <div className={`flex items-center justify-between rounded-2xl bg-white/50 border border-white/80 shadow-xs ${collapsed ? 'p-2' : 'p-2.5'}`} title={collapsed ? studentName : undefined}>
             <div className="flex items-center gap-2.5">
               <span className="text-2xl">{studentAvatar}</span>
-              <div className="min-w-0">
+              <div className={`min-w-0 ${collapsed ? 'hidden' : ''}`}>
                 <span className="font-display font-bold text-xs text-slate-800 block truncate">{studentName}</span>
                 <span className="text-[10px] text-slate-400 block font-label-caps tracking-wider">{studentXP} XP</span>
               </div>
             </div>
-            <div className="flex items-center gap-0.5 text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded-lg border border-amber-100">
+            <div className={`items-center gap-0.5 text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded-lg border border-amber-100 ${collapsed ? 'hidden' : 'flex'}`}>
               <span className="material-symbols-outlined text-xs font-fill">local_fire_department</span>
               <span className="text-[10px] font-bold">{studentStreak}d</span>
             </div>
@@ -222,11 +244,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, batchColor, logoText
 
         {/* User preview for teacher / school admin / super admin — real auth data */}
         {REAL_AUTH_PORTALS.has(batchColor) && (
-          <div className="flex items-center gap-2.5 p-2 bg-slate-50 rounded-xl">
+          <div className={`flex items-center p-2 bg-slate-50 rounded-xl ${collapsed ? '' : 'gap-2.5'}`}>
             <div className={`w-8 h-8 rounded-lg text-white flex items-center justify-center font-bold text-sm ${currentTheme.logoBg}`}>
               {(user?.full_name ?? '?').charAt(0).toUpperCase()}
             </div>
-            <div className="min-w-0">
+            <div className={`min-w-0 ${collapsed ? 'hidden' : ''}`}>
               <span className="font-display font-semibold text-xs text-slate-800 block truncate">{user?.full_name ?? '—'}</span>
               <span className="text-[10px] text-slate-400 block font-label-caps">
                 {batchColor === 'teacher'
@@ -244,10 +266,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, batchColor, logoText
         {/* Log Out button */}
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 py-2.5 px-4 rounded-xl font-sans text-sm font-semibold text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all cursor-pointer w-full text-left"
+          title={collapsed ? 'Sign out' : undefined}
+          className={`flex items-center py-2.5 rounded-xl font-sans text-sm font-semibold text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all cursor-pointer w-full ${collapsed ? 'justify-center px-2' : 'gap-3 px-4 text-left'}`}
         >
           <span className="material-symbols-outlined text-lg">logout</span>
-          <span>Sign Out</span>
+          {!collapsed && <span>Sign Out</span>}
         </button>
       </div>
     </aside>

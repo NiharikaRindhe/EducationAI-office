@@ -12,9 +12,12 @@ import { teacherRouter } from './routes/teacher.routes.js';
 import { studentRouter } from './routes/student.routes.js';
 import { labInchargeRouter } from './routes/labIncharge.routes.js';
 import { ticketRouter } from './routes/ticket.routes.js';
-import { startStreakResetJob } from './jobs/streakReset.job.js';
-import { startLeaderboardRecomputeJob } from './jobs/leaderboardRecompute.job.js';
-import { startIngestionWorker } from './jobs/ingestionWorker.job.js';
+
+// Background jobs deliberately do NOT run here — they live in their own
+// process (src/worker.ts). Ingestion is a long synchronous block that used to
+// freeze every in-flight student request when it ran in-process, and the cron
+// jobs would double-fire from every replica. Keeping this process stateless is
+// what makes it safe to run several API containers behind nginx.
 
 const app = express();
 
@@ -39,9 +42,29 @@ app.use('/api/tickets', ticketRouter);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-app.listen(env.port, () => {
+const server = app.listen(env.port, () => {
   logger.info(`EduAI API listening on http://localhost:${env.port}`);
-  startStreakResetJob();
-  startLeaderboardRecomputeJob();
-  startIngestionWorker();
 });
+
+// Rolling restarts and `docker compose up -d` send SIGTERM. Without this the
+// process dies instantly and every request in flight — a student mid-exam
+// submission, a teacher saving grades — fails with a connection reset. Stop
+// accepting new connections, let the ones already open finish, then exit.
+const SHUTDOWN_GRACE_MS = 15_000;
+
+function shutdown(signal: string) {
+  logger.info({ signal }, 'API shutting down…');
+  server.close(() => {
+    logger.info('API stopped cleanly');
+    process.exit(0);
+  });
+  // A hung upstream (a stalled LLM call) must not keep the container alive
+  // forever — past the grace period, exit anyway.
+  setTimeout(() => {
+    logger.warn('Graceful shutdown timed out — forcing exit');
+    process.exit(1);
+  }, SHUTDOWN_GRACE_MS).unref();
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

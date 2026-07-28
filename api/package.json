@@ -6,12 +6,15 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "dev:worker": "tsx watch src/worker.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
+    "start:worker": "node dist/worker.js",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
     "seed:super-admin": "tsx scripts/seedSuperAdmin.ts",
-    "seed:school-admin": "tsx scripts/seedSchoolAdmin.ts"
+    "seed:school-admin": "tsx scripts/seedSchoolAdmin.ts",
+    "assets:upload-lab": "tsx scripts/uploadLabAssets.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

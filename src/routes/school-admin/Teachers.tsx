@@ -2,9 +2,11 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   UploadCloud, Loader2, Download, Plus, AlertCircle, Printer, KeyRound,
   Search, X, GraduationCap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown,
+  UserCheck, UserRoundX, BookOpenCheck,
 } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 import { printCredentialSlips } from '../../lib/printSlips';
+import { MetricCard, PortalPageHeader } from '../../components/shared/PortalPageHeader';
 
 interface TeacherRow {
   id: string;
@@ -112,6 +114,9 @@ export const SchoolAdminTeachers: React.FC = () => {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const loggedInCount = teachers.filter((teacher) => teacher.has_logged_in_ever).length;
+  const unassignedCount = teachers.filter((teacher) => (tp(teacher)?.classes_taught ?? []).length === 0).length;
+  const mappedClasses = new Set(teachers.flatMap((teacher) => tp(teacher)?.classes_taught ?? [])).size;
 
   useEffect(() => { setPage(1); }, [searchQuery, classFilter, statusFilter]);
 
@@ -209,6 +214,28 @@ export const SchoolAdminTeachers: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-5">
+      <PortalPageHeader
+        eyebrow="Faculty operations"
+        title="Teacher directory"
+        description="Keep faculty profiles, class mappings and account access accurate across the school."
+        actions={(
+          <>
+            <button onClick={() => setShowImport(true)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[13px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
+              <UploadCloud size={15} /> Import faculty
+            </button>
+            <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-slate-800">
+              <Plus size={15} /> Add teacher
+            </button>
+          </>
+        )}
+      >
+        <div className="portal-metrics-grid">
+          <MetricCard label="Total teachers" value={teachers.length} hint="faculty members" icon={<GraduationCap size={18} />} />
+          <MetricCard label="Activated" value={loggedInCount} hint={`${teachers.length ? Math.round((loggedInCount / teachers.length) * 100) : 0}% signed in`} icon={<UserCheck size={18} />} tone="emerald" />
+          <MetricCard label="Needs mapping" value={unassignedCount} hint="no classes" icon={<UserRoundX size={18} />} tone="amber" />
+          <MetricCard label="Class coverage" value={mappedClasses} hint="classes mapped" icon={<BookOpenCheck size={18} />} tone="indigo" />
+        </div>
+      </PortalPageHeader>
       {error && (
         <div className="bg-rose-50 border border-rose-200 text-rose-700 text-[13px] rounded-lg px-4 py-3 flex items-center gap-2">
           <AlertCircle size={15} /> {error}
@@ -255,7 +282,7 @@ export const SchoolAdminTeachers: React.FC = () => {
       )}
 
       {/* Toolbar */}
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="portal-toolbar">
         <div className="relative max-w-xs flex-1 min-w-[200px]">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -275,24 +302,13 @@ export const SchoolAdminTeachers: React.FC = () => {
           <option value="never">Never logged in</option>
         </select>
 
-        <div className="flex items-center gap-2 ml-auto">
-          <button
-            onClick={() => setShowImport(true)}
-            className="inline-flex items-center gap-2 text-[13px] font-semibold text-slate-600 border border-slate-300 hover:bg-slate-50 px-4 py-2 rounded-lg transition-colors cursor-pointer"
-          >
-            <UploadCloud size={15} /> Import CSV/XLSX
-          </button>
-          <button
-            onClick={() => setShowAdd(true)}
-            className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-[13px] font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer"
-          >
-            <Plus size={15} /> Add teacher
-          </button>
+        <div className="ml-auto rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
+          {filtered.length} result{filtered.length === 1 ? '' : 's'}
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="portal-panel">
         {isLoading ? (
           <div className="flex justify-center py-16"><Loader2 className="animate-spin text-slate-400" /></div>
         ) : pageRows.length === 0 ? (
@@ -303,7 +319,7 @@ export const SchoolAdminTeachers: React.FC = () => {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="portal-table w-full">
                 <thead>
                   <tr className="bg-slate-50 text-left text-[11px] text-slate-500">
                     <th className="px-4 py-3 whitespace-nowrap"><SortHeader label="Teacher" k="name" /></th>

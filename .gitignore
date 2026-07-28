@@ -37,3 +37,10 @@ api/*.log
 supabase/.branches
 supabase/.temp
 supabase/logs
+
+# Database dumps written by the db-backup service (docker-compose.yml).
+# Contains real student data — must never be committed.
+backups/
+
+# Reference source the Chemistry Lab was ported from — not app code.
+EducationAI-Games-master/

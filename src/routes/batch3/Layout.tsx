@@ -1,13 +1,25 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, Suspense, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Sidebar, NavItem } from '../../components/shared/Sidebar';
 import { TopBar } from '../../components/shared/TopBar';
+
+const LabLoading: React.FC = () => (
+  <div className="h-full w-full flex items-center justify-center">
+    <div className="flex flex-col items-center gap-3">
+      <div className="w-7 h-7 rounded-full border-2 border-sky-500/40 border-t-sky-500 animate-spin" />
+      <p className="text-xs font-semibold text-slate-400">Loading lab…</p>
+    </div>
+  </div>
+);
 
 export const Batch3Layout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { batchId, currentClass, studentAvatar, studentName } = useApp();
+  const [navCollapsed, setNavCollapsed] = useState(false);
+  const [labFocusMode, setLabFocusMode] = useState(false);
 
   useEffect(() => {
     if (currentClass < 9 || currentClass > 10) {
@@ -19,6 +31,7 @@ export const Batch3Layout: React.FC = () => {
     { href: '/batch3/home', label: 'Home', iconName: 'home' },
     { href: '/batch3/subjects', label: 'Subjects', iconName: 'library_books' },
     { href: '/batch3/concept-map', label: 'Concept Map', iconName: 'schema' },
+    { href: '/batch3/labs', label: 'Science Labs', iconName: 'science' },
     { href: '/batch3/board-prep', label: 'Board Prep', iconName: 'event_upcoming' },
     { href: '/batch3/chat', label: 'AI Doubt Tutor', iconName: 'chat' },
     { href: '/batch3/daily-challenges', label: 'Daily Challenges', iconName: 'electric_bolt' },
@@ -34,6 +47,12 @@ export const Batch3Layout: React.FC = () => {
 
   const getHeaderDetails = () => {
     const path = location.pathname;
+    // Labs first — their paths contain segments (/chemistry/teacher) that would
+    // otherwise fall through to a dashboard match below.
+    if (path === '/batch3/labs') return { title: 'Science Labs', sub: 'Interactive NCERT labs for Physics, Chemistry and Biology.' };
+    if (path.includes('/labs/physics')) return { title: 'Physics Lab', sub: 'Motion, friction, sound, circuits and optics simulators.' };
+    if (path.includes('/labs/chemistry')) return { title: 'Chemistry Lab', sub: 'Balance reactions, craft compounds, and run the free lab.' };
+    if (path.includes('/labs/biology')) return { title: 'Biology Lab', sub: 'NCERT diagram hub, cell sandbox, and spatial recall quizzes.' };
     if (path.includes('/subjects')) return { title: 'Subjects & Units', sub: 'NCERT CBSE syllabus checklist with Board tags.' };
     if (path.includes('/concept-map')) return { title: 'Interactive Concept Maps', sub: 'Visualize logical connections between chapter topics.' };
     if (path.includes('/board-prep')) return { title: 'CBSE Board Prep Zone', sub: 'Syllabus weightage trends, past papers, and answer tips.' };
@@ -54,32 +73,77 @@ export const Batch3Layout: React.FC = () => {
 
   if (currentClass < 9 || currentClass > 10) return null;
 
+  /* The science labs manage their own scrolling and internal panels, so they
+     get a full-bleed content area pinned to the viewport height instead of the
+     usual padded, max-width, page-scrolling <main>. */
+  const isLabRoute = location.pathname.startsWith('/batch3/labs');
+  const isLab = location.pathname.includes('/labs/');
+
+  useEffect(() => {
+    setNavCollapsed(isLabRoute);
+    if (!isLabRoute) setLabFocusMode(false);
+  }, [isLabRoute]);
+
   return (
-    <div className="min-h-screen flex bg-slate-50/50">
+    <div className={`flex bg-slate-50/50 ${isLab ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
       {/* Sidebar Navigation */}
-      <Sidebar 
-        navItems={navItems}
-        batchColor="sky"
-        logoText="EduAI"
-        logoIcon="auto_stories"
-      />
+      {!labFocusMode && (
+        <Sidebar
+          navItems={navItems}
+          batchColor="sky"
+          logoText="EduAI"
+          logoIcon="auto_stories"
+          collapsed={isLabRoute && navCollapsed}
+          onCollapsedChange={isLabRoute ? setNavCollapsed : undefined}
+        />
+      )}
 
       {/* Main content wrapper */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header TopBar */}
-        <TopBar 
-          greeting="Study Workspace,"
-          userName={studentName}
-          subtitle={header.sub}
-          batchColor="sky"
-          userAvatar={studentAvatar}
-          profileHref="/batch3/profile"
-        />
+        {!labFocusMode && (
+          <TopBar
+            greeting="Study Workspace,"
+            userName={studentName}
+            subtitle={header.sub}
+            batchColor="sky"
+            userAvatar={studentAvatar}
+            profileHref="/batch3/profile"
+            rightSlot={isLab ? (
+              <div className="hidden items-center gap-2 lg:flex">
+                <button
+                  type="button"
+                  onClick={() => setLabFocusMode(true)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800"
+                >
+                  <Maximize2 size={14} /> Focus mode
+                </button>
+              </div>
+            ) : undefined}
+          />
+        )}
 
         {/* Dynamic page container */}
-        <main className="flex-1 p-8 overflow-y-auto max-w-7xl w-full mx-auto">
-          <Outlet />
-        </main>
+        {isLab ? (
+          <main className="lab-embed relative flex-1 min-h-0 w-full overflow-hidden">
+            {labFocusMode && (
+              <button
+                type="button"
+                onClick={() => setLabFocusMode(false)}
+                className="absolute left-4 top-4 z-[100] inline-flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/90 px-3 py-2 text-xs font-bold text-white shadow-xl backdrop-blur transition hover:bg-slate-800"
+              >
+                <Minimize2 size={14} /> Exit focus mode
+              </button>
+            )}
+            <Suspense fallback={<LabLoading />}>
+              <Outlet />
+            </Suspense>
+          </main>
+        ) : (
+          <main className="flex-1 p-8 overflow-y-auto max-w-7xl w-full mx-auto">
+            <Outlet />
+          </main>
+        )}
       </div>
     </div>
   );

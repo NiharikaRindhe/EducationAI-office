@@ -2,9 +2,10 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Plus, Trash2, Loader2, AlertCircle, CheckCircle2, Send, Copy, Lock,
-  FileText, Library, ClipboardCheck, Download, ArrowLeft,
+  FileText, Library, ClipboardCheck, Download, ArrowLeft, Clock3, PencilLine, CircleCheckBig,
 } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
+import { MetricCard, PortalPageHeader } from '../../components/shared/PortalPageHeader';
 
 // ─── Types mirroring the API ─────────────────────────────────
 
@@ -108,9 +109,26 @@ export const TeacherCreateExam: React.FC = () => {
   };
 
   if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="animate-spin text-indigo-400" /></div>;
+  const draftCount = exams.filter((exam) => exam.status === 'draft').length;
+  const publishedCount = exams.filter((exam) => exam.status === 'published').length;
+  const closedCount = exams.filter((exam) => exam.status === 'closed').length;
 
   return (
     <div className="flex flex-col gap-6">
+      {!openExam && (
+        <PortalPageHeader
+          eyebrow="Assessment workspace"
+          title="Build and manage exams"
+          description="Create structured assessments, reuse trusted questions and publish to the right sections with confidence."
+        >
+          <div className="portal-metrics-grid">
+            <MetricCard label="All exams" value={exams.length} hint="total" icon={<FileText size={18} />} />
+            <MetricCard label="Drafts" value={draftCount} hint="in progress" icon={<PencilLine size={18} />} tone="amber" />
+            <MetricCard label="Live" value={publishedCount} hint="published" icon={<Clock3 size={18} />} tone="indigo" />
+            <MetricCard label="Completed" value={closedCount} hint="closed" icon={<CircleCheckBig size={18} />} tone="emerald" />
+          </div>
+        </PortalPageHeader>
+      )}
       {error && (
         <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium rounded-xl px-4 py-3 flex items-center gap-2">
           <AlertCircle size={14} /> {error}
@@ -135,27 +153,33 @@ export const TeacherCreateExam: React.FC = () => {
       ) : (
         <>
           <NewExamCard mySections={mySections} onCreated={(id) => void openDetail(id)} onError={setError} />
-          <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
-            <h2 className="font-display font-bold text-lg text-slate-800 mb-4 flex items-center gap-2">
-              <FileText size={17} className="text-indigo-500" /> My Exams ({exams.length})
-            </h2>
+          <div className="portal-panel">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div>
+                <h2 className="font-display font-bold text-[15px] text-slate-900 flex items-center gap-2">
+                  <FileText size={17} className="text-indigo-500" /> Exam library
+                </h2>
+                <p className="mt-1 text-xs text-slate-400">Open an exam to edit, duplicate, publish or review results.</p>
+              </div>
+              <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-500">{exams.length} total</span>
+            </div>
             {exams.length === 0 ? (
               <p className="text-xs text-slate-400 text-center py-8">No exams yet — create your first one above.</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-xs">
+                <table className="portal-table w-full text-xs">
                   <thead>
                     <tr className="text-left text-slate-400 font-label-caps text-[9px] border-b border-slate-100">
-                      <th className="pb-2">Title</th><th className="pb-2">Class</th><th className="pb-2">Subject</th><th className="pb-2">Marks</th><th className="pb-2">Status</th><th className="pb-2"></th>
+                      <th className="px-5">Title</th><th>Class</th><th>Subject</th><th>Marks</th><th>Status</th><th className="px-5"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {exams.map((e) => (
                       <tr key={e.id} className="border-b border-slate-50 hover:bg-slate-50/60 cursor-pointer" onClick={() => void openDetail(e.id)}>
-                        <td className="py-2.5 font-semibold text-slate-700">{e.title}</td>
-                        <td className="py-2.5">Class {e.class_num}</td>
-                        <td className="py-2.5">{e.subject}</td>
-                        <td className="py-2.5">{e.total_marks}</td>
+                        <td className="px-5 py-3.5 text-sm font-semibold text-slate-800">{e.title}</td>
+                        <td className="py-3.5">Class {e.class_num}</td>
+                        <td className="py-3.5">{e.subject}</td>
+                        <td className="py-3.5">{e.total_marks}</td>
                         <td className="py-2.5">
                           <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] uppercase ${STATUS_STYLES[e.status]}`}>{e.status}</span>
                         </td>

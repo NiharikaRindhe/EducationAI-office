@@ -2,12 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { ApiError } from '../lib/errors.js';
 import { parseChapterMap } from '../lib/pdfExtract.js';
 import * as contentService from '../services/superAdminContent.service.js';
-
-function requireSchoolId(req: Request): string {
-  const schoolId = req.user?.schoolId;
-  if (!schoolId) throw new ApiError('FORBIDDEN', 'No school associated with this account');
-  return schoolId;
-}
+import { requireSchoolId } from '../lib/httpParams.js';
 
 export async function listSchoolIngestionJobsController(req: Request, res: Response, next: NextFunction) {
   try {

@@ -2,11 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { ApiError } from '../lib/errors.js';
 import * as labService from '../services/lab.service.js';
 import { createLabSchema, updateLabSchema } from '../schemas/lab.schema.js';
-
-function requireSchoolId(req: Request): string {
-  if (!req.user?.schoolId) throw new ApiError('FORBIDDEN', 'No school associated with this account');
-  return req.user.schoolId;
-}
+import { requireSchoolId } from '../lib/httpParams.js';
 
 export async function listLabsController(req: Request, res: Response, next: NextFunction) {
   try {
