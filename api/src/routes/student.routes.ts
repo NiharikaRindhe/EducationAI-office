@@ -32,6 +32,7 @@ import {
   renameSessionController,
   deleteSessionController,
 } from '../controllers/chat.controller.js';
+import { getStudentSyllabusController } from '../controllers/syllabus.controller.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import {
   getStudentBadgesController,
@@ -96,6 +97,9 @@ studentRouter.get('/english/progress', getProgressController);
 
 studentRouter.get('/subjects', listMySubjectsController);
 studentRouter.get('/curriculum', getStudentCurriculumController);
+// Classes 5-10 syllabus, derived from the school's indexed books rather than
+// the Batch-1-only `curriculum_chapters` seed. See syllabus.service.ts.
+studentRouter.get('/syllabus', getStudentSyllabusController);
 studentRouter.get('/timetable', getMyStudentTimetableController);
 studentRouter.get('/timetable/occurrences', getMyStudentOccurrencesController);
 
