@@ -11,6 +11,16 @@ import { NumberHopEngine } from './games/NumberHopEngine';
 import { NumberSlideEngine } from './games/NumberSlideEngine';
 import { WordBuildEngine } from './games/WordBuildEngine';
 import { FractionPieEngine } from './games/FractionPieEngine';
+import { NumberLineDistanceEngine } from './games/NumberLineDistanceEngine';
+import { AreaBuilderEngine } from './games/AreaBuilderEngine';
+import { GridSplitterEngine } from './games/GridSplitterEngine';
+import { DivisionGridEngine } from './games/DivisionGridEngine';
+import { FractionCompareEngine } from './games/FractionCompareEngine';
+import { ContextFillEngine } from './games/ContextFillEngine';
+import { SentenceGrammarEngine } from './games/SentenceGrammarEngine';
+import { StoryOrderEngine } from './games/StoryOrderEngine';
+import { PictureClueEngine } from './games/PictureClueEngine';
+import { CrosswordEngine } from './games/CrosswordEngine';
 
 /* ───────────────────────── Types ───────────────────────── */
 
@@ -24,6 +34,31 @@ interface GameParams {
   startSize?: number;
   words?: { sentence: string; answer: string; emoji: string; distractors: string[] }[];
   challenges?: { num: number; den: number }[];
+  min?: number;
+  rowMin?: number;
+  rowMax?: number;
+  colMin?: number;
+  colMax?: number;
+  decompose?: boolean;
+  minA?: number;
+  maxA?: number;
+  minB?: number;
+  maxB?: number;
+  divisorMin?: number;
+  divisorMax?: number;
+  quotientMin?: number;
+  quotientMax?: number;
+  hasRemainder?: boolean;
+  problems?: { a: { num: number; den: number }; b: { num: number; den: number } }[];
+  contextPuzzles?: { passage: string; emoji: string; options: string[]; correct: string; wrong?: Record<string, string> }[];
+  crosswordPuzzles?: { words: [{ id: string; answer: string; clue: string; emoji: string }, { id: string; answer: string; clue: string; emoji: string }] }[];
+  sentences?: {
+    slots: { id: string; accepts: ('noun' | 'pronoun' | 'verb' | 'adjective' | 'adverb')[]; label: string }[];
+    wordBank: { word: string; pos: 'noun' | 'pronoun' | 'verb' | 'adjective' | 'adverb' }[];
+    example: string;
+  }[];
+  stories?: { title: string; tiles: { id: string; text: string }[]; correctOrder: string[] }[];
+  questions?: { text: string; correctIdx: number; options: { emoji: string; label: string; distractor?: string }[] }[];
 }
 
 interface GameItem {
@@ -480,6 +515,103 @@ export const Batch1Games: React.FC = () => {
         return (
           <FractionPieEngine
             game={{ gameId: activeGame.gameId, name: activeGame.name, icon: activeGame.icon, params: { challenges: activeGame.params.challenges } }}
+            isPreReader={isPreReader}
+            onFinish={submitAttempt}
+          />
+        );
+      case 'number-distance':
+        return (
+          <NumberLineDistanceEngine
+            game={{ gameId: activeGame.gameId, name: activeGame.name, icon: activeGame.icon, params: { min: activeGame.params.min, max: activeGame.params.max } }}
+            isPreReader={isPreReader}
+            onFinish={submitAttempt}
+          />
+        );
+      case 'area-builder':
+        return (
+          <AreaBuilderEngine
+            game={{
+              gameId: activeGame.gameId, name: activeGame.name, icon: activeGame.icon,
+              params: {
+                rowMin: activeGame.params.rowMin, rowMax: activeGame.params.rowMax,
+                colMin: activeGame.params.colMin, colMax: activeGame.params.colMax,
+                decompose: activeGame.params.decompose,
+              },
+            }}
+            isPreReader={isPreReader}
+            onFinish={submitAttempt}
+          />
+        );
+      case 'grid-splitter':
+        return (
+          <GridSplitterEngine
+            game={{
+              gameId: activeGame.gameId, name: activeGame.name, icon: activeGame.icon,
+              params: { minA: activeGame.params.minA, maxA: activeGame.params.maxA, minB: activeGame.params.minB, maxB: activeGame.params.maxB },
+            }}
+            isPreReader={isPreReader}
+            onFinish={submitAttempt}
+          />
+        );
+      case 'division-grid':
+        return (
+          <DivisionGridEngine
+            game={{
+              gameId: activeGame.gameId, name: activeGame.name, icon: activeGame.icon,
+              params: {
+                divisorMin: activeGame.params.divisorMin, divisorMax: activeGame.params.divisorMax,
+                quotientMin: activeGame.params.quotientMin, quotientMax: activeGame.params.quotientMax,
+                hasRemainder: activeGame.params.hasRemainder,
+              },
+            }}
+            isPreReader={isPreReader}
+            onFinish={submitAttempt}
+          />
+        );
+      case 'fraction-compare':
+        return (
+          <FractionCompareEngine
+            game={{ gameId: activeGame.gameId, name: activeGame.name, icon: activeGame.icon, params: { problems: activeGame.params.problems } }}
+            isPreReader={isPreReader}
+            onFinish={submitAttempt}
+          />
+        );
+      case 'context-fill':
+        return (
+          <ContextFillEngine
+            game={{ gameId: activeGame.gameId, name: activeGame.name, icon: activeGame.icon, params: { puzzles: activeGame.params.contextPuzzles } }}
+            isPreReader={isPreReader}
+            onFinish={submitAttempt}
+          />
+        );
+      case 'sentence-grammar':
+        return (
+          <SentenceGrammarEngine
+            game={{ gameId: activeGame.gameId, name: activeGame.name, icon: activeGame.icon, params: { sentences: activeGame.params.sentences } }}
+            isPreReader={isPreReader}
+            onFinish={submitAttempt}
+          />
+        );
+      case 'story-order':
+        return (
+          <StoryOrderEngine
+            game={{ gameId: activeGame.gameId, name: activeGame.name, icon: activeGame.icon, params: { stories: activeGame.params.stories } }}
+            isPreReader={isPreReader}
+            onFinish={submitAttempt}
+          />
+        );
+      case 'picture-clue-read':
+        return (
+          <PictureClueEngine
+            game={{ gameId: activeGame.gameId, name: activeGame.name, icon: activeGame.icon, params: { questions: activeGame.params.questions } }}
+            isPreReader={isPreReader}
+            onFinish={submitAttempt}
+          />
+        );
+      case 'crossword':
+        return (
+          <CrosswordEngine
+            game={{ gameId: activeGame.gameId, name: activeGame.name, icon: activeGame.icon, params: { puzzles: activeGame.params.crosswordPuzzles } }}
             isPreReader={isPreReader}
             onFinish={submitAttempt}
           />
