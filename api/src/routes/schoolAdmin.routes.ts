@@ -26,6 +26,7 @@ import {
 import {
   getPromotionPreviewController,
   executePromotionController,
+  exportGraduatesController,
   getClassFeaturesController,
   updateClassFeaturesController,
   getPrincipalReportController,
@@ -41,11 +42,24 @@ import {
 } from '../controllers/timetable.controller.js';
 import { listLabsController, createLabController, updateLabController } from '../controllers/lab.controller.js';
 import {
+  schoolAdminListController,
+  schoolAdminIdsController,
+  schoolAdminExportController,
+  bulkResetCredentialsController,
+  bulkMoveController,
+  bulkSetActiveController,
+} from '../controllers/studentDirectory.controller.js';
+import {
   listSchoolIngestionJobsController,
   uploadSchoolNcertPdfController,
   retrySchoolIngestionJobController,
   deleteSchoolIngestionJobController,
 } from '../controllers/schoolContent.controller.js';
+import {
+  listGeneratableChaptersController,
+  generateQuestionsController,
+  saveGeneratedQuestionsController,
+} from '../controllers/examGenerator.controller.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 // PDFs run far larger than the CSV/XLSX imports above — same 150MB ceiling
@@ -55,6 +69,16 @@ const pdfUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 
 export const schoolAdminRouter = Router();
 
 schoolAdminRouter.use(requireAuth, requireRole('school_admin'));
+
+// Paged/filtered/sorted roster backing the student directory table. The
+// legacy unpaged /students is kept for callers that still expect a plain
+// array (e.g. pickers), but the directory UI uses /students/directory.
+schoolAdminRouter.get('/students/directory', schoolAdminListController);
+schoolAdminRouter.get('/students/directory/ids', schoolAdminIdsController);
+schoolAdminRouter.get('/students/directory/export', schoolAdminExportController);
+schoolAdminRouter.post('/students/bulk/reset-credentials', bulkResetCredentialsController);
+schoolAdminRouter.post('/students/bulk/move', bulkMoveController);
+schoolAdminRouter.post('/students/bulk/active', bulkSetActiveController);
 
 schoolAdminRouter.get('/students', listStudentsController);
 schoolAdminRouter.post('/students', addSingleStudentController);
@@ -88,6 +112,7 @@ schoolAdminRouter.post('/lab-incharges/:id/reset-password', resetLabInchargePass
 
 schoolAdminRouter.get('/promotion/preview', getPromotionPreviewController);
 schoolAdminRouter.post('/promotion/execute', executePromotionController);
+schoolAdminRouter.get('/promotion/graduates.csv', exportGraduatesController);
 schoolAdminRouter.get('/features', getClassFeaturesController);
 schoolAdminRouter.post('/features', updateClassFeaturesController);
 schoolAdminRouter.get('/reports/principal', getPrincipalReportController);
@@ -103,3 +128,12 @@ schoolAdminRouter.patch('/timetable/:id', updateSlotController);
 schoolAdminRouter.delete('/timetable/:id', deleteSlotController);
 schoolAdminRouter.post('/timetable/:slotId/exceptions', createExceptionController);
 schoolAdminRouter.get('/timetable/occurrences', getSchoolOccurrencesController);
+
+// ── AI question generation ────────────────────────────────────
+// Same controllers as the teacher routes; the controller derives the actor
+// role from the authenticated user, so a School Admin is scoped to their whole
+// school (subject still validated against the class_subjects whitelist) while
+// a teacher stays scoped to their own assignments.
+schoolAdminRouter.get('/exam-generator/chapters', listGeneratableChaptersController);
+schoolAdminRouter.post('/exam-generator/generate', generateQuestionsController);
+schoolAdminRouter.post('/exam-generator/save', saveGeneratedQuestionsController);
