@@ -23,11 +23,11 @@ export const Batch2Layout: React.FC = () => {
     { href: '/batch2/tasks', label: 'My Tasks', iconName: 'assignment_turned_in' },
     { href: '/batch2/notes', label: 'Study Notes', iconName: 'sticky_note_2' },
     { href: '/batch2/pyq', label: 'PYQ Hub', iconName: 'bookmark' },
-    { href: '/batch2/leaderboard', label: 'Leaderboard', iconName: 'emoji_events' },
     { href: '/batch2/daily-challenges', label: 'Daily Challenges', iconName: 'electric_bolt' },
     { href: '/batch2/streak', label: 'Streak Tracker', iconName: 'local_fire_department' },
     { href: '/batch2/badges', label: 'My Badges', iconName: 'military_tech' },
-    { href: '/batch2/profile', label: 'Profile', iconName: 'person' }
+    { href: '/batch2/profile', label: 'Profile', iconName: 'person' },
+    { href: '/batch2/help', label: 'Report an Issue', iconName: 'confirmation_number' }
   ];
 
   const getHeaderDetails = () => {
@@ -38,7 +38,6 @@ export const Batch2Layout: React.FC = () => {
     if (path.includes('/tasks')) return { title: 'My Tasks', sub: 'Complete work your teacher has assigned to earn XP.' };
     if (path.includes('/notes')) return { title: 'Study Notes Manager', sub: 'Organize and review your study notes.' };
     if (path.includes('/pyq')) return { title: 'PYQ Hub', sub: 'Attempt past board papers and review solutions.' };
-    if (path.includes('/leaderboard')) return { title: 'Podium Leaderboard', sub: 'Compete with your classmates to top the classroom ranks!' };
     if (path.includes('/daily-challenges')) return { title: 'Daily Challenges', sub: 'Solve CBSE pattern questions to win double XP!' };
     if (path.includes('/streak')) return { title: 'Streak Tracker', sub: 'View daily activity records and heatmap milestones.' };
     if (path.includes('/badges')) return { title: 'Academic Badges', sub: 'Check unlocked achievements for subject toppers.' };

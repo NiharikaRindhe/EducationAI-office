@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { Flame, Star, Trophy, BookOpen, Compass, ChevronRight, MessageSquare, Clock, Loader2, Zap, FileText } from 'lucide-react';
+import { ChevronRight, Clock, Loader2 } from 'lucide-react';
 import { TodayPanel } from '../../components/shared/TodayPanel';
 import { api } from '../../lib/api';
 
@@ -14,10 +14,12 @@ interface ExamListItem {
   end_time?: string;
 }
 
-interface SubjectItem {
-  name: string;
-  progress: number;
-  emoji?: string;
+interface SyllabusSubject {
+  subject: string;
+  chapters: { chapterNum: number; title: string | null }[];
+  hasBook: boolean;
+  averageScore: number | null;
+  examsTaken: number;
 }
 
 interface DailyChallengeItem {
@@ -28,12 +30,11 @@ interface DailyChallengeItem {
 }
 
 export const Batch3Home: React.FC = () => {
-  const { studentName, studentXP, studentStreak } = useApp();
+  const { studentName, studentXP, studentStreak, currentClass } = useApp();
 
   const [exams, setExams] = useState<ExamListItem[] | null>(null);
-  const [subjects, setSubjects] = useState<SubjectItem[] | null>(null);
+  const [subjects, setSubjects] = useState<SyllabusSubject[] | null>(null);
   const [challenges, setChallenges] = useState<DailyChallengeItem[] | null>(null);
-  const [myRank, setMyRank] = useState<number | null>(null);
 
   useEffect(() => {
     // 1. Exams
@@ -41,46 +42,21 @@ export const Batch3Home: React.FC = () => {
       .then(setExams)
       .catch(() => setExams([]));
 
-    // 2. Subjects
-    api.get<string[]>('/student/subjects')
-      .then(res => {
-        if (res.length > 0) {
-          const mapped = res.map(name => {
-            const mock = fallbackSubjects.find(m => m.name.toLowerCase().includes(name.toLowerCase()) || name.toLowerCase().includes(m.name.toLowerCase()));
-            return {
-              name,
-              progress: mock ? mock.progress : 75,
-              emoji: mock ? mock.emoji : undefined
-            };
-          });
-          setSubjects(mapped);
-        } else {
-          setSubjects(null);
-        }
-      })
-      .catch(() => setSubjects(null));
+    // 2. Real syllabus. Previously fell back to invented completion
+    //    percentages (85%, 78%…) for a board-year student — the worst place
+    //    to guess. Only measured exam averages are shown now.
+    api.get<{ subjects: SyllabusSubject[] }>('/student/syllabus')
+      .then(res => setSubjects(res.subjects))
+      .catch(() => setSubjects([]));
 
     // 3. Daily challenges
     api.get<DailyChallengeItem[]>('/student/daily-challenges')
       .then(res => setChallenges(res.slice(0, 2)))
       .catch(() => setChallenges(null));
-
-    // 4. Leaderboard rank
-    api.get<{ myRank: number }>('/student/leaderboard', { batchId: 3, period: 'weekly' })
-      .then(res => setMyRank(res.myRank))
-      .catch(() => setMyRank(null));
   }, []);
 
   const openExams = (exams ?? []).filter(e => e.state === 'open');
   const nextExam = openExams[0];
-
-  const fallbackSubjects = [
-    { name: 'Mathematics', progress: 85, emoji: '📐' },
-    { name: 'Science', progress: 78, emoji: '🔬' },
-    { name: 'English', progress: 92, emoji: '📖' },
-  ];
-
-  const displaySubjects = subjects || fallbackSubjects;
 
   return (
     <div className="flex flex-col gap-6 select-none anim-fade-up">
@@ -94,7 +70,7 @@ export const Batch3Home: React.FC = () => {
             <span className="text-sky-100">{studentName}</span>
           </h2>
           <p className="font-sans text-xs text-sky-100 font-medium mt-1">
-            Class 10 · Streak: {studentStreak} days. Focus on mock papers and PYQs to score full marks! 🎯
+            Class {currentClass} · Streak: {studentStreak} days. Focus on mock papers and PYQs to score full marks! 🎯
           </p>
         </div>
         <div className="flex items-center gap-4 bg-white/10 backdrop-blur-md p-3 px-5 rounded-2xl border border-white/10 text-xs font-bold font-display">
@@ -155,19 +131,29 @@ export const Batch3Home: React.FC = () => {
             </div>
 
             <div className="flex flex-col gap-2.5">
-              {displaySubjects.map((sub, idx) => (
-                <div key={idx} className="p-3 bg-slate-50 rounded-xl flex items-center justify-between gap-3 text-xs">
+              {subjects === null ? (
+                <div className="flex justify-center py-3"><Loader2 size={14} className="animate-spin text-sky-500" /></div>
+              ) : subjects.length === 0 ? (
+                <p className="text-[10px] text-slate-400">No subjects set up for your class yet.</p>
+              ) : subjects.map((sub) => (
+                <div key={sub.subject} className="p-3 bg-slate-50 rounded-xl flex items-center justify-between gap-3 text-xs">
                   <div className="flex items-center gap-2.5">
-                    <span className="text-lg">{sub.emoji ?? (sub.name.includes('Math') ? '📐' : sub.name.includes('Science') ? '🔬' : '📖')}</span>
-                    <span className="font-bold text-slate-700">{sub.name}</span>
+                    <span className="text-lg">{sub.subject.includes('Math') ? '📐' : sub.subject.includes('Science') ? '🔬' : '📖'}</span>
+                    <span className="font-bold text-slate-700">{sub.subject}</span>
                   </div>
                   <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-20 progress-bar h-1.5">
-                        <div className="progress-fill bg-sky-500" style={{ width: `${sub.progress}%` }} />
+                    {sub.examsTaken > 0 ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-20 progress-bar h-1.5">
+                          <div className="progress-fill bg-sky-500" style={{ width: `${sub.averageScore}%` }} />
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-bold">{sub.averageScore}%</span>
                       </div>
-                      <span className="text-[10px] text-slate-400 font-bold">{sub.progress}%</span>
-                    </div>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 font-medium">
+                        {sub.hasBook ? `${sub.chapters.length} chapters` : 'No book yet'}
+                      </span>
+                    )}
                     <ChevronRight size={14} className="text-slate-400" />
                   </div>
                 </div>
@@ -176,7 +162,7 @@ export const Batch3Home: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column (4 cols): daily challenges snippet & rank */}
+        {/* Right Column (4 cols): daily challenges snippet */}
         <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
           {/* Daily challenges widget */}
           <div className="bento-card border border-sky-100 bg-white p-5 flex flex-col gap-3">
@@ -208,27 +194,6 @@ export const Batch3Home: React.FC = () => {
                 ))
               )}
             </div>
-          </div>
-
-          {/* Leaderboard rank chip */}
-          <div className="bento-card border border-sky-100 bg-white p-5 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-sky-50 border border-sky-100 text-sky-500 flex items-center justify-center">
-                <Trophy size={18} />
-              </div>
-              <div className="text-left">
-                <span className="font-sans text-[10px] font-bold text-slate-400 uppercase tracking-wide">Weekly Rank</span>
-                <span className="font-display font-black text-xl text-slate-800 block mt-0.5">
-                  {myRank !== null ? `#${myRank}` : 'Unranked'}
-                </span>
-              </div>
-            </div>
-            <Link
-              to="/batch3/leaderboard"
-              className="py-1.5 px-3 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg text-[10px] font-bold transition-all"
-            >
-              Leaderboard
-            </Link>
           </div>
         </div>
 

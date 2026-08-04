@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Search, ChevronRight, Zap, Flame, User, FileText, AlertTriangle } from 'lucide-react';
+import React from 'react';
+import { Zap, Flame, User, FileText, AlertTriangle } from 'lucide-react';
+import { SyllabusView } from '../../components/shared/SyllabusView';
 import { ExamCenter } from '../../components/shared/ExamCenter';
 import { ChatCenter } from '../../components/shared/ChatCenter';
 import { NotesView } from '../../components/shared/NotesView';
@@ -9,151 +10,14 @@ import { StreakCalendar } from '../../components/shared/StreakCalendar';
 import { ProfileCard } from '../../components/shared/ProfileCard';
 
 /* ─────────────────────────────────────────────────────────
-   1. BATCH 3 SUBJECTS LIST (UNIT ACCORDION & WEAK ALERTS)
+   1. BATCH 3 SYLLABUS — real chapters from the school's books
+   Previously a hardcoded unit/chapter tree with invented scores and
+   invented "Board Important" stars. Now shared with Batch 2 via
+   SyllabusView, backed by GET /student/syllabus.
 ───────────────────────────────────────────────────────── */
-export const Batch3Subjects: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'Maths' | 'Science' | 'English'>('Science');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [expandedUnits, setExpandedUnits] = useState<Record<string, boolean>>({
-    'Unit 1: Effects of Light': true,
-    'Unit 2: Chemical Substances': false
-  });
-
-  const syllabus = {
-    Science: [
-      {
-        title: 'Unit 1: Effects of Light',
-        chapters: [
-          { name: 'Chapter 10: Light Reflection & Refraction', status: 'In Progress', boardImportant: true, score: 70 },
-          { name: 'Chapter 11: Human Eye & Colorful World', status: 'Completed', boardImportant: false, score: 92 }
-        ]
-      },
-      {
-        title: 'Unit 2: Chemical Substances',
-        chapters: [
-          { name: 'Chapter 1: Chemical Reactions & Equations', status: 'Completed', boardImportant: true, score: 85 },
-          { name: 'Chapter 2: Acids, Bases and Salts', status: 'Not Started', boardImportant: false }
-        ]
-      }
-    ],
-    Maths: [
-      {
-        title: 'Unit 1: Geometry & Trigonometry',
-        chapters: [
-          { name: 'Chapter 6: Similar Triangles', status: 'In Progress', boardImportant: true, score: 58 },
-          { name: 'Chapter 8: Introduction to Trigonometry', status: 'Completed', boardImportant: true, score: 80 }
-        ]
-      }
-    ],
-    English: [
-      {
-        title: 'Unit 1: Prose Readings',
-        chapters: [
-          { name: 'Chapter 1: A Letter to God', status: 'Completed', boardImportant: false, score: 95 }
-        ]
-      }
-    ]
-  };
-
-  const currentUnits = syllabus[activeTab];
-
-  const filteredUnits = searchQuery
-    ? currentUnits.map(u => ({
-        ...u,
-        chapters: u.chapters.filter(ch => ch.name.toLowerCase().includes(searchQuery.toLowerCase()))
-      })).filter(u => u.chapters.length > 0)
-    : currentUnits;
-
-  return (
-    <div className="flex flex-col gap-6 font-sans select-none anim-fade-up">
-      {/* Top filters */}
-      <div className="bg-white border border-slate-100 p-5 rounded-3xl flex flex-col md:flex-row justify-between items-center gap-4 shadow-xs">
-        <div className="flex gap-2">
-          {(['Maths', 'Science', 'English'] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`py-2 px-5 rounded-full font-sans text-xs font-bold transition-all cursor-pointer ${
-                activeTab === tab ? 'bg-sky-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-700'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        <div className="relative w-full md:w-64">
-          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 focus:border-sky-500 rounded-xl font-sans text-xs outline-none"
-            placeholder="Search board chapters..."
-          />
-        </div>
-      </div>
-
-      {/* Weak area alerts */}
-      {activeTab === 'Maths' && (
-        <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-start gap-2.5 text-xs text-red-800">
-          <AlertTriangle size={16} className="text-red-600 shrink-0 mt-0.5" />
-          <div>
-            <span className="font-bold">Maths score warning!</span>
-            <p className="font-sans text-red-700 mt-0.5">Your similar triangles score is 58% which needs revision.</p>
-          </div>
-        </div>
-      )}
-
-      {/* Units accordions */}
-      <div className="flex flex-col gap-4">
-        {filteredUnits.map((unit, idx) => (
-          <div key={idx} className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-xs">
-            <button
-              onClick={() => setExpandedUnits(prev => ({ ...prev, [unit.title]: !prev[unit.title] }))}
-              className="w-full py-4 px-5 bg-slate-50/50 hover:bg-slate-50 flex items-center justify-between font-display font-bold text-sm text-slate-700 cursor-pointer"
-            >
-              <span>{unit.title}</span>
-              {expandedUnits[unit.title] !== false ? <ChevronRight size={16} className="rotate-90 transition-transform" /> : <ChevronRight size={16} />}
-            </button>
-
-            {expandedUnits[unit.title] !== false && (
-              <div className="p-4 border-t border-slate-100 flex flex-col gap-3 font-sans text-xs">
-                {unit.chapters.map((ch, cIdx) => (
-                  <div key={cIdx} className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-2.5 h-2.5 rounded-full ${
-                        ch.status === 'Completed' ? 'bg-emerald-500' : ch.status === 'In Progress' ? 'bg-amber-500' : 'bg-slate-300'
-                      }`}></div>
-                      <div>
-                        <span className="font-sans font-bold text-xs text-slate-700 block">{ch.name}</span>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[10px] text-slate-400">Status: {ch.status}</span>
-                          {ch.boardImportant && (
-                            <span className="badge pill-sky text-[8px] font-black uppercase">⭐ Board Important</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      {ch.score && (
-                        <span className="badge pill-sky text-[9px] font-bold">Score: {ch.score}%</span>
-                      )}
-                      <button className="py-1.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold cursor-pointer">
-                        Practice
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
+export const Batch3Subjects: React.FC = () => (
+  <SyllabusView accent="sky" chatHref="/batch3/chat" />
+);
 
 /* ─────────────────────────────────────────────────────────
    2. BATCH 3 AI DOUBT SOLVER — real RAG chat, sky-themed

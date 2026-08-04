@@ -4,7 +4,6 @@ import { StreakCalendar } from '../../components/shared/StreakCalendar';
 import { ChallengeList } from '../../components/shared/ChallengeList';
 import { ProfileCard } from '../../components/shared/ProfileCard';
 import { PyqBrowser } from '../../components/shared/PyqBrowser';
-import { LeaderboardView } from '../../components/shared/LeaderboardView';
 import { NotesView } from '../../components/shared/NotesView';
 
 /* ----------------------------------------------------
@@ -33,21 +32,6 @@ export const Batch2Pyq: React.FC = () => {
         <p className="text-xs text-slate-400 font-medium mt-0.5">Browse past board exam questions by subject for practice.</p>
       </div>
       <PyqBrowser accent="indigo" />
-    </div>
-  );
-};
-
-/* ----------------------------------------------------
-   3. BATCH 2 LEADERBOARD — real school+batch rankings
-   ---------------------------------------------------- */
-export const Batch2Leaderboard: React.FC = () => {
-  return (
-    <div className="flex flex-col gap-6 font-sans select-none anim-fade-up">
-      <div>
-        <h2 className="font-display font-extrabold text-xl text-slate-800">Leaderboards</h2>
-        <p className="text-xs text-slate-400 font-medium mt-0.5">See where you stand in your class this week.</p>
-      </div>
-      <LeaderboardView accent="indigo" />
     </div>
   );
 };
