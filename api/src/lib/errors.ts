@@ -7,10 +7,21 @@ export type ErrorCode =
   | 'SUBJECT_NOT_WHITELISTED'
   | 'AI_RATE_LIMIT'
   | 'RATE_LIMITED'
+  // The tier is switched off by the Super Admin, or no provider is reachable.
+  // Distinct from a 500 because retrying won't help until someone acts.
+  | 'AI_UNAVAILABLE'
+  // The model replied, but with unparseable or unusable output — retrying
+  // the same request genuinely might succeed.
+  | 'AI_BAD_OUTPUT'
+  // The action needs indexed source material that hasn't been uploaded yet.
+  | 'NO_CONTENT'
   | 'EXAM_NOT_OPEN'
   | 'EXAM_CLOSED'
   | 'EXAM_ALREADY_SUBMITTED'
   | 'CSV_IMPORT_ERROR'
+  // The action has already been performed and must not be repeated — e.g. an
+  // academic-year promotion that has already rolled this school over.
+  | 'CONFLICT'
   | 'INTERNAL_ERROR';
 
 const STATUS_BY_CODE: Record<ErrorCode, number> = {
@@ -22,10 +33,14 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   SUBJECT_NOT_WHITELISTED: 422,
   AI_RATE_LIMIT: 429,
   RATE_LIMITED: 429,
+  AI_UNAVAILABLE: 503,
+  AI_BAD_OUTPUT: 502,
+  NO_CONTENT: 422,
   EXAM_NOT_OPEN: 400,
   EXAM_CLOSED: 400,
   EXAM_ALREADY_SUBMITTED: 400,
   CSV_IMPORT_ERROR: 422,
+  CONFLICT: 409,
   INTERNAL_ERROR: 500,
 };
 

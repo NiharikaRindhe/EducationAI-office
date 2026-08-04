@@ -55,7 +55,10 @@ export const Login: React.FC = () => {
     setError('');
     setIsLoading(true);
     try {
-      const redirectPath = await login(email, password);
+      // Trimmed because these credentials are pasted from a printed slip or an
+      // email far more often than typed, and a stray trailing space otherwise
+      // reads back as "invalid email or password".
+      const redirectPath = await login(email.trim(), password.trim());
       navigate(redirectPath);
     } catch (err) {
       setError(friendlyAuthError(err));

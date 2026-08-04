@@ -3,6 +3,7 @@ import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AppProvider } from './context/AppContext';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/shared/ProtectedRoute';
+import { ErrorBoundary } from './components/shared/ErrorBoundary';
 
 // Import Auth/Public Pages
 import { Landing } from './routes/public/Landing';
@@ -10,6 +11,7 @@ import { Features } from './routes/public/Features';
 import { Pricing } from './routes/public/Pricing';
 import { Login } from './routes/auth/Login';
 import { Register } from './routes/auth/Register';
+import { NotFound } from './routes/public/NotFound';
 
 // Import Batch 1 Pages
 import { Batch1Layout } from './routes/batch1/Layout';
@@ -28,10 +30,10 @@ import { Batch2Subjects } from './routes/batch2/Subjects';
 import { Batch2Chat } from './routes/batch2/Chat';
 import { Batch2Exams } from './routes/batch2/Exams';
 import { Batch2Tasks } from './routes/batch2/Tasks';
+import { Batch2Help } from './routes/batch2/Help';
 import {
   Batch2Notes,
   Batch2Pyq,
-  Batch2Leaderboard,
   Batch2DailyChallenges,
   Batch2Streak,
   Batch2Badges,
@@ -60,7 +62,7 @@ const FrictionSimulator = lazy(() => import('./routes/batch3/labs/Physics/Fricti
 const SoundWaveTank = lazy(() => import('./routes/batch3/labs/Physics/SoundWave/SoundWaveTank'));
 import { Batch3Pomodoro } from './routes/batch3/Pomodoro';
 import { Batch3Tasks } from './routes/batch3/Tasks';
-import { Batch3Leaderboard } from './routes/batch3/Leaderboard';
+import { Batch3Help } from './routes/batch3/Help';
 import {
   Batch3Subjects,
   Batch3Chat,
@@ -81,6 +83,7 @@ import { SuperAdminAiConsole } from './routes/super-admin/AiConsole';
 import { SuperAdminTickets } from './routes/super-admin/Tickets';
 import { SuperAdminSchoolDetail } from './routes/super-admin/SchoolDetail';
 import { SuperAdminAuditLog } from './routes/super-admin/AuditLog';
+import { SuperAdminStudents } from './routes/super-admin/Students';
 
 // Import Teacher Pages
 import { TeacherLayout } from './routes/teacher/Layout';
@@ -118,9 +121,10 @@ import { LabInchargeTeachers } from './routes/lab-incharge/Teachers';
 
 function App() {
   return (
-    <AuthProvider>
-      <AppProvider>
-        <Router>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppProvider>
+          <Router>
           <Routes>
             {/* Public Marketing Routes */}
             <Route path="/" element={<Landing />} />
@@ -167,11 +171,11 @@ function App() {
               <Route path="tasks" element={<Batch2Tasks />} />
               <Route path="notes" element={<Batch2Notes />} />
               <Route path="pyq" element={<Batch2Pyq />} />
-              <Route path="leaderboard" element={<Batch2Leaderboard />} />
               <Route path="daily-challenges" element={<Batch2DailyChallenges />} />
               <Route path="streak" element={<Batch2Streak />} />
               <Route path="badges" element={<Batch2Badges />} />
               <Route path="profile" element={<Batch2Profile />} />
+              <Route path="help" element={<Batch2Help />} />
             </Route>
 
             {/* Student Batch 3 (Class 9-10) Dashboard Routes */}
@@ -195,9 +199,9 @@ function App() {
               <Route path="tasks" element={<Batch3Tasks />} />
               <Route path="notes" element={<Batch3Notes />} />
               <Route path="pyq" element={<Batch3Pyq />} />
-              <Route path="leaderboard" element={<Batch3Leaderboard />} />
               <Route path="streak" element={<Batch3Streak />} />
               <Route path="profile" element={<Batch3Profile />} />
+              <Route path="help" element={<Batch3Help />} />
 
               {/* Class 9-10 science labs. Rendered inside this layout so the
                   dashboard sidebar/topbar stay put; Batch3Layout gives lab
@@ -277,6 +281,7 @@ function App() {
               <Route path="overview" element={<SuperAdminOverview />} />
               <Route path="schools" element={<SuperAdminSchools />} />
               <Route path="schools/:schoolId" element={<SuperAdminSchoolDetail />} />
+              <Route path="students" element={<SuperAdminStudents />} />
               <Route path="content" element={<SuperAdminContentPortal />} />
               <Route path="ai-console" element={<SuperAdminAiConsole />} />
               <Route path="tickets" element={<SuperAdminTickets />} />
@@ -298,12 +303,14 @@ function App() {
               <Route path="teachers" element={<LabInchargeTeachers />} />
             </Route>
 
-            {/* Catch-all fallback redirect */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Router>
-      </AppProvider>
-    </AuthProvider>
+            {/* Unknown URL. Shows a real 404 rather than bouncing a signed-in
+                user to the marketing page as if they'd been logged out. */}
+            <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Router>
+        </AppProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

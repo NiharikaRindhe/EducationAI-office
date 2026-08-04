@@ -9,6 +9,63 @@ async function requireExamOwnedByTeacher(teacherId: string, examId: string) {
   return data;
 }
 
+/**
+ * Exams this teacher owns that still have subjective answers waiting on them.
+ *
+ * The teacher dashboard's "Needs Grading" card has always called
+ * `GET /teacher/pending-reviews`, but the route was never implemented — the
+ * request 404'd, the card's `.catch` set an empty list, and it rendered
+ * "All submissions graded ✓". A teacher was being told their grading was done
+ * while students' long-answer papers sat ungraded, which is the worst possible
+ * direction for that error to fail in.
+ *
+ * "Pending" means a submitted answer on a subjective question that no teacher
+ * has finalised yet (`teacher_reviewed_at is null`). AI pre-scoring doesn't
+ * count as reviewed — a teacher still has to sign it off, which is exactly the
+ * gate `finalizeAnswerScore` implements.
+ */
+export async function listPendingReviews(teacherId: string) {
+  const { data: exams, error: examErr } = await supabaseAdmin
+    .from('exams')
+    .select('id, title')
+    .eq('created_by', teacherId)
+    .in('status', ['published', 'closed']);
+
+  if (examErr) throw new ApiError('INTERNAL_ERROR', 'Failed to load your exams', examErr.message);
+  if (!exams || exams.length === 0) return [];
+
+  const examIds = exams.map((e) => e.id as string);
+
+  const { data: rows, error } = await supabaseAdmin
+    .from('exam_answers')
+    .select(
+      'id, exam_submissions!inner(exam_id, submitted_at), questions!inner(type)',
+    )
+    .in('exam_submissions.exam_id', examIds)
+    .not('exam_submissions.submitted_at', 'is', null)
+    .in('questions.type', ['short_answer', 'long_answer'])
+    .is('teacher_reviewed_at', null);
+
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to load pending reviews', error.message);
+
+  const titleById = new Map(exams.map((e) => [e.id as string, e.title as string]));
+  const counts = new Map<string, number>();
+  for (const row of rows ?? []) {
+    const sub = Array.isArray(row.exam_submissions) ? row.exam_submissions[0] : row.exam_submissions;
+    const examId = (sub as { exam_id?: string } | null)?.exam_id;
+    if (!examId) continue;
+    counts.set(examId, (counts.get(examId) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([exam_id, pending_count]) => ({
+      exam_id,
+      exam_title: titleById.get(exam_id) ?? 'Exam',
+      pending_count,
+    }))
+    .sort((a, b) => b.pending_count - a.pending_count);
+}
+
 export async function listSubmissions(teacherId: string, examId: string) {
   await requireExamOwnedByTeacher(teacherId, examId);
 

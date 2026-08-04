@@ -1,8 +1,15 @@
 import { z } from 'zod';
 
+// Credentials reach teachers on printed slips and in emails, so they arrive
+// pasted — and a pasted value routinely carries a trailing space or newline.
+// Untrimmed, that surfaced as a bare "invalid email or password" (or a 422)
+// with nothing on screen hinting at whitespace, which is indistinguishable
+// from a genuinely wrong password. Trimming is safe here: emails never contain
+// surrounding whitespace, and every password this system issues comes from
+// `generatePassword()`, which emits alphanumerics only.
 export const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email: z.string().trim().email(),
+  password: z.string().trim().min(1),
 });
 
 export const pinRosterQuerySchema = z.object({

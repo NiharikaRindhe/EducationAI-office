@@ -3,6 +3,15 @@ import { finalizeScoreSchema } from '../schemas/exam.schema.js';
 import * as examReviewService from '../services/examReview.service.js';
 import { requireId } from '../lib/httpParams.js';
 
+/** Backs the teacher dashboard's "Needs Grading" card. */
+export async function listPendingReviewsController(req: Request, res: Response, next: NextFunction) {
+  try {
+    res.json(await examReviewService.listPendingReviews(req.user!.id));
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function listSubmissionsController(req: Request, res: Response, next: NextFunction) {
   try {
     res.json(await examReviewService.listSubmissions(req.user!.id, requireId(req, 'examId')));
