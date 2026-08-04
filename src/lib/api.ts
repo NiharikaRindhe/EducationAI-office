@@ -99,30 +99,59 @@ export const api = {
   put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
-  /** For endpoints returning a binary blob (admit card PDF/zip) rather than JSON. */
-  async download(path: string): Promise<Blob> {
+  /** For endpoints returning a binary blob (admit card PDF/zip, CSV export)
+   *  rather than JSON. Takes a query so an export can carry the same filters
+   *  the on-screen table is using. */
+  async download(path: string, query?: RequestOptions['query']): Promise<Blob> {
     const headers: Record<string, string> = {};
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
-    const res = await fetch(buildUrl(path), { headers });
+    const res = await fetch(buildUrl(path, query), { headers });
     if (res.status === 401 && accessToken) handleSessionExpired();
     if (!res.ok) throw new ApiClientError('DOWNLOAD_FAILED', res.statusText, res.status);
     return res.blob();
   },
-  async upload<T>(path: string, file: File, fields?: Record<string, string>): Promise<T> {
+  /** Multipart upload. Goes through XMLHttpRequest rather than fetch because
+   *  fetch cannot report upload progress — and a 150MB textbook uploading
+   *  behind nothing but a spinner is indistinguishable from a hung page. */
+  upload<T>(
+    path: string,
+    file: File,
+    fields?: Record<string, string>,
+    onProgress?: (percent: number) => void,
+  ): Promise<T> {
     const formData = new FormData();
     formData.append('file', file);
     if (fields) {
       for (const [key, value] of Object.entries(fields)) formData.append(key, value);
     }
-    const headers: Record<string, string> = {};
-    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
-    const res = await fetch(buildUrl(path), { method: 'POST', headers, body: formData });
-    if (res.status === 401 && accessToken) handleSessionExpired();
-    const payload = await res.json().catch(() => null);
-    if (!res.ok) {
-      const err = payload?.error;
-      throw new ApiClientError(err?.code ?? 'UNKNOWN', err?.message ?? res.statusText, res.status, err?.details);
-    }
-    return payload as T;
+
+    return new Promise<T>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', buildUrl(path));
+      if (accessToken) xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+
+      if (onProgress) {
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+        });
+      }
+
+      xhr.addEventListener('load', () => {
+        const payload = (() => {
+          try { return JSON.parse(xhr.responseText); } catch { return null; }
+        })();
+        if (xhr.status === 401 && accessToken) handleSessionExpired();
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(payload as T);
+          return;
+        }
+        const err = payload?.error;
+        reject(new ApiClientError(err?.code ?? 'UNKNOWN', err?.message ?? xhr.statusText, xhr.status, err?.details));
+      });
+      xhr.addEventListener('error', () => reject(new ApiClientError('NETWORK', 'Upload failed — check your connection', 0)));
+      xhr.addEventListener('abort', () => reject(new ApiClientError('ABORTED', 'Upload cancelled', 0)));
+
+      xhr.send(formData);
+    });
   },
 };

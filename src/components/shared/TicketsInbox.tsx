@@ -64,7 +64,7 @@ const CATEGORY_LABELS: Record<Category, string> = {
 };
 
 interface TicketsInboxProps {
-  accentColor: 'rose' | 'slate' | 'indigo';
+  accentColor: 'rose' | 'slate' | 'indigo' | 'sky' | 'amber';
   /** Show status-change controls (school admin and super admin manage; a teacher/student only reads + replies). */
   canTriage: boolean;
   /** Show the "Escalate to Super Admin" action (school admin only). */
@@ -83,6 +83,8 @@ export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTria
     rose: { btn: 'bg-rose-600 hover:bg-rose-700', text: 'text-rose-600', ring: 'focus:border-rose-400', chip: 'bg-rose-50 text-rose-600' },
     slate: { btn: 'bg-slate-800 hover:bg-slate-900', text: 'text-slate-800', ring: 'focus:border-slate-400', chip: 'bg-slate-100 text-slate-700' },
     indigo: { btn: 'bg-indigo-600 hover:bg-indigo-700', text: 'text-indigo-600', ring: 'focus:border-indigo-400', chip: 'bg-indigo-50 text-indigo-600' },
+    sky: { btn: 'bg-sky-500 hover:bg-sky-600', text: 'text-sky-600', ring: 'focus:border-sky-400', chip: 'bg-sky-50 text-sky-600' },
+    amber: { btn: 'bg-amber-500 hover:bg-amber-600', text: 'text-amber-600', ring: 'focus:border-amber-400', chip: 'bg-amber-50 text-amber-700' },
   } as const;
   const accent = ACCENTS[accentColor];
 

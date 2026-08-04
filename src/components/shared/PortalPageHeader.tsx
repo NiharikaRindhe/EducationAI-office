@@ -16,12 +16,12 @@ export const PortalPageHeader: React.FC<PortalPageHeaderProps> = ({
   children,
 }) => (
   <section className="portal-page-header">
-    <div className="relative z-10 flex flex-col gap-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div className="relative z-10 flex flex-col gap-3.5">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-2xl">
           {eyebrow && <p className="portal-eyebrow">{eyebrow}</p>}
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-950 md:text-[28px]">{title}</h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">{description}</p>
+          <h1 className="mt-1.5 text-xl font-bold tracking-tight text-slate-950 md:text-[22px]">{title}</h1>
+          <p className="mt-1 max-w-2xl text-[13px] leading-5 text-slate-500">{description}</p>
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
@@ -55,14 +55,14 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   tone = 'slate',
 }) => (
   <div className="portal-metric">
-    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${toneStyles[tone]}`}>
+    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${toneStyles[tone]}`}>
       {icon}
     </div>
     <div className="min-w-0">
-      <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">{label}</p>
-      <div className="mt-0.5 flex items-baseline gap-2">
-        <p className="text-xl font-bold tabular-nums text-slate-900">{value}</p>
-        {hint && <span className="truncate text-xs text-slate-400">{hint}</span>}
+      <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">{label}</p>
+      <div className="flex items-baseline gap-1.5">
+        <p className="text-[17px] font-bold leading-tight tabular-nums text-slate-900">{value}</p>
+        {hint && <span className="truncate text-[11px] text-slate-400">{hint}</span>}
       </div>
     </div>
   </div>

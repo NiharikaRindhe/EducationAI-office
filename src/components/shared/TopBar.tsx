@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, Search, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 
@@ -9,7 +9,6 @@ interface TopBarProps {
   userName?: string;
   subtitle: string;
   batchColor: 'amber' | 'indigo' | 'sky' | 'slate' | 'emerald' | 'teacher' | 'schoolAdmin' | 'superAdmin' | 'labIncharge';
-  notifCount?: number;
   userAvatar?: string;
   profileHref?: string;
   rightSlot?: React.ReactNode;
@@ -23,7 +22,6 @@ export const TopBar: React.FC<TopBarProps> = ({
   userName,
   subtitle,
   batchColor,
-  notifCount = 2,
   userAvatar,
   profileHref = '/profile',
   rightSlot
@@ -107,16 +105,11 @@ export const TopBar: React.FC<TopBarProps> = ({
           </button>
         )}
 
-        {/* Action icons */}
+        {/* Action icons.
+            A notification bell used to live here with a hardcoded unread count,
+            so every user saw a permanent red dot that opened nothing. Removed
+            until there is a real notifications feed to hang off it. */}
         <div className="flex items-center gap-3">
-          {/* Notification bell */}
-          <button className="w-10 h-10 rounded-xl hover:bg-slate-50 border border-slate-100 flex items-center justify-center relative cursor-pointer group transition-all">
-            <span className="material-symbols-outlined text-slate-600 text-xl group-hover:scale-110 transition-transform">notifications</span>
-            {notifCount > 0 && (
-              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"></span>
-            )}
-          </button>
-
           {/* Profile Circle / Avatar Link */}
           {userAvatar ? (
             <Link 
