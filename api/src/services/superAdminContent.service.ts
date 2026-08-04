@@ -227,6 +227,12 @@ export async function createIngestionJob(
     /** Set only for a School Admin's own upload. Omitted/null = platform-wide
      *  book (Super Admin upload), visible to every school — unchanged behavior. */
     schoolId?: string | null;
+    /** True for a previous-year question paper PDF rather than a textbook —
+     *  same ingestion pipeline, just tagged so the library and the AI
+     *  tutor's citations can tell the two apart. */
+    isPyq?: boolean;
+    pyqYear?: number;
+    pyqSource?: string;
   },
 ) {
   const { data, error } = await supabaseAdmin
@@ -241,6 +247,9 @@ export async function createIngestionJob(
       school_id: input.schoolId ?? null,
       status: 'queued',
       uploaded_by: superAdminId,
+      is_pyq: input.isPyq ?? false,
+      pyq_year: input.pyqYear ?? null,
+      pyq_source: input.pyqSource ?? null,
     })
     .select()
     .single();
@@ -257,7 +266,7 @@ export async function listIngestionJobs(
     // schools(name): only resolves for a school-uploaded job (school_id set) —
     // lets the Super Admin's merged view tell "platform" and school uploads
     // apart, since both now live in the same table.
-    .select('id, class_num, subject, book_title, original_filename, status, total_pages, chunks_created, chunks_embedded, error_message, chapters_detected, uploaded_by, school_id, created_at, updated_at, schools(name)');
+    .select('id, class_num, subject, book_title, original_filename, status, total_pages, chunks_created, chunks_embedded, error_message, chapters_detected, uploaded_by, school_id, is_pyq, pyq_year, pyq_source, created_at, updated_at, schools(name)');
 
   if (filters.classNum !== undefined) query = query.eq('class_num', filters.classNum);
   if (filters.subject) query = query.eq('subject', filters.subject);

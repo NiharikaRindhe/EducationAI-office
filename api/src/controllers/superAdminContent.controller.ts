@@ -140,6 +140,21 @@ export async function uploadNcertPdfController(req: Request, res: Response, next
       throw new ApiError('VALIDATION_ERROR', 'classNum must be between 1 and 10');
     }
 
+    // A previous-year question paper PDF goes through the same pipeline as a
+    // textbook, just tagged — 'true'/'false' because multipart fields always
+    // arrive as strings.
+    const isPyq = req.body.isPyq === 'true';
+    let pyqYear: number | undefined;
+    let pyqSource: string | undefined;
+    if (isPyq) {
+      const currentYear = new Date().getFullYear();
+      pyqYear = Number(req.body.pyqYear);
+      if (!req.body.pyqYear || isNaN(pyqYear) || pyqYear < 1990 || pyqYear > currentYear + 1) {
+        throw new ApiError('VALIDATION_ERROR', `pyqYear is required for a PYQ paper and must be between 1990 and ${currentYear + 1}`);
+      }
+      pyqSource = typeof req.body.pyqSource === 'string' && req.body.pyqSource.trim() ? req.body.pyqSource.trim() : undefined;
+    }
+
     // Optional manual chapter map (JSON string in the multipart form):
     // [{ "chapter": 1, "title": "...", "fromPage": 1, "toPage": 14 }, ...]
     // Validated here so a typo fails the upload, not the background job.
@@ -167,6 +182,9 @@ export async function uploadNcertPdfController(req: Request, res: Response, next
       originalFilename,
       storagePath,
       chapterMap,
+      isPyq,
+      pyqYear,
+      pyqSource,
     });
 
     // The in-process worker (jobs/ingestionWorker.job.ts) picks queued jobs up

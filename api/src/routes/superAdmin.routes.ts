@@ -18,6 +18,11 @@ import {
   getAiUsageController,
 } from '../controllers/aiConsole.controller.js';
 import {
+  superAdminListController,
+  superAdminExportController,
+  superAdminBulkSetActiveController,
+} from '../controllers/studentDirectory.controller.js';
+import {
   listGlobalQuestionBankController,
   addGlobalQuestionController,
   deleteGlobalQuestionController,
@@ -60,6 +65,12 @@ superAdminRouter.post('/schools/:id/admins', addSchoolAdminController);
 superAdminRouter.post('/schools/:id/admins/:userId/reset-password', resetSchoolAdminPasswordController);
 
 // ── Audit log ───────────────────────────────────────────────
+// Cross-school student directory. Bulk writes stay school-scoped via
+// ?schoolId — see superAdminBulkSetActiveController.
+superAdminRouter.get('/students', superAdminListController);
+superAdminRouter.get('/students/export', superAdminExportController);
+superAdminRouter.post('/students/bulk/active', superAdminBulkSetActiveController);
+
 superAdminRouter.get('/audit-log', listAuditLogsController);
 
 // ── AI Console ──────────────────────────────────────────────
