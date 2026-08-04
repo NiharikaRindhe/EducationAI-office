@@ -96,7 +96,12 @@ services:
       GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
       GOTRUE_SITE_URL: ${SITE_URL}
       GOTRUE_URI_ALLOW_LIST: ${SITE_URL}
-      GOTRUE_DISABLE_SIGNUP: "false"
+      # Every account on this platform is provisioned by a Super Admin or a
+      # School Admin — there is no self-serve signup path in the product (the
+      # /register page is a contact form). Leaving GoTrue's signup endpoint
+      # open let anyone POST /auth/v1/signup and mint an authenticated account
+      # against a school's stack, so it stays off.
+      GOTRUE_DISABLE_SIGNUP: "true"
       GOTRUE_JWT_ADMIN_ROLES: service_role
       GOTRUE_JWT_AUD: authenticated
       GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
