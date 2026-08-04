@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { Loader2, Plus, AlertCircle, Users } from 'lucide-react';
+import { Loader2, Plus, AlertCircle, Users, TriangleAlert } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
+import { buildTeacherLabels, duplicateTeacherNames } from '../../lib/teacherLabel';
 
 interface SectionRow {
   id: string;
@@ -16,6 +17,7 @@ interface SectionRow {
 interface TeacherRow {
   id: string;
   full_name: string;
+  teacher_profiles?: { employee_id?: string | null; specialization?: string | null } | null;
 }
 
 interface SubjectRow {
@@ -52,12 +54,16 @@ export const SchoolAdminClassesSections: React.FC = () => {
     try {
       const [sectionData, teacherData, subjectData, assignmentData] = await Promise.all([
         api.get<SectionRow[]>('/school-admin/class-sections'),
-        api.get<{ id: string; full_name: string }[]>('/school-admin/teachers'),
+        api.get<TeacherRow[]>('/school-admin/teachers'),
         api.get<SubjectRow[]>('/school-admin/subjects'),
         api.get<AssignmentRow[]>('/school-admin/teaching-assignments'),
       ]);
       setSections(sectionData);
-      setTeachers(teacherData.map((t) => ({ id: t.id, full_name: t.full_name })));
+      setTeachers(teacherData.map((t) => ({
+        id: t.id,
+        full_name: t.full_name,
+        teacher_profiles: t.teacher_profiles ?? null,
+      })));
       setSubjects(subjectData);
       setAssignments(assignmentData);
       setMatrixClass((prev) => prev ?? sectionData[0]?.class_num ?? null);
@@ -69,6 +75,12 @@ export const SchoolAdminClassesSections: React.FC = () => {
   }, []);
 
   useEffect(() => { void loadAll(); }, [loadAll]);
+
+  // Two staff with the same name would otherwise be identical options here,
+  // and picking the wrong one silently assigns the class to a teacher who
+  // never sees it. See lib/teacherLabel.ts.
+  const teacherLabels = useMemo(() => buildTeacherLabels(teachers), [teachers]);
+  const duplicateNames = useMemo(() => duplicateTeacherNames(teachers), [teachers]);
 
   const sectionsByClass = useMemo(() => {
     const map = new Map<number, SectionRow[]>();
@@ -209,7 +221,7 @@ export const SchoolAdminClassesSections: React.FC = () => {
                         className="px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-rose-400"
                       >
                         <option value="">— Not assigned —</option>
-                        {teachers.map((t) => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+                        {teachers.map((t) => <option key={t.id} value={t.id}>{teacherLabels.get(t.id) ?? t.full_name}</option>)}
                       </select>
                     </div>
                   ))}
@@ -228,6 +240,19 @@ export const SchoolAdminClassesSections: React.FC = () => {
             Assign which teacher teaches each subject to each section. This is what scopes a teacher's tasks, exams and student lists.
           </p>
         </div>
+
+        {duplicateNames.length > 0 && (
+          <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] leading-5 text-amber-800">
+            <TriangleAlert size={14} className="mt-px shrink-0" />
+            <span>
+              More than one staff account is named{' '}
+              <span className="font-semibold">{duplicateNames.join(', ')}</span>. They're shown below with an
+              employee ID or subject in brackets so you can tell them apart — assigning the wrong one means that
+              teacher won't see the class in their portal. If these are duplicates, remove the extra account under
+              Teachers.
+            </span>
+          </div>
+        )}
 
         {classesWithSections.length > 0 && (
           <div className="flex flex-wrap gap-2">
@@ -274,7 +299,7 @@ export const SchoolAdminClassesSections: React.FC = () => {
                               } ${savingCell === cellKey ? 'opacity-50' : ''}`}
                             >
                               <option value="">—</option>
-                              {teachers.map((t) => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+                              {teachers.map((t) => <option key={t.id} value={t.id}>{teacherLabels.get(t.id) ?? t.full_name}</option>)}
                             </select>
                           </td>
                         );

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Loader2, AlertCircle, X, Trash2, Plus, FlaskConical, AlertTriangle } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
+import { buildTeacherLabels } from '../../lib/teacherLabel';
 
 interface SectionRow {
   id: string;
@@ -10,6 +11,7 @@ interface SectionRow {
 interface TeacherRow {
   id: string;
   full_name: string;
+  teacher_profiles?: { employee_id?: string | null; specialization?: string | null } | null;
 }
 interface SubjectRow {
   class_num: number;
@@ -100,6 +102,9 @@ export const SchoolAdminTimetable: React.FC = () => {
 
   useEffect(() => { void loadStatic(); }, [loadStatic]);
   useEffect(() => { if (selectedSectionId) void loadSlots(selectedSectionId); }, [selectedSectionId, loadSlots]);
+
+  // Disambiguates staff who share a name — see lib/teacherLabel.ts.
+  const teacherLabels = useMemo(() => buildTeacherLabels(teachers), [teachers]);
 
   const slotByCell = useMemo(() => {
     const map = new Map<string, Slot>();
@@ -308,7 +313,7 @@ export const SchoolAdminTimetable: React.FC = () => {
                 <label className={labelCls}>Teacher</label>
                 <select value={form.teacherId} onChange={(e) => setForm((p) => ({ ...p, teacherId: e.target.value }))} className={inputCls}>
                   <option value="">— No teacher —</option>
-                  {teachers.map((t) => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+                  {teachers.map((t) => <option key={t.id} value={t.id}>{teacherLabels.get(t.id) ?? t.full_name}</option>)}
                 </select>
               </div>
               <div>
