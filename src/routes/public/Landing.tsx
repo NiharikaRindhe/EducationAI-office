@@ -1,411 +1,242 @@
-import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Flame, Sparkles, Trophy, BookOpen, Award, CheckCircle, GraduationCap, School, ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import {
+  ArrowRight, Atom, BarChart3, BookOpen, Bot, BrainCircuit, Check,
+  ChevronRight, ClipboardCheck, FlaskConical, Gamepad2, Menu, School, ShieldCheck,
+  Sparkles, Star, Target, TrendingUp, Trophy, Users, X, Zap
+} from 'lucide-react';
+
+const paths = [
+  {
+    range: '01—04', label: 'Young Explorers', color: '#ff6b35', soft: '#fff2ea',
+    title: 'Learn through play.', desc: 'Stories, number games and joyful quests that turn strong foundations into a daily habit.',
+    features: ['16 skill games', 'Story journeys', 'Stars & streaks'], icon: Gamepad2, href: '/batch1/home'
+  },
+  {
+    range: '05—08', label: 'Curious Thinkers', color: '#6657e8', soft: '#f0eeff',
+    title: 'Understand the why.', desc: 'NCERT-aligned lessons, smart practice and an AI tutor that explains without giving the answer away.',
+    features: ['AI doubt coach', 'Chapter roadmaps', 'Practice analytics'], icon: BrainCircuit, href: '/batch2/home'
+  },
+  {
+    range: '09—10', label: 'Board Achievers', color: '#078a9b', soft: '#e7f8f8',
+    title: 'Prepare with purpose.', desc: 'Concept labs, PYQs and focus tools built around confident, measurable board preparation.',
+    features: ['Virtual science labs', 'Board countdown', 'HOTS challenges'], icon: Target, href: '/batch3/home'
+  }
+];
+
+const capabilities = [
+  { icon: Bot, title: 'AI tutor that teaches', copy: 'Guided explanations grounded in the NCERT curriculum—not generic internet answers.' },
+  { icon: FlaskConical, title: 'Interactive science labs', copy: 'Experiment with forces, atoms, reactions and cells in safe virtual environments.' },
+  { icon: BarChart3, title: 'Progress you can act on', copy: 'Clear insights for students, teachers and school leaders, without spreadsheet overload.' },
+  { icon: Trophy, title: 'Motivation that feels earned', copy: 'Streaks, quests and class challenges designed around mastery, not empty screen time.' },
+  { icon: BookOpen, title: 'One academic workspace', copy: 'Tasks, notes, exams, concept maps and doubt-solving in one connected learning flow.' },
+  { icon: ShieldCheck, title: 'Built for schools', copy: 'Role-based portals, school controls and age-appropriate experiences from day one.' }
+];
 
 export const Landing: React.FC = () => {
-  const navigate = useNavigate();
-  const [stats, setStats] = useState({ grades: 0, batches: 0, games: 0, ncert: 0 });
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [activeRole, setActiveRole] = useState<'student' | 'teacher' | 'principal'>('student');
 
-  // Animate stats counter on load
-  useEffect(() => {
-    const duration = 1500;
-    const steps = 50;
-    const stepTime = duration / steps;
-    let currentStep = 0;
-
-    const timer = setInterval(() => {
-      currentStep++;
-      setStats({
-        grades: Math.min(Math.round((10 / steps) * currentStep), 10),
-        batches: Math.min(Math.round((3 / steps) * currentStep), 3),
-        games: Math.min(Math.round((16 / steps) * currentStep), 16),
-        ncert: Math.min(Math.round((100 / steps) * currentStep), 100),
-      });
-
-      if (currentStep >= steps) clearInterval(timer);
-    }, stepTime);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  const batchesData = [
-    {
-      id: 1,
-      name: 'Batch 1',
-      grades: 'Class 1–4',
-      tagline: 'Playful Learning',
-      desc: 'High-energy, gamified environment focusing on foundational concepts, storytelling, and early-stage interactive mini-games.',
-      color: 'amber',
-      accentBg: 'bg-amber-500',
-      textColor: 'text-amber-600',
-      gradient: 'from-amber-400 to-orange-500',
-      features: ['🎮 16 Mini Games', '📖 Illustrated Stories', '🎤 AI Show & Tell', '⭐ Star Quizzes'],
-      stats: '16 Games Loaded',
-      link: '/batch1/home'
+  const roleContent = {
+    student: {
+      greeting: 'GOOD MORNING, AARAV',
+      heading: 'Ready for today’s mission?',
+      badge: '🔥 12 day streak',
+      eyebrow: 'SCIENCE • CHAPTER 8',
+      title: 'Force & Laws of Motion',
+      action: 'Continue your interactive lesson',
+      icon: Atom,
+      cards: [
+        { icon: Bot, label: 'ASK YOUR AI COACH', value: '“Why do objects keep moving in space?”', note: 'Let’s discover it together →' },
+        { icon: Star, label: 'THIS WEEK', value: '860', note: 'learning points' }
+      ]
     },
-    {
-      id: 2,
-      name: 'Batch 2',
-      grades: 'Class 5–8',
-      tagline: 'Academic Foundations',
-      desc: 'Structured, NCERT-focused roadmap helping middle schoolers master core sciences, history, and basic analytics with AI doubt solving.',
-      color: 'indigo',
-      accentBg: 'bg-indigo-600',
-      textColor: 'text-indigo-600',
-      gradient: 'from-indigo-500 to-violet-600',
-      features: ['🤖 AI doubt solver chat', '📝 Chapter Notes manager', '🏆 Classroom Leaderboard', '🔖 PYQ Paper Hub'],
-      stats: '50+ NCERT Chapters',
-      link: '/batch2/home'
+    teacher: {
+      greeting: 'CLASS 7B • SCIENCE',
+      heading: 'Your class is on track.',
+      badge: '24 of 28 active',
+      eyebrow: 'NEXT UP • 10:30 AM',
+      title: 'Live lesson: Heat & Temperature',
+      action: 'Open lesson workspace',
+      icon: Users,
+      cards: [
+        { icon: ClipboardCheck, label: 'TASKS TO REVIEW', value: '12 submissions', note: '4 need your feedback →' },
+        { icon: TrendingUp, label: 'CLASS MASTERY', value: '78%', note: '+6% this week' }
+      ]
     },
-    {
-      id: 3,
-      name: 'Batch 3',
-      grades: 'Class 9–10',
-      tagline: 'Board Readiness',
-      desc: 'Rigorous preparation suite geared towards CBSE Board Exams, combining complex concept mapping, Pomodoro logging, and analytical prep.',
-      color: 'sky',
-      accentBg: 'bg-sky-500',
-      textColor: 'text-sky-600',
-      gradient: 'from-sky-400 to-cyan-500',
-      features: ['📋 Board Prep countdown', '🗺️ Interactive Concept Maps', '🍅 Pomodoro Focus Timer', '⚡ CBSE HOTS Challenges'],
-      stats: 'March 2026 Target Board',
-      link: '/batch3/home'
+    principal: {
+      greeting: 'SCHOOL OVERVIEW',
+      heading: 'Learning is moving forward.',
+      badge: 'All systems healthy',
+      eyebrow: 'WEEKLY SCHOOL PULSE',
+      title: '1,248 active learners',
+      action: 'View leadership report',
+      icon: School,
+      cards: [
+        { icon: BarChart3, label: 'ACADEMIC GROWTH', value: '+11.4%', note: 'across all grades' },
+        { icon: ShieldCheck, label: 'ENGAGEMENT', value: '92%', note: 'teacher adoption' }
+      ]
     }
-  ];
+  };
+  const currentRole = roleContent[activeRole];
+  const MissionIcon = currentRole.icon;
 
   return (
-    <div className="min-h-screen flex flex-col font-sans text-slate-800 bg-[#fcf8ff]">
-      {/* 3 Floating blurred orbs in background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-1/4 left-1/10 w-[500px] h-[500px] rounded-full bg-indigo-200/30 blur-[100px] anim-float"></div>
-        <div className="absolute top-2/3 right-1/10 w-[600px] h-[600px] rounded-full bg-purple-200/20 blur-[120px] anim-float" style={{ animationDelay: '-2s' }}></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full bg-amber-100/20 blur-[80px] anim-spin-slow"></div>
-      </div>
-
-      {/* Navigation bar */}
-      <nav className="fixed top-0 inset-x-0 h-[68px] glass z-50 px-8 flex items-center justify-between shadow-xs border-b border-white/40 select-none">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-600 flex items-center justify-center font-display font-bold text-white text-lg">
-            E
+    <div className="edu-landing">
+      <nav className="edu-nav">
+        <Link to="/" className="edu-brand" aria-label="EduAI home">
+          <span className="edu-brand-mark"><Sparkles size={17} /></span>
+          <span>EduAI</span>
+          <span className="edu-school-tag">for schools</span>
+        </Link>
+        <div className="edu-nav-links">
+          <a href="#pathways">Learning paths</a>
+          <a href="#platform">Platform</a>
+          <Link to="/pricing">Pricing</Link>
+          <Link to="/login">Sign in</Link>
+        </div>
+        <Link to="/register" className="edu-nav-cta">Book a school demo <ArrowRight size={16} /></Link>
+        <button className="edu-menu-btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu">
+          {menuOpen ? <X /> : <Menu />}
+        </button>
+        {menuOpen && (
+          <div className="edu-mobile-menu">
+            <a href="#pathways" onClick={() => setMenuOpen(false)}>Learning paths</a>
+            <a href="#platform" onClick={() => setMenuOpen(false)}>Platform</a>
+            <Link to="/pricing">Pricing</Link><Link to="/login">Sign in</Link><Link to="/register">Book a demo</Link>
           </div>
-          <span className="font-display font-bold text-lg text-slate-800">EduAI</span>
-          <span className="badge pill-indigo ml-2">For Schools</span>
-        </div>
-
-        <div className="hidden md:flex items-center gap-8 font-sans text-sm font-semibold text-slate-500">
-          <a href="#features" className="hover:text-indigo-600 transition-colors">Features</a>
-          <a href="#batches" className="hover:text-indigo-600 transition-colors">Batches</a>
-          <Link to="/pricing" className="hover:text-indigo-600 transition-colors">Pricing</Link>
-          <Link to="/login" className="hover:text-indigo-600 transition-colors">Portals</Link>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <Link to="/login" className="font-sans text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">
-            Explore
-          </Link>
-          <Link to="/register" className="py-2.5 px-5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white font-sans text-sm font-bold shadow-md shadow-indigo-500/10 hover:shadow-lg transition-all flex items-center gap-1.5">
-            Get Started
-            <ArrowRight size={16} />
-          </Link>
-        </div>
+        )}
       </nav>
 
-      {/* Hero Section */}
-      <main className="relative z-10 pt-[120px] pb-16 px-8 max-w-7xl mx-auto w-full flex flex-col items-center gap-16">
-        <div className="text-center max-w-4xl flex flex-col items-center gap-6">
-          {/* Announcement pill */}
-          <div className="anim-fade-up inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100/50 shadow-xs">
-            <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping"></span>
-            <span className="text-xs font-semibold text-emerald-800">Now live for CBSE Schools across India</span>
-            <ArrowRight size={12} className="text-emerald-800" />
+      <main>
+        <section className="edu-hero">
+          <div className="edu-hero-copy">
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="edu-kicker">
+              <span className="edu-live-dot" /> Now onboarding CBSE schools for 2026
+            </motion.div>
+            <motion.h1 initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .08 }}>
+              One school.<br />Every learner.<br /><em>Built to grow.</em>
+            </motion.h1>
+            <motion.p initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .16 }}>
+              A complete learning platform that changes with every age—playful for young minds, structured for middle school and focused for board years.
+            </motion.p>
+            <motion.div className="edu-hero-actions" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .24 }}>
+              <Link to="/register" className="edu-primary-btn">See EduAI for your school <ArrowRight size={18} /></Link>
+              <a href="#pathways" className="edu-text-btn">Explore student journeys <ChevronRight size={17} /></a>
+            </motion.div>
+            <motion.div className="edu-trust-row" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: .4 }}>
+              <span><Check size={14} /> NCERT aligned</span><span><Check size={14} /> Classes 1–10</span><span><Check size={14} /> Teacher controlled</span>
+            </motion.div>
           </div>
 
-          {/* Title */}
-          <h1 className="font-display font-extrabold text-5xl md:text-7xl text-slate-900 tracking-tight leading-[1.1] anim-fade-up" style={{ animationDelay: '0.1s' }}>
-            The AI Platform for <br />
-            <span className="relative">
-              <span className="bg-gradient-to-r from-indigo-500 via-violet-600 to-purple-600 bg-clip-text text-transparent">Every Student,</span>
-              <span className="absolute bottom-1.5 left-0 w-full h-2 bg-indigo-500/10 rounded-full -z-10"></span>
-            </span> Every Grade.
-          </h1>
-
-          <p className="font-sans text-lg text-slate-500 max-w-2xl anim-fade-up" style={{ animationDelay: '0.2s' }}>
-            An adaptive, B2B education system for Indian classrooms. Delivering gamified journeys for Class 1–4, structured NCERT foundations for Class 5–8, and rigorous board-exam preparation for Class 9–10.
-          </p>
-
-          {/* CTA Row */}
-          <div className="flex items-center gap-4 mt-2 anim-fade-up" style={{ animationDelay: '0.3s' }}>
-            <Link to="/login" className="py-3.5 px-7 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-sans font-bold shadow-lg shadow-indigo-600/20 hover:shadow-xl transition-all flex items-center gap-2 hover:-translate-y-0.5">
-              Explore the Platform
-              <ArrowRight size={18} />
-            </Link>
-            <a href="#batches" className="py-3.5 px-7 rounded-2xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-sans font-bold transition-all hover:-translate-y-0.5">
-              View All Batches
-            </a>
-          </div>
-        </div>
-
-        {/* Bento Preview Grid */}
-        <div className="w-full grid grid-cols-12 gap-6 anim-fade-up" style={{ animationDelay: '0.4s' }}>
-          {/* Streak Card */}
-          <div className="bento-card col-span-12 md:col-span-4 flex flex-col justify-between gap-4 card-interactive select-none">
-            <div className="flex items-center justify-between">
-              <span className="font-label-caps text-xs text-slate-400">DAILY ENGAGEMENT</span>
-              <div className="p-2 bg-amber-50 rounded-xl text-amber-500">
-                <Flame size={20} className="fill-amber-500" />
+          <motion.div className="edu-hero-product" initial={{ opacity: 0, scale: .96, x: 24 }} animate={{ opacity: 1, scale: 1, x: 0 }} transition={{ duration: .7, ease: [0.2, 0.8, 0.2, 1] }}>
+            <div className="edu-orbit edu-orbit-one" /><div className="edu-orbit edu-orbit-two" />
+            <div className="edu-role-switcher" aria-label="Preview platform by role">
+              <button className={activeRole === 'student' ? 'active' : ''} onClick={() => setActiveRole('student')}><Gamepad2 /> Student</button>
+              <button className={activeRole === 'teacher' ? 'active' : ''} onClick={() => setActiveRole('teacher')}><Users /> Teacher</button>
+              <button className={activeRole === 'principal' ? 'active' : ''} onClick={() => setActiveRole('principal')}><School /> Principal</button>
+            </div>
+            <div className="edu-product-window">
+              <div className="edu-window-top">
+                <div className="edu-mini-brand"><Sparkles size={13} /> EduAI</div>
+                <span>One platform • Three focused experiences</span>
+                <div className="edu-avatar">AK</div>
               </div>
-            </div>
-            <div>
-              <h3 className="font-display font-extrabold text-3xl text-slate-800 mb-1">🔥 12 Days!</h3>
-              <p className="font-sans text-xs text-slate-400">Streak count this month. Keep it going!</p>
-            </div>
-            <div className="flex justify-between items-center bg-slate-50 border border-slate-100 p-3 rounded-2xl">
-              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, idx) => (
-                <div key={idx} className="flex flex-col items-center gap-1.5">
-                  <span className="text-[10px] font-bold text-slate-400">{day}</span>
-                  <div className={`w-3.5 h-3.5 rounded-full ${idx < 5 ? 'bg-amber-500 shadow-xs shadow-amber-500/20' : 'border-2 border-slate-200'}`}></div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* AI Chat Card */}
-          <div className="bento-card col-span-12 md:col-span-5 flex flex-col justify-between gap-4 card-interactive">
-            <div className="flex items-center justify-between">
-              <span className="font-label-caps text-xs text-slate-400">AI TUTOR ASSISTANT</span>
-              <span className="badge pill-indigo">NCERT Ch.3</span>
-            </div>
-            {/* Mock chat conversation */}
-            <div className="flex flex-col gap-3 font-sans text-xs my-1">
-              <div className="self-end bg-indigo-600 text-white rounded-2xl p-2.5 rounded-tr-xs max-w-[85%] font-medium">
-                How does Newton's second law apply in real life?
-              </div>
-              <div className="self-start bg-slate-50 border border-slate-100 text-slate-700 rounded-2xl p-2.5 rounded-tl-xs max-w-[85%] leading-relaxed">
-                It explains why pushing an empty swing is easy, but pushing a heavy person needs a lot more force! \(F = ma\)
-              </div>
-            </div>
-            <div className="w-full flex items-center justify-between p-1 px-3 bg-slate-100 rounded-xl text-slate-400 text-xs">
-              <span>Ask about F=ma...</span>
-              <span className="material-symbols-outlined text-sm">send</span>
-            </div>
-          </div>
-
-          {/* Badges Card */}
-          <div className="bento-card col-span-12 md:col-span-3 flex flex-col justify-between gap-4 card-interactive">
-            <div className="flex items-center justify-between">
-              <span className="font-label-caps text-xs text-slate-400">RECENT REWARDS</span>
-              <Trophy size={18} className="text-amber-500" />
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-center select-none">
-              {[
-                { icon: '⭐', label: 'First Quiz', bg: 'bg-amber-50' },
-                { icon: '🔥', label: '7-Day Streak', bg: 'bg-orange-50' },
-                { icon: '🧠', label: 'Quiz Master', bg: 'bg-indigo-50' },
-                { icon: '📸', label: 'Explorer', bg: 'bg-purple-50' },
-              ].map((badge, idx) => (
-                <div key={idx} className={`${badge.bg} p-2 rounded-xl border border-slate-100/50 flex flex-col items-center gap-1`}>
-                  <span className="text-lg">{badge.icon}</span>
-                  <span className="text-[9px] font-bold text-slate-600 whitespace-nowrap">{badge.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Subject Progress Card */}
-          <div className="bento-card col-span-12 md:col-span-6 flex flex-col justify-between gap-4 card-interactive">
-            <div className="flex items-center justify-between">
-              <span className="font-label-caps text-xs text-slate-400">STUDENT READINESS</span>
-              <span className="text-xs font-bold text-indigo-600">Grade average: 81%</span>
-            </div>
-            <div className="flex flex-col gap-3.5 my-1">
-              {[
-                { name: 'Mathematics', value: 78, color: 'bg-indigo-500' },
-                { name: 'Science & Tech', value: 64, color: 'bg-sky-500' },
-                { name: 'English Literature', value: 91, color: 'bg-amber-500' }
-              ].map((sub, idx) => (
-                <div key={idx} className="flex flex-col gap-1">
-                  <div className="flex justify-between items-center text-xs font-semibold text-slate-700">
-                    <span>{sub.name}</span>
-                    <span>{sub.value}%</span>
+              <div className="edu-dashboard">
+                <aside>
+                  <div className="active"><Zap size={15} /> Overview</div>
+                  <div><BookOpen size={15} /> Learning</div><div><ClipboardCheck size={15} /> Tasks</div>
+                  <div><BarChart3 size={15} /> Insights</div>
+                </aside>
+                <motion.div className="edu-dash-main" key={activeRole} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .25 }}>
+                  <div className="edu-dash-welcome">
+                    <div><small>{currentRole.greeting}</small><h3>{currentRole.heading}</h3></div>
+                    <span>{currentRole.badge}</span>
                   </div>
-                  <div className="progress-bar">
-                    <div className={`progress-fill ${sub.color}`} style={{ width: `${sub.value}%` }}></div>
+                  <div className={`edu-mission-card role-${activeRole}`}>
+                    <div className="edu-mission-icon"><MissionIcon /></div>
+                    <div><small>{currentRole.eyebrow}</small><h4>{currentRole.title}</h4><p>{currentRole.action}</p></div>
+                    <button aria-label={currentRole.action}><ArrowRight /></button>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Board Countdown Card */}
-          <div className="bento-card col-span-12 md:col-span-6 flex flex-col justify-between gap-4 card-interactive">
-            <div className="flex items-center justify-between">
-              <span className="font-label-caps text-xs text-slate-400">BOARD EXAM TRACKER</span>
-              <span className="badge pill-rose">Urgent</span>
-            </div>
-            <div className="flex justify-between items-center gap-4 my-1 select-none">
-              <div>
-                <h3 className="font-display font-extrabold text-4xl text-slate-800">87 Days</h3>
-                <p className="font-sans text-xs text-slate-400">To CBSE Board Exam 2026</p>
-              </div>
-              <div className="text-right">
-                <span className="font-display font-bold text-2xl text-rose-500">65%</span>
-                <p className="font-sans text-xs text-slate-400">Syllabus Complete</p>
-              </div>
-            </div>
-            <div className="progress-bar">
-              <div className="progress-fill bg-rose-500" style={{ width: '65%' }}></div>
-            </div>
-          </div>
-        </div>
-
-        {/* Stats Bar */}
-        <div className="w-full bg-gradient-to-r from-indigo-600 to-violet-700 rounded-3xl p-8 py-10 shadow-xl shadow-indigo-600/10 text-white flex flex-col md:flex-row justify-around gap-8 text-center select-none">
-          {[
-            { value: `${stats.grades}+`, label: 'Grade Levels' },
-            { value: `${stats.batches}`, label: 'Learning Batches' },
-            { value: `${stats.games}`, label: 'Interactive Games' },
-            { value: `${stats.ncert}%`, label: 'NCERT Aligned' }
-          ].map((item, idx) => (
-            <div key={idx} className="flex flex-col gap-1">
-              <span className="font-display font-extrabold text-4xl md:text-5xl">{item.value}</span>
-              <span className="font-sans text-xs text-indigo-100 font-medium tracking-wide uppercase">{item.label}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Batch Showcase Section */}
-        <section id="batches" className="w-full pt-16 flex flex-col gap-12">
-          <div className="text-center flex flex-col gap-2">
-            <h2 className="font-display font-bold text-3xl md:text-4xl text-slate-900">One Platform. Three Worlds.</h2>
-            <p className="font-sans text-slate-400 text-sm max-w-xl mx-auto">
-              Tailored workspaces engineered with progressive maturity to grow with the student.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {batchesData.map((batch) => (
-              <div key={batch.id} className="bento-card relative overflow-hidden group border border-slate-100 shadow-md card-interactive flex flex-col justify-between gap-6 p-8 min-h-[300px]">
-                {/* Decorative gradient blob behind */}
-                <div className={`absolute -right-20 -bottom-20 w-48 h-48 rounded-full ${batch.accentBg} opacity-5 group-hover:opacity-15 group-hover:scale-125 transition-all blur-3xl`}></div>
-
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className={`badge pill-${batch.color} mb-3`}>{batch.name}</span>
-                    <h3 className="font-display font-bold text-2xl text-slate-900">{batch.grades}</h3>
-                    <p className={`font-sans font-semibold text-xs ${batch.textColor} mt-0.5`}>{batch.tagline}</p>
+                  <div className="edu-dash-grid">
+                    {currentRole.cards.map((card, index) => {
+                      const CardIcon = card.icon;
+                      return (
+                        <div className={index === 0 ? 'edu-ai-card' : 'edu-score-card'} key={card.label}>
+                          <div className="edu-card-label"><CardIcon size={14}/>{card.label}</div>
+                          {index === 0 ? <><p>{card.value}</p><span>{card.note}</span></> : <><strong>{card.value}</strong><span>{card.note}</span><div className="edu-bars"><i/><i/><i/><i/><i/><i/><i/></div></>}
+                        </div>
+                      );
+                    })}
                   </div>
-                  <span className="text-2xl select-none">{batch.id === 1 ? '🎮' : batch.id === 2 ? '💬' : '🗺️'}</span>
-                </div>
-
-                <p className="font-sans text-sm text-slate-500 leading-relaxed pr-6">{batch.desc}</p>
-
-                <div className="flex flex-wrap gap-2.5">
-                  {batch.features.map((feat, idx) => (
-                    <span key={idx} className="text-xs font-semibold px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-slate-600">
-                      {feat}
-                    </span>
-                  ))}
-                </div>
-
-                <div className="flex justify-between items-center pt-2 border-t border-slate-100 mt-2 select-none">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">{batch.stats}</span>
-                  <Link to={batch.link} className={`flex items-center gap-1.5 font-sans font-bold text-sm ${batch.textColor} group-hover:translate-x-1 transition-transform`}>
-                    Enter Dashboard
-                    <ArrowRight size={16} />
-                  </Link>
-                </div>
+                </motion.div>
               </div>
+            </div>
+            <motion.div className="edu-float-chip edu-chip-one" animate={{ y: [0, -8, 0] }} transition={{ duration: 3.5, repeat: Infinity }}>
+              <Trophy size={17} /> Every learner supported
+            </motion.div>
+            <motion.div className="edu-float-chip edu-chip-two" animate={{ y: [0, 8, 0] }} transition={{ duration: 4, repeat: Infinity }}>
+              <Users size={17} /> One connected school
+            </motion.div>
+          </motion.div>
+        </section>
+
+        <section className="edu-proof">
+          <span>Everything your school needs to move learning forward</span>
+          <div><strong>10</strong><small>grade levels</small></div><div><strong>3</strong><small>age-specific worlds</small></div>
+          <div><strong>16+</strong><small>interactive games</small></div><div><strong>100%</strong><small>NCERT aligned</small></div>
+        </section>
+
+        <section id="pathways" className="edu-section edu-pathways">
+          <div className="edu-section-head">
+            <div><span className="edu-eyebrow">Designed around how children grow</span><h2>Not one interface<br />stretched across ten grades.</h2></div>
+            <p>Each stage has its own pace, motivation system and learning tools—while teachers manage everything from one connected platform.</p>
+          </div>
+          <div className="edu-path-grid">
+            {paths.map((path, index) => {
+              const Icon = path.icon;
+              return (
+                <motion.article key={path.range} className="edu-path-card" style={{ '--path-color': path.color, '--path-soft': path.soft } as React.CSSProperties} whileHover={{ y: -8 }} transition={{ type: 'spring', stiffness: 300 }}>
+                  <div className="edu-path-top"><span>{path.range}</span><Icon /></div>
+                  <small>{path.label}</small><h3>{path.title}</h3><p>{path.desc}</p>
+                  <ul>{path.features.map(f => <li key={f}><Check size={14}/>{f}</li>)}</ul>
+                  <Link to={path.href}>Enter this learning world <ArrowRight size={16}/></Link>
+                  <div className="edu-path-index">0{index + 1}</div>
+                </motion.article>
+              );
+            })}
+          </div>
+        </section>
+
+        <section id="platform" className="edu-platform">
+          <div className="edu-platform-intro">
+            <span className="edu-eyebrow">A serious platform, made delightful</span>
+            <h2>Deep learning tools.<br />Zero clutter.</h2>
+            <p>Every feature has a job: help a student understand, help a teacher intervene, or help a school see what’s working.</p>
+            <Link to="/features" className="edu-light-btn">Explore all features <ArrowRight size={17}/></Link>
+          </div>
+          <div className="edu-cap-grid">
+            {capabilities.map(({ icon: Icon, title, copy }, index) => (
+              <motion.div className="edu-cap-card" key={title} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: .3 }} transition={{ delay: index * .06 }}>
+                <Icon /><h3>{title}</h3><p>{copy}</p>
+              </motion.div>
             ))}
           </div>
         </section>
 
-        {/* Features Section */}
-        <section id="features" className="w-full pt-16 flex flex-col gap-12">
-          <div className="text-center flex flex-col gap-2">
-            <h2 className="font-display font-bold text-3xl md:text-4xl text-slate-900">Built for Every Learning Moment</h2>
-            <p className="font-sans text-slate-400 text-sm max-w-xl mx-auto">
-              Our advanced features combine AI capability with CBSE standards for optimal educational outcomes.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              { icon: '🤖', title: 'AI-Powered Tutoring', desc: 'Instant feedback, doubt-solving formulas, and step-by-step NCERT explanations available 24/7.' },
-              { icon: '🎮', title: 'Gamified Learning', desc: 'Mini-quizzes, daily streaks, stars, and leaderboards built to encourage healthy competition.' },
-              { icon: '📊', title: 'Smart Analytics', desc: 'In-depth dashboard metrics for parents and teachers. Spot at-risk students and gaps early.' },
-              { icon: '🗺️', title: 'Concept Maps', desc: 'Visual node diagrams tracking mathematical and chemical connections across chapters.' },
-              { icon: '🎯', title: 'Career Pathway', desc: 'Intelligent score evaluation mapping to ideal branches of engineering, medicine, and research.' },
-              { icon: '📋', title: 'Board Exam Prep', desc: 'Countdown tracking, past board questions, marking schemes, and expert answer tips.' }
-            ].map((feat, idx) => (
-              <div key={idx} className="bento-card card-interactive border border-slate-100 flex flex-col gap-3 p-6 text-left">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100/30 flex items-center justify-center text-xl shadow-xs group-hover:scale-110 transition-transform select-none">
-                  {feat.icon}
-                </div>
-                <h4 className="font-display font-bold text-lg text-slate-800">{feat.title}</h4>
-                <p className="font-sans text-xs text-slate-400 leading-relaxed">{feat.desc}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Trust Section */}
-        <section className="w-full pt-16">
-          <div className="w-full bg-gradient-to-tr from-indigo-950 to-indigo-900 rounded-3xl p-10 md:p-14 text-white text-center flex flex-col items-center gap-8 relative overflow-hidden shadow-2xl">
-            {/* Dotted design background */}
-            <div className="absolute inset-0 opacity-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent pointer-events-none"></div>
-
-            <div className="w-16 h-16 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-4xl shadow-lg select-none">
-              🏫
-            </div>
-
-            <div className="max-w-2xl flex flex-col gap-3">
-              <h2 className="font-display font-extrabold text-3xl md:text-4xl">Ready to transform your school?</h2>
-              <p className="font-sans text-xs text-indigo-200 leading-relaxed">
-                Connect with our academic directors to deploy EduAI in your CBSE classrooms. Integrate parent connections, teacher grade books, and student dashboards in a single day.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-4 z-10">
-              <Link to="/register" className="py-3 px-6 rounded-xl bg-white hover:bg-slate-50 text-indigo-950 font-sans font-bold shadow-md shadow-white/5 transition-all cursor-pointer">
-                Try the Platform →
-              </Link>
-              <button className="py-3 px-6 rounded-xl bg-indigo-500/10 border border-indigo-400/30 backdrop-blur-md hover:bg-indigo-500/20 text-white font-sans font-bold transition-all cursor-pointer">
-                Schedule a Demo
-              </button>
-            </div>
-          </div>
+        <section className="edu-school-cta">
+          <div className="edu-cta-icon"><School /></div>
+          <div><span>Bring your whole school forward</span><h2>Give every child a learning experience built for their next step.</h2></div>
+          <div className="edu-cta-actions"><Link to="/register">Book a personalised demo <ArrowRight size={17}/></Link><small>No credit card • Guided setup • CBSE ready</small></div>
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="relative z-10 mt-auto bg-slate-950 text-slate-400 pt-16 pb-12 border-t border-slate-900 px-8">
-        <div className="max-w-7xl mx-auto w-full flex flex-col gap-10">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 border-b border-slate-900 pb-8">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-display font-bold text-white text-md">
-                E
-              </div>
-              <span className="font-display font-bold text-md text-white">EduAI</span>
-            </div>
-
-            <div className="flex flex-wrap gap-8 text-xs font-semibold">
-              <a href="#features" className="hover:text-white transition-colors">Features</a>
-              <a href="#batches" className="hover:text-white transition-colors">Batches</a>
-              <Link to="/pricing" className="hover:text-white transition-colors">Pricing</Link>
-              <span className="hover:text-white transition-colors cursor-pointer">Privacy Policy</span>
-              <span className="hover:text-white transition-colors cursor-pointer">Terms of Service</span>
-            </div>
-          </div>
-
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-[11px] font-medium text-slate-500">
-            <span>© {new Date().getFullYear()} EduAI Learning Pvt. Ltd. All rights reserved.</span>
-            <div className="flex items-center gap-6">
-              <Link to="/batch1/home" className="hover:text-slate-400">Class 1-4</Link>
-              <Link to="/batch2/home" className="hover:text-slate-400">Class 5-8</Link>
-              <Link to="/batch3/home" className="hover:text-slate-400">Class 9-10</Link>
-            </div>
-          </div>
-        </div>
+      <footer className="edu-footer">
+        <div className="edu-brand"><span className="edu-brand-mark"><Sparkles size={17}/></span><span>EduAI</span></div>
+        <p>Learning technology that grows with every student.</p>
+        <div><a href="#pathways">Learning paths</a><Link to="/pricing">Pricing</Link><Link to="/login">Portals</Link></div>
+        <span>© {new Date().getFullYear()} EduAI Learning Pvt. Ltd.</span>
       </footer>
     </div>
   );
