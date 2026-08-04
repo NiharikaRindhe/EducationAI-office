@@ -2,10 +2,11 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Plus, Trash2, Loader2, AlertCircle, CheckCircle2, Send, Copy, Lock,
-  FileText, Library, ClipboardCheck, Download, ArrowLeft, Clock3, PencilLine, CircleCheckBig,
+  FileText, Library, ClipboardCheck, Download, ArrowLeft, Clock3, PencilLine, CircleCheckBig, Sparkles,
 } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 import { MetricCard, PortalPageHeader } from '../../components/shared/PortalPageHeader';
+import { AiQuestionGenerator } from '../../components/shared/AiQuestionGenerator';
 
 // ─── Types mirroring the API ─────────────────────────────────
 
@@ -385,6 +386,7 @@ const ExamBuilder: React.FC<{
       {/* Questions */}
       <QuestionList exam={exam} isDraft={isDraft} onReload={onReload} onError={onError} />
 
+      {isDraft && <AiGeneratorCard exam={exam} onReload={onReload} onError={onError} onNotice={onNotice} />}
       {isDraft && <AddQuestionCard examId={exam.id} onReload={onReload} onError={onError} />}
       {isDraft && <BankPicker exam={exam} onReload={onReload} onError={onError} />}
       {isDraft && <PublishCard exam={exam} mySections={mySections} onReload={onReload} onError={onError} onNotice={onNotice} />}
@@ -541,6 +543,68 @@ const AddQuestionCard: React.FC<{ examId: string; onReload: () => void; onError:
           </button>
         </div>
       </form>
+    </div>
+  );
+};
+
+/**
+ * Generate questions straight into the open paper.
+ *
+ * The generator shipped only on the Question Bank page, which made the real
+ * workflow "leave the exam → generate → save → come back → browse bank → add",
+ * and it was the main reason the feature didn't feel finished. Here it is
+ * locked to this exam's class+subject and, once the teacher saves, the new
+ * bank rows are added to this paper in the same action — the review gate
+ * inside the generator is unchanged, so nothing reaches the exam unreviewed.
+ */
+const AiGeneratorCard: React.FC<{
+  exam: ExamDetail;
+  onReload: () => void;
+  onError: (m: string) => void;
+  onNotice: (m: string) => void;
+}> = ({ exam, onReload, onError, onNotice }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleSaved = async ({ ids }: { saved: number; ids: string[] }) => {
+    if (ids.length === 0) return;
+    try {
+      await api.post(`/teacher/exams/${exam.id}/questions/from-bank`, { bankIds: ids });
+      onNotice(`${ids.length} AI question${ids.length === 1 ? '' : 's'} added to this exam. Review them above before publishing.`);
+      setIsOpen(false);
+      onReload();
+    } catch (err) {
+      // The questions are safely in the bank either way — say so, so the
+      // teacher doesn't regenerate and end up with duplicates.
+      onError(
+        err instanceof ApiClientError
+          ? `Questions were saved to your bank but could not be added to this exam: ${err.message}. Add them from "Browse Bank" below.`
+          : 'Questions were saved to your bank but could not be added to this exam. Add them from "Browse Bank" below.',
+      );
+    }
+  };
+
+  return (
+    <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-display font-bold text-sm text-slate-700 flex items-center gap-2">
+          <Sparkles size={15} className="text-indigo-500" /> Generate with AI — from your school's books
+        </h3>
+        <button
+          onClick={() => setIsOpen((v) => !v)}
+          className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-2 rounded-xl cursor-pointer"
+        >
+          {isOpen ? 'Close' : 'Generate Questions'}
+        </button>
+      </div>
+
+      {isOpen && (
+        <AiQuestionGenerator
+          scope={[{ classNum: exam.class_num, subjects: [exam.subject] }]}
+          lockedTo={{ classNum: exam.class_num, subject: exam.subject }}
+          savedMessage={(n) => `${n} question${n === 1 ? '' : 's'} saved and added to this exam.`}
+          onSaved={handleSaved}
+        />
+      )}
     </div>
   );
 };

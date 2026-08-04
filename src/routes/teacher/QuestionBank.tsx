@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Loader2, Plus, Search, ChevronDown, ChevronUp, AlertCircle, CheckCircle } from 'lucide-react';
-import { api } from '../../lib/api';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Loader2, Plus, Search, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Sparkles, Trash2 } from 'lucide-react';
+import { api, ApiClientError } from '../../lib/api';
+import { AiQuestionGenerator } from '../../components/shared/AiQuestionGenerator';
 
 interface QuestionBankItem {
   id: string;
@@ -17,6 +18,15 @@ interface QuestionBankItem {
   pyq_year?: number;
   pyq_source?: string;
   scope: 'global' | 'school';
+  source?: 'eduai' | 'teacher' | 'ai_generated';
+  /** Book/chapter/pages a generated question was grounded in — lets a teacher
+   *  spot-check an AI question against the actual textbook. */
+  source_citation?: {
+    bookTitle: string;
+    chapterNum: number | null;
+    chapterTitle: string | null;
+    pages: number[];
+  } | null;
 }
 
 const SUBJECT_WHITELIST = ['English', 'Mathematics', 'Science', 'World Around Us', 'Social Science', 'ICT'];
@@ -28,14 +38,23 @@ const TYPE_OPTIONS = [
   { value: 'fill_blank', label: 'Fill in Blanks' }
 ];
 
+interface TeachingSection {
+  classNum: number;
+  section: string;
+  subjects: string[];
+}
+
 export const TeacherQuestionBank: React.FC = () => {
   const [questions, setQuestions] = useState<QuestionBankItem[] | null>(null);
-  
+  const [showGenerator, setShowGenerator] = useState(false);
+  const [sections, setSections] = useState<TeachingSection[] | null>(null);
+
   // Filters
   const [classNum, setClassNum] = useState<string>('');
   const [subject, setSubject] = useState<string>('');
   const [type, setType] = useState<string>('');
   const [isPyq, setIsPyq] = useState<boolean>(false);
+  const [source, setSource] = useState<string>('');
   const [search, setSearch] = useState<string>('');
 
   // Add question modal
@@ -63,6 +82,7 @@ export const TeacherQuestionBank: React.FC = () => {
     if (classNum) query.classNum = classNum;
     if (subject) query.subject = subject;
     if (type) query.type = type;
+    if (source) query.source = source;
     if (isPyq) query.isPyq = true;
     if (search) query.search = search;
 
@@ -73,7 +93,29 @@ export const TeacherQuestionBank: React.FC = () => {
 
   useEffect(() => {
     fetchQuestions();
-  }, [classNum, subject, type, isPyq]);
+  }, [classNum, subject, type, source, isPyq]);
+
+  // The generator's class/subject options come from the teacher's actual
+  // section assignments, not the class subject whitelist — the API authorizes
+  // generation against the same list, so anything else would offer a choice
+  // the server then rejects.
+  useEffect(() => {
+    api.get<{ sections: TeachingSection[] }>('/teacher/my-sections')
+      .then((res) => setSections(res.sections ?? []))
+      .catch(() => setSections([]));
+  }, []);
+
+  const generatorScope = useMemo(() => {
+    const byClass = new Map<number, Set<string>>();
+    for (const s of sections ?? []) {
+      const existing = byClass.get(s.classNum) ?? new Set<string>();
+      s.subjects.forEach((sub) => existing.add(sub));
+      byClass.set(s.classNum, existing);
+    }
+    return [...byClass.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([cn, subs]) => ({ classNum: cn, subjects: [...subs].sort((a, b) => a.localeCompare(b)) }));
+  }, [sections]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,6 +163,7 @@ export const TeacherQuestionBank: React.FC = () => {
     setClassNum('');
     setSubject('');
     setType('');
+    setSource('');
     setIsPyq(false);
     setSearch('');
   };
@@ -134,13 +177,47 @@ export const TeacherQuestionBank: React.FC = () => {
           <h2 className="font-display font-extrabold text-xl text-slate-800 font-black">Question Bank</h2>
           <p className="text-xs text-slate-400 font-medium mt-0.5">Browse CBSE mock questions &amp; add school-scoped challenges.</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-md shadow-indigo-600/10"
-        >
-          <Plus size={14} /> Add Question
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowGenerator((v) => !v)}
+            className={`px-4 py-2.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold ${
+              showGenerator
+                ? 'bg-slate-900 text-white shadow-md'
+                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <Sparkles size={14} /> {showGenerator ? 'Hide AI generator' : 'Generate with AI'}
+          </button>
+          <button
+            onClick={() => setShowModal(true)}
+            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-md shadow-indigo-600/10"
+          >
+            <Plus size={14} /> Add Question
+          </button>
+        </div>
       </div>
+
+      {/* Page-level errors (e.g. a failed delete). The other errorMsg render
+          lives inside the Add Question modal, so without this a delete failure
+          would set the message and show nothing. */}
+      {errorMsg && !showModal && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded-xl px-4 py-3 flex items-start gap-2 text-xs font-semibold">
+          <AlertCircle className="text-rose-600 shrink-0 mt-px" size={14} />
+          <span className="flex-1">{errorMsg}</span>
+          <button onClick={() => setErrorMsg('')} className="text-rose-500 hover:text-rose-700 cursor-pointer font-bold">✕</button>
+        </div>
+      )}
+
+      {showGenerator && (
+        sections === null ? (
+          <div className="flex justify-center py-10"><Loader2 className="animate-spin text-indigo-400" /></div>
+        ) : (
+          <AiQuestionGenerator
+            scope={generatorScope}
+            onSaved={() => { setShowGenerator(false); void fetchQuestions(); }}
+          />
+        )
+      )}
 
       {/* Main Two-Pane layout */}
       <div className="grid grid-cols-12 gap-6">
@@ -198,6 +275,21 @@ export const TeacherQuestionBank: React.FC = () => {
               </select>
             </div>
 
+            {/* Source filter — mainly so a teacher can review the AI batch */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Written by</label>
+              <select
+                value={source}
+                onChange={e => setSource(e.target.value)}
+                className="px-3 py-2 bg-slate-50 border border-slate-200 focus:border-indigo-500 rounded-xl font-sans text-xs outline-none cursor-pointer"
+              >
+                <option value="">Anyone</option>
+                <option value="ai_generated">AI generated</option>
+                <option value="teacher">A teacher</option>
+                <option value="eduai">EduAI library</option>
+              </select>
+            </div>
+
             {/* PYQ toggle */}
             <label className="flex items-center gap-2 p-2 bg-slate-50 border border-slate-100 rounded-xl cursor-pointer text-xs font-semibold text-slate-700">
               <input
@@ -242,7 +334,7 @@ export const TeacherQuestionBank: React.FC = () => {
             <div className="flex flex-col gap-3">
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">{questions.length} questions available</p>
               {questions.map(q => (
-                <QuestionCard key={q.id} item={q} />
+                <QuestionCard key={q.id} item={q} onDeleted={fetchQuestions} onError={setErrorMsg} />
               ))}
             </div>
           )}
@@ -357,8 +449,32 @@ export const TeacherQuestionBank: React.FC = () => {
 };
 
 /* ── Individual Question Card component ────────────────────── */
-const QuestionCard: React.FC<{ item: QuestionBankItem }> = ({ item }) => {
+const QuestionCard: React.FC<{
+  item: QuestionBankItem;
+  onDeleted: () => void;
+  onError: (msg: string) => void;
+}> = ({ item, onDeleted, onError }) => {
   const [expanded, setExpanded] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Only this school's own rows are deletable. Global EduAI questions are
+  // shared library content — the server rejects those too, but not offering
+  // the button is clearer than offering one that always fails.
+  const canDelete = item.scope === 'school';
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await api.delete(`/teacher/question-bank/${item.id}`);
+      onDeleted();
+    } catch (err) {
+      onError(err instanceof ApiClientError ? err.message : 'Could not delete this question');
+      setConfirmingDelete(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const diffColors: Record<string, string> = {
     easy: 'bg-emerald-100 text-emerald-700',
@@ -381,13 +497,55 @@ const QuestionCard: React.FC<{ item: QuestionBankItem }> = ({ item }) => {
               PYQ {item.pyq_year}
             </span>
           )}
+          {item.source === 'ai_generated' && (
+            <span
+              className="inline-flex items-center gap-1 text-[9px] font-bold bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full"
+              title={
+                item.source_citation
+                  ? `Generated from ${item.source_citation.bookTitle}${item.source_citation.chapterNum !== null ? `, chapter ${item.source_citation.chapterNum}` : ''}${item.source_citation.pages?.length === 2 ? `, pages ${item.source_citation.pages[0]}–${item.source_citation.pages[1]}` : ''}`
+                  : 'Written by AI and reviewed by a teacher'
+              }
+            >
+              <Sparkles size={9} /> AI
+            </span>
+          )}
           <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${item.scope === 'global' ? 'bg-slate-100 text-slate-600' : 'bg-rose-100 text-rose-700'}`}>
             {item.scope}
           </span>
         </div>
-        <button onClick={() => setExpanded(e => !e)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-          {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          {canDelete && (
+            confirmingDelete ? (
+              <span className="flex items-center gap-1">
+                <button
+                  onClick={() => void handleDelete()}
+                  disabled={deleting}
+                  className="text-[10px] font-bold text-rose-600 hover:text-rose-700 px-2 py-1 rounded-lg hover:bg-rose-50 cursor-pointer disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting…' : 'Delete?'}
+                </button>
+                <button
+                  onClick={() => setConfirmingDelete(false)}
+                  disabled={deleting}
+                  className="text-[10px] font-bold text-slate-400 hover:text-slate-600 px-1.5 py-1 cursor-pointer"
+                >
+                  No
+                </button>
+              </span>
+            ) : (
+              <button
+                onClick={() => setConfirmingDelete(true)}
+                title="Delete this question from your school's bank"
+                className="text-slate-300 hover:text-rose-600 cursor-pointer p-1"
+              >
+                <Trash2 size={14} />
+              </button>
+            )
+          )}
+          <button onClick={() => setExpanded(e => !e)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+            {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+        </div>
       </div>
 
       <p className="font-sans text-xs text-slate-700 font-semibold leading-relaxed truncate-2-lines">

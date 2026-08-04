@@ -14,6 +14,11 @@ import {
   participantsController,
 } from '../controllers/liveSession.controller.js';
 import { createAnnouncementController, deleteAnnouncementController } from '../controllers/announcement.controller.js';
+import {
+  teacherListController,
+  teacherIdsController,
+  teacherExportController,
+} from '../controllers/studentDirectory.controller.js';
 import { createTaskController, listTasksForTeacherController } from '../controllers/task.controller.js';
 import { addToBankController, listBankController } from '../controllers/questionBank.controller.js';
 import {
@@ -28,11 +33,18 @@ import {
   closeExamController,
 } from '../controllers/exam.controller.js';
 import {
+  listPendingReviewsController,
   listSubmissionsController,
   getSubmissionDetailController,
   finalizeAnswerScoreController,
   getMeritListController,
 } from '../controllers/examReview.controller.js';
+import {
+  listGeneratableChaptersController,
+  generateQuestionsController,
+  saveGeneratedQuestionsController,
+} from '../controllers/examGenerator.controller.js';
+import { deleteFromBankController } from '../controllers/questionBank.controller.js';
 import { recomputeLeaderboardController } from '../controllers/leaderboard.controller.js';
 import { downloadAllAdmitCardsController } from '../controllers/admitCard.controller.js';
 import {
@@ -54,6 +66,12 @@ teacherRouter.use(requireAuth, requireRole('teacher'));
 
 teacherRouter.get('/dashboard', dashboardController);
 teacherRouter.get('/my-sections', mySectionsController);
+// Paged roster for the directory table, scoped to this teacher's sections.
+// Declared before /students/:id so "directory" isn't captured as an id.
+teacherRouter.get('/students/directory', teacherListController);
+teacherRouter.get('/students/directory/ids', teacherIdsController);
+teacherRouter.get('/students/directory/export', teacherExportController);
+
 teacherRouter.get('/students', listStudentsController);
 teacherRouter.get('/students/:id', studentDrillDownController);
 teacherRouter.get('/at-risk', atRiskController);
@@ -75,6 +93,17 @@ teacherRouter.get('/tasks', listTasksForTeacherController);
 
 teacherRouter.post('/question-bank', addToBankController);
 teacherRouter.get('/question-bank', listBankController);
+// A teacher may delete their own school's questions (never global EduAI ones).
+teacherRouter.delete('/question-bank/:id', deleteFromBankController);
+
+// ── AI question generation from uploaded books ────────────────
+// Generation never persists; the teacher reviews and then POSTs /save.
+teacherRouter.get('/exam-generator/chapters', listGeneratableChaptersController);
+teacherRouter.post('/exam-generator/generate', generateQuestionsController);
+teacherRouter.post('/exam-generator/save', saveGeneratedQuestionsController);
+
+// Exams with subjective answers still awaiting this teacher's sign-off.
+teacherRouter.get('/pending-reviews', listPendingReviewsController);
 
 teacherRouter.post('/exams', createExamController);
 teacherRouter.get('/exams', listExamsController);
