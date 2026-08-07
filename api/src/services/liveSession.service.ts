@@ -3,9 +3,20 @@ import { ApiError } from '../lib/errors.js';
 import { logStreakActivity } from './gamification.service.js';
 import type { StartSessionInput } from '../schemas/liveSession.schema.js';
 
-// One active session per class+section at a time — starting a new one for
-// the same class/section auto-ends whatever was already running there
-// (covers the "teacher forgot to end last period's session" case cleanly).
+// At most one active session per (school, class, section) — regardless of
+// which teacher started it — AND at most one active session per teacher —
+// regardless of which class. Both need clearing before the insert, and both
+// were found live and stale in this school's data independently: a class-3A
+// session from a different teacher untouched since July 10, and Mr. Rao's
+// own sessions for 2-B/3-B untouched since July 10 and July 27. Either
+// collision on its own reproduces the same failure — every .maybeSingle()
+// read below (and requireActiveSessionFor in auth.service.ts, which gates
+// the PIN roster) throws the instant a second row matches its filter, and
+// since these call sites only destructure `{ data }`, that throw is
+// swallowed and surfaces as "no session found" — a live class reads as not
+// live. A partial unique index (see migration) makes the invariant durable;
+// this pre-emptive cleanup is what lets a legitimate new session actually
+// take that slot instead of colliding with it.
 export async function startSession(teacherId: string, schoolId: string, input: StartSessionInput) {
   await supabaseAdmin
     .from('live_sessions')
@@ -13,6 +24,12 @@ export async function startSession(teacherId: string, schoolId: string, input: S
     .eq('school_id', schoolId)
     .eq('class_num', input.classNum)
     .eq('section', input.section)
+    .eq('is_active', true);
+
+  await supabaseAdmin
+    .from('live_sessions')
+    .update({ ended_at: new Date().toISOString(), is_active: false })
+    .eq('teacher_id', teacherId)
     .eq('is_active', true);
 
   const { data, error } = await supabaseAdmin
@@ -45,13 +62,20 @@ export async function endSession(teacherId: string, sessionId: string) {
 }
 
 export async function getActiveSessionForTeacher(teacherId: string) {
+  // Defense in depth: startSession() now guarantees at most one active row
+  // per teacher, but .maybeSingle() throws (silently, since only `data` was
+  // destructured here) the instant that invariant is ever violated again —
+  // which is exactly the failure mode that made this page unusable for
+  // Mr. Rao's account. .limit(1) degrades to "show the most recent one"
+  // instead of breaking outright if it ever recurs.
   const { data } = await supabaseAdmin
     .from('live_sessions')
     .select('*')
     .eq('teacher_id', teacherId)
     .eq('is_active', true)
-    .maybeSingle();
-  return data;
+    .order('started_at', { ascending: false })
+    .limit(1);
+  return data?.[0] ?? null;
 }
 
 /** School-wide view of every currently-live session — the Lab In-charge
@@ -96,6 +120,11 @@ export async function getParticipants(teacherId: string, sessionId: string) {
 export async function getActiveSessionForStudent(schoolId: string, classNum: number, section: string) {
   // live_sessions.teacher_id FKs to teacher_profiles(user_id), not directly
   // to user_profiles — same nesting rule as everywhere else in this file.
+  //
+  // .limit(1) rather than .maybeSingle(): the invariant is enforced at write
+  // time (startSession above) and by a partial unique index, but a read path
+  // that hard-fails the instant it's ever violated is the wrong failure mode
+  // for "is my class live" — degrade to the most recent row instead.
   const { data } = await supabaseAdmin
     .from('live_sessions')
     .select('id, teacher_id, subject, started_at, teacher_profiles(user_profiles(full_name))')
@@ -103,8 +132,9 @@ export async function getActiveSessionForStudent(schoolId: string, classNum: num
     .eq('class_num', classNum)
     .eq('section', section)
     .eq('is_active', true)
-    .maybeSingle();
-  return data;
+    .order('started_at', { ascending: false })
+    .limit(1);
+  return data?.[0] ?? null;
 }
 
 export async function joinSession(studentId: string, sessionId: string) {

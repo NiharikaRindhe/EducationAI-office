@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Plus, AlertCircle, Search, X, Building2, MapPin, Phone, UserPlus, Copy, Check } from 'lucide-react';
+import { Loader2, Plus, AlertCircle, Search, X, Building2, Copy, Check } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 
 interface School {
@@ -36,14 +36,6 @@ interface AdminCredential {
 
 const inputCls =
   'w-full px-3 py-2 text-[13px] text-slate-800 bg-white border border-slate-300 rounded-lg outline-none transition-colors focus:border-slate-500 focus:ring-2 focus:ring-slate-100 placeholder:text-slate-400';
-const labelCls = 'block text-[12px] font-medium text-slate-600 mb-1';
-
-const EMPTY_FORM = {
-  name: '', code: '', board: 'CBSE', plan: 'starter',
-  address: '', city: '', state: '', pincode: '',
-  contactName: '', contactEmail: '', contactPhone: '',
-  createAdmin: true, adminFullName: '', adminEmail: '',
-};
 
 export const SuperAdminSchools: React.FC = () => {
   const [schools, setSchools] = useState<School[]>([]);
@@ -54,10 +46,8 @@ export const SuperAdminSchools: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [formError, setFormError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Creation lives on the dedicated onboarding page (schools/new); this
+  // banner only shows the credential it hands back on redirect.
   const [newCredential, setNewCredential] = useState<AdminCredential | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -96,64 +86,6 @@ export const SuperAdminSchools: React.FC = () => {
     });
   }, [schools, searchQuery, statusFilter]);
 
-  const set = (field: keyof typeof EMPTY_FORM) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm((prev) => ({ ...prev, [field]: e.target.type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value }));
-
-  // School codes are used for student PIN login and must be A-Z 0-9 hyphen —
-  // normalize as the user types instead of rejecting at submit.
-  const setCode = (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((prev) => ({ ...prev, code: e.target.value.toUpperCase().replace(/\s+/g, '-').replace(/[^A-Z0-9-]/g, '') }));
-
-  // Zod failures arrive as { fieldErrors: { name: ["..."] } } — surface the
-  // actual field problem instead of the generic "Request failed validation".
-  const friendlyFormError = (err: unknown): string => {
-    if (err instanceof ApiClientError) {
-      const details = err.details as { fieldErrors?: Record<string, string[]> } | undefined;
-      const fieldErrors = details?.fieldErrors;
-      if (fieldErrors) {
-        const first = Object.entries(fieldErrors).find(([, msgs]) => msgs.length > 0);
-        if (first) {
-          const [field, msgs] = first;
-          const label = field.replace(/([A-Z])/g, ' $1').toLowerCase();
-          return `${label.charAt(0).toUpperCase()}${label.slice(1)}: ${msgs[0]}`;
-        }
-      }
-      return err.message;
-    }
-    return 'Failed to create school';
-  };
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError('');
-    setIsSubmitting(true);
-    try {
-      const result = await api.post<School & { adminCredential: AdminCredential | null }>('/super-admin/schools', {
-        name: form.name,
-        code: form.code.toUpperCase(),
-        board: form.board,
-        plan: form.plan,
-        address: form.address || undefined,
-        city: form.city || undefined,
-        state: form.state || undefined,
-        pincode: form.pincode || undefined,
-        contactName: form.contactName || undefined,
-        contactEmail: form.contactEmail || undefined,
-        contactPhone: form.contactPhone || undefined,
-        ...(form.createAdmin && form.adminEmail
-          ? { admin: { fullName: form.adminFullName, email: form.adminEmail } }
-          : {}),
-      });
-      setForm(EMPTY_FORM);
-      setShowModal(false);
-      if (result.adminCredential) setNewCredential(result.adminCredential);
-      await load();
-    } catch (err) {
-      setFormError(friendlyFormError(err));
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const toggleActive = async (school: School) => {
     setTogglingId(school.id);
@@ -225,12 +157,12 @@ export const SuperAdminSchools: React.FC = () => {
             <option value="inactive">Inactive only</option>
           </select>
         </div>
-        <button
-          onClick={() => { setShowModal(true); setFormError(''); }}
+        <Link
+          to="/super-admin/schools/new"
           className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-[13px] font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer shrink-0"
         >
-          <Plus size={15} /> Add School
-        </button>
+          <Plus size={15} /> Onboard School
+        </Link>
       </div>
 
       {/* Table */}
@@ -310,144 +242,6 @@ export const SuperAdminSchools: React.FC = () => {
           </div>
         )}
       </div>
-
-      {/* Create school modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 backdrop-blur-[2px] overflow-y-auto py-10 px-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <div>
-                <h2 className="text-[15px] font-semibold text-slate-800">Add a new school</h2>
-                <p className="text-[12px] text-slate-400 mt-0.5">Complete the school's profile. The admin account can be created in the same step.</p>
-              </div>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 p-1.5 cursor-pointer"><X size={17} /></button>
-            </div>
-
-            <form onSubmit={handleCreate} className="px-6 py-5 flex flex-col gap-6">
-              {formError && (
-                <div className="bg-rose-50 border border-rose-200 text-rose-700 text-[13px] rounded-lg px-4 py-3 flex items-center gap-2">
-                  <AlertCircle size={15} /> {formError}
-                </div>
-              )}
-
-              {/* Section: identity */}
-              <fieldset>
-                <legend className="flex items-center gap-2 text-[12px] font-semibold text-slate-500 uppercase tracking-wider mb-3">
-                  <Building2 size={13} /> School information
-                </legend>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <label className={labelCls}>School name <span className="text-rose-500">*</span></label>
-                    <input required value={form.name} onChange={set('name')} placeholder="Springfield Public School" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>School code <span className="text-rose-500">*</span></label>
-                    <input required value={form.code} onChange={setCode} placeholder="SPS-DELHI-01" className={`${inputCls} font-mono`} />
-                    <p className="text-[11px] text-slate-400 mt-1">Uppercase letters, numbers, hyphens. Used for student PIN login.</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className={labelCls}>Board</label>
-                      <select value={form.board} onChange={set('board')} className={inputCls}>
-                        {['CBSE', 'ICSE', 'State', 'IB'].map((b) => <option key={b} value={b}>{b}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className={labelCls}>Plan</label>
-                      <select value={form.plan} onChange={set('plan')} className={inputCls}>
-                        <option value="starter">Starter</option>
-                        <option value="school">School</option>
-                        <option value="enterprise">Enterprise</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </fieldset>
-
-              {/* Section: location */}
-              <fieldset>
-                <legend className="flex items-center gap-2 text-[12px] font-semibold text-slate-500 uppercase tracking-wider mb-3">
-                  <MapPin size={13} /> Location
-                </legend>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="col-span-3">
-                    <label className={labelCls}>Street address</label>
-                    <input value={form.address} onChange={set('address')} placeholder="12, MG Road, Sector 4" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>City</label>
-                    <input value={form.city} onChange={set('city')} placeholder="New Delhi" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>State</label>
-                    <input value={form.state} onChange={set('state')} placeholder="Delhi" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Pincode</label>
-                    <input value={form.pincode} onChange={set('pincode')} placeholder="110001" maxLength={6} className={inputCls} />
-                  </div>
-                </div>
-              </fieldset>
-
-              {/* Section: contact */}
-              <fieldset>
-                <legend className="flex items-center gap-2 text-[12px] font-semibold text-slate-500 uppercase tracking-wider mb-3">
-                  <Phone size={13} /> Primary contact
-                </legend>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className={labelCls}>Contact person</label>
-                    <input value={form.contactName} onChange={set('contactName')} placeholder="Mrs. Sharma (Principal)" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Email</label>
-                    <input type="email" value={form.contactEmail} onChange={set('contactEmail')} placeholder="principal@school.edu" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Phone</label>
-                    <input value={form.contactPhone} onChange={set('contactPhone')} placeholder="+91 98xxxxxx00" className={inputCls} />
-                  </div>
-                </div>
-              </fieldset>
-
-              {/* Section: admin account */}
-              <fieldset className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                <legend className="sr-only">Administrator account</legend>
-                <label className="flex items-center gap-2.5 cursor-pointer">
-                  <input type="checkbox" checked={form.createAdmin} onChange={set('createAdmin')} className="accent-slate-800 w-4 h-4" />
-                  <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-slate-700"><UserPlus size={14} /> Create the school admin account now</span>
-                </label>
-                <p className="text-[12px] text-slate-400 mt-1 ml-6">A strong password is generated and shown once after creation.</p>
-                {form.createAdmin && (
-                  <div className="grid grid-cols-2 gap-4 mt-4 ml-6">
-                    <div>
-                      <label className={labelCls}>Admin full name <span className="text-rose-500">*</span></label>
-                      <input required value={form.adminFullName} onChange={set('adminFullName')} placeholder="Mrs. Gupta" className={inputCls} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Admin login email <span className="text-rose-500">*</span></label>
-                      <input required type="email" value={form.adminEmail} onChange={set('adminEmail')} placeholder="admin@school.edu" className={inputCls} />
-                    </div>
-                  </div>
-                )}
-              </fieldset>
-
-              <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
-                <button type="button" onClick={() => setShowModal(false)} className="text-[13px] font-semibold text-slate-500 hover:text-slate-700 px-4 py-2 rounded-lg cursor-pointer">
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-[13px] font-semibold px-5 py-2 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  {isSubmitting && <Loader2 size={14} className="animate-spin" />} Create school
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

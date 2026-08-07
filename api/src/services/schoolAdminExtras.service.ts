@@ -1,11 +1,23 @@
 import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
+import { isFeatureEnabled } from '../lib/entitlements.js';
 
+/**
+ * class_features is the School Admin's own per-class preference layer. It sits
+ * UNDER the entitlement layer the Super Admin controls: a school may switch a
+ * feature off for Class 3, but may never switch on something it did not buy.
+ * Both reads and writes are clamped by entitlement, so an unentitled feature
+ * reads as off and cannot be turned on by a crafted request.
+ */
 export async function getClassFeatures(schoolId: string) {
-  const { data, error } = await supabaseAdmin
-    .from('class_features')
-    .select('class_num, ai_chat_enabled, leaderboard_enabled')
-    .eq('school_id', schoolId);
+  const [{ data, error }, aiEntitled, leaderboardEntitled] = await Promise.all([
+    supabaseAdmin
+      .from('class_features')
+      .select('class_num, ai_chat_enabled, leaderboard_enabled')
+      .eq('school_id', schoolId),
+    isFeatureEnabled(schoolId, 'ai_tutor'),
+    isFeatureEnabled(schoolId, 'leaderboard'),
+  ]);
 
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to load class features', error.message);
 
@@ -16,8 +28,12 @@ export async function getClassFeatures(schoolId: string) {
     const f = featureMap.get(c);
     features.push({
       classNum: c,
-      aiChatEnabled: f ? f.ai_chat_enabled : true,
-      leaderboardEnabled: f ? f.leaderboard_enabled : true,
+      aiChatEnabled: aiEntitled && (f ? f.ai_chat_enabled : true),
+      leaderboardEnabled: leaderboardEntitled && (f ? f.leaderboard_enabled : true),
+      // Lets the UI show "not in your plan" instead of a toggle that
+      // silently refuses to stay on.
+      aiChatEntitled: aiEntitled,
+      leaderboardEntitled: leaderboardEntitled,
     });
   }
 
@@ -32,6 +48,20 @@ export async function updateClassFeatures(
 ) {
   if (classNum < 1 || classNum > 10) {
     throw new ApiError('VALIDATION_ERROR', 'Class number must be between 1 and 10');
+  }
+
+  // Clamp to what the school actually bought. Turning a feature ON that isn't
+  // entitled is rejected outright rather than silently downgraded, so the
+  // admin gets told why instead of watching a toggle bounce back.
+  const [aiEntitled, leaderboardEntitled] = await Promise.all([
+    isFeatureEnabled(schoolId, 'ai_tutor'),
+    isFeatureEnabled(schoolId, 'leaderboard'),
+  ]);
+  if (aiChatEnabled && !aiEntitled) {
+    throw new ApiError('FORBIDDEN', "AI Doubt Tutor is not included in your school's plan.");
+  }
+  if (leaderboardEnabled && !leaderboardEntitled) {
+    throw new ApiError('FORBIDDEN', "Leaderboard is not included in your school's plan.");
   }
 
   const { data, error } = await supabaseAdmin

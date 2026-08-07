@@ -12,12 +12,25 @@ export interface StudentProfile {
   streak: number;
 }
 
+/** Paid features the user's school is entitled to. Mirrors FEATURE_KEYS in
+ *  api/src/lib/entitlements.ts — keep the two in step. */
+export type FeatureKey =
+  | 'ai_tutor'
+  | 'ai_exam_generator'
+  | 'virtual_labs'
+  | 'games'
+  | 'leaderboard'
+  | 'pyq_hub'
+  | 'reports_analytics'
+  | 'school_content_upload';
+
 export interface AuthUser {
   id: string;
   role: Role;
   school_id: string | null;
   full_name: string;
   student_profiles: StudentProfile | null;
+  features: FeatureKey[];
 }
 
 interface LoginResponse {
@@ -35,6 +48,9 @@ interface AuthState {
   pinLogin: (schoolCode: string, studentId: string, pin: string) => Promise<string>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  /** Is this paid feature available to the signed-in user's school?
+   *  UI convenience only — the API gates every one of these independently. */
+  hasFeature: (feature: FeatureKey) => boolean;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -92,8 +108,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   }, []);
 
+  // An older token whose /me response predates entitlements has no `features`
+  // array. Treat that as "entitled" rather than hiding the whole app — same
+  // grandfathering rule the server applies.
+  const hasFeature = useCallback(
+    (feature: FeatureKey) => (user?.features ? user.features.includes(feature) : true),
+    [user],
+  );
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, pinLogin, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, isLoading, login, pinLogin, logout, refreshUser, hasFeature }}>
       {children}
     </AuthContext.Provider>
   );

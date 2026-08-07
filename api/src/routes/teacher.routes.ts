@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 import {
   dashboardController,
   listStudentsController,
@@ -78,7 +79,7 @@ teacherRouter.get('/at-risk', atRiskController);
 teacherRouter.get('/timetable', getMyTeacherTimetableController);
 teacherRouter.get('/timetable/occurrences', getMyTeacherOccurrencesController);
 teacherRouter.post('/timetable/:slotId/exceptions', createExceptionController);
-teacherRouter.get('/labs', listLabsController);
+teacherRouter.get('/labs', requireFeature('virtual_labs'), listLabsController);
 
 teacherRouter.post('/sessions/start', startSessionController);
 teacherRouter.post('/sessions/:id/end', endSessionController);
@@ -98,9 +99,9 @@ teacherRouter.delete('/question-bank/:id', deleteFromBankController);
 
 // ── AI question generation from uploaded books ────────────────
 // Generation never persists; the teacher reviews and then POSTs /save.
-teacherRouter.get('/exam-generator/chapters', listGeneratableChaptersController);
-teacherRouter.post('/exam-generator/generate', generateQuestionsController);
-teacherRouter.post('/exam-generator/save', saveGeneratedQuestionsController);
+teacherRouter.get('/exam-generator/chapters', requireFeature('ai_exam_generator'), listGeneratableChaptersController);
+teacherRouter.post('/exam-generator/generate', requireFeature('ai_exam_generator'), generateQuestionsController);
+teacherRouter.post('/exam-generator/save', requireFeature('ai_exam_generator'), saveGeneratedQuestionsController);
 
 // Exams with subjective answers still awaiting this teacher's sign-off.
 teacherRouter.get('/pending-reviews', listPendingReviewsController);
@@ -120,11 +121,11 @@ teacherRouter.get('/exams/:examId/submissions/:submissionId', getSubmissionDetai
 teacherRouter.put('/exams/:examId/answers/:answerId/score', finalizeAnswerScoreController);
 teacherRouter.get('/exams/:examId/merit-list', getMeritListController);
 
-teacherRouter.post('/leaderboard/recompute', recomputeLeaderboardController);
+teacherRouter.post('/leaderboard/recompute', requireFeature('leaderboard'), recomputeLeaderboardController);
 
 teacherRouter.get('/exams/:examId/admit-cards', downloadAllAdmitCardsController);
 
-teacherRouter.get('/reports/performance', getClassPerformanceHeatmapController);
-teacherRouter.get('/reports/english', getEnglishAssessmentReportController);
-teacherRouter.get('/reports/tasks', getTaskCompletionMatrixController);
-teacherRouter.get('/reports/ptm', getPtmReportController);
+teacherRouter.get('/reports/performance', requireFeature('reports_analytics'), getClassPerformanceHeatmapController);
+teacherRouter.get('/reports/english', requireFeature('reports_analytics'), getEnglishAssessmentReportController);
+teacherRouter.get('/reports/tasks', requireFeature('reports_analytics'), getTaskCompletionMatrixController);
+teacherRouter.get('/reports/ptm', requireFeature('reports_analytics'), getPtmReportController);

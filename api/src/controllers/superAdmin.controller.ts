@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { createSchoolSchema, updateSchoolSchema, addSchoolAdminSchema, auditLogQuerySchema } from '../schemas/superAdmin.schema.js';
+import { createSchoolSchema, updateSchoolSchema, addSchoolAdminSchema, auditLogQuerySchema, setEntitlementsSchema } from '../schemas/superAdmin.schema.js';
 import * as superAdminService from '../services/superAdmin.service.js';
 import { ApiError } from '../lib/errors.js';
 
@@ -94,6 +94,29 @@ export async function listAuditLogsController(req: Request, res: Response, next:
     const query = auditLogQuerySchema.parse(req.query);
     const logs = await superAdminService.listAuditLogs(query);
     res.json(logs);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getSchoolEntitlementsController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    if (!id) throw new ApiError('VALIDATION_ERROR', 'Missing school id in path');
+    const entitlements = await superAdminService.getSchoolEntitlements(id);
+    res.json(entitlements);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function setSchoolEntitlementsController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    if (!id) throw new ApiError('VALIDATION_ERROR', 'Missing school id in path');
+    const { features } = setEntitlementsSchema.parse(req.body);
+    const updated = await superAdminService.setSchoolEntitlements(id, features, req.user!.id);
+    res.json(updated);
   } catch (err) {
     next(err);
   }

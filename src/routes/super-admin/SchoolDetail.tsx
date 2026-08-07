@@ -54,6 +54,25 @@ interface Credential {
   password: string;
 }
 
+interface FeatureRow {
+  key: string;
+  label: string;
+  description: string | null;
+  enabled: boolean;
+  updatedAt: string | null;
+}
+
+interface EntitlementsPayload {
+  school: { id: string; name: string; plan: string };
+  features: FeatureRow[];
+}
+
+const PACKAGES = [
+  { key: 'starter', label: 'Starter' },
+  { key: 'school', label: 'School' },
+  { key: 'enterprise', label: 'Enterprise' },
+] as const;
+
 const inputCls =
   'w-full px-3 py-2 text-[13px] text-slate-800 bg-white border border-slate-300 rounded-lg outline-none transition-colors focus:border-slate-500 focus:ring-2 focus:ring-slate-100 placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-500';
 const labelCls = 'block text-[12px] font-medium text-slate-600 mb-1';
@@ -62,7 +81,13 @@ export const SuperAdminSchoolDetail: React.FC = () => {
   const { schoolId } = useParams<{ schoolId: string }>();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState<'profile' | 'admins' | 'usage'>('profile');
+  const [tab, setTab] = useState<'profile' | 'features' | 'admins' | 'usage'>('profile');
+
+  // Feature entitlements — what this school has actually bought.
+  const [entitlements, setEntitlements] = useState<EntitlementsPayload | null>(null);
+  const [draftFeatures, setDraftFeatures] = useState<Record<string, boolean>>({});
+  const [isSavingFeatures, setIsSavingFeatures] = useState(false);
+  const [featuresSaved, setFeaturesSaved] = useState(false);
 
   // Profile editing
   const [isEditing, setIsEditing] = useState(false);
@@ -88,7 +113,60 @@ export const SuperAdminSchoolDetail: React.FC = () => {
     }
   }, [schoolId]);
 
+  const loadEntitlements = useCallback(async () => {
+    if (!schoolId) return;
+    try {
+      const payload = await api.get<EntitlementsPayload>(`/super-admin/schools/${schoolId}/entitlements`);
+      setEntitlements(payload);
+      setDraftFeatures(Object.fromEntries(payload.features.map((f) => [f.key, f.enabled])));
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Failed to load features');
+    }
+  }, [schoolId]);
+
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void loadEntitlements(); }, [loadEntitlements]);
+
+  const saveFeatures = async () => {
+    if (!schoolId) return;
+    setIsSavingFeatures(true);
+    setError('');
+    try {
+      const payload = await api.put<EntitlementsPayload>(
+        `/super-admin/schools/${schoolId}/entitlements`,
+        { features: draftFeatures },
+      );
+      setEntitlements(payload);
+      setDraftFeatures(Object.fromEntries(payload.features.map((f) => [f.key, f.enabled])));
+      setFeaturesSaved(true);
+      setTimeout(() => setFeaturesSaved(false), 2500);
+      // The plan label becomes 'custom' server-side on a hand-picked set.
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Failed to save features');
+    } finally {
+      setIsSavingFeatures(false);
+    }
+  };
+
+  /** Applies a package's feature set to the draft without saving, so the
+   *  Super Admin can see exactly what changes before committing. */
+  const applyPackage = (packageKey: string) => {
+    const presets: Record<string, string[]> = {
+      starter: ['games', 'leaderboard'],
+      school: ['games', 'leaderboard', 'ai_tutor', 'virtual_labs', 'pyq_hub', 'reports_analytics'],
+      enterprise: [
+        'games', 'leaderboard', 'ai_tutor', 'virtual_labs', 'pyq_hub',
+        'reports_analytics', 'ai_exam_generator', 'school_content_upload',
+      ],
+    };
+    const granted = new Set(presets[packageKey] ?? []);
+    setDraftFeatures((prev) => Object.fromEntries(Object.keys(prev).map((k) => [k, granted.has(k)])));
+  };
+
+  const featuresDirty =
+    entitlements !== null &&
+    entitlements.features.some((f) => draftFeatures[f.key] !== f.enabled);
 
   const startEditing = () => {
     if (!detail) return;
@@ -284,6 +362,7 @@ export const SuperAdminSchoolDetail: React.FC = () => {
       <div className="border-b border-slate-200 flex gap-6">
         {([
           { id: 'profile', label: 'Profile' },
+          { id: 'features', label: 'Features & plan' },
           { id: 'admins', label: `Admin accounts (${admins.length})` },
           { id: 'usage', label: 'Enrollment' },
         ] as const).map((t) => (
@@ -298,6 +377,110 @@ export const SuperAdminSchoolDetail: React.FC = () => {
           </button>
         ))}
       </div>
+
+      {/* Features & plan tab — what this school has actually bought */}
+      {tab === 'features' && (
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+            <div>
+              <h3 className="text-[14px] font-bold text-slate-800">Features &amp; plan</h3>
+              <p className="text-[12px] text-slate-400 mt-0.5">
+                Only EduAI can change this. The school cannot switch on anything it hasn&apos;t bought.
+              </p>
+            </div>
+            {featuresSaved && (
+              <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-emerald-700">
+                <Check size={13} /> Saved
+              </span>
+            )}
+          </div>
+
+          {!entitlements ? (
+            <div className="px-5 py-10 flex justify-center">
+              <Loader2 size={18} className="animate-spin text-slate-300" />
+            </div>
+          ) : (
+            <>
+              {/* Package presets */}
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3 flex-wrap">
+                <span className="text-[12px] font-medium text-slate-500">Apply a package:</span>
+                {PACKAGES.map((p) => (
+                  <button
+                    key={p.key}
+                    onClick={() => applyPackage(p.key)}
+                    className="text-[12px] font-semibold text-slate-600 border border-slate-200 px-3 py-1.5 rounded-lg hover:border-slate-400 hover:text-slate-900 transition-colors cursor-pointer"
+                  >
+                    {p.label}
+                  </button>
+                ))}
+                <span className="text-[12px] text-slate-400 ml-auto">
+                  Current plan: <span className="font-semibold capitalize text-slate-600">{entitlements.school.plan}</span>
+                </span>
+              </div>
+
+              <div className="divide-y divide-slate-100">
+                {entitlements.features.map((f) => {
+                  const on = draftFeatures[f.key] ?? false;
+                  const changed = on !== f.enabled;
+                  return (
+                    <div key={f.key} className="px-5 py-3.5 flex items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[13px] font-semibold text-slate-800">{f.label}</span>
+                          {changed && (
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                              unsaved
+                            </span>
+                          )}
+                        </div>
+                        {f.description && (
+                          <p className="text-[12px] text-slate-400 mt-0.5">{f.description}</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setDraftFeatures((d) => ({ ...d, [f.key]: !on }))}
+                        aria-label={`${on ? 'Disable' : 'Enable'} ${f.label}`}
+                        className={`shrink-0 w-11 h-6 rounded-full transition-colors cursor-pointer relative ${
+                          on ? 'bg-emerald-500' : 'bg-slate-200'
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${
+                            on ? 'left-[22px]' : 'left-0.5'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-end gap-3">
+                {featuresDirty && (
+                  <button
+                    onClick={() =>
+                      setDraftFeatures(
+                        Object.fromEntries(entitlements.features.map((f) => [f.key, f.enabled])),
+                      )
+                    }
+                    className="text-[13px] font-semibold text-slate-500 px-4 py-2 rounded-lg hover:bg-slate-50 cursor-pointer"
+                  >
+                    Discard
+                  </button>
+                )}
+                <button
+                  onClick={() => void saveFeatures()}
+                  disabled={!featuresDirty || isSavingFeatures}
+                  className="inline-flex items-center gap-2 text-[13px] font-semibold text-white bg-slate-900 px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {isSavingFeatures ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  Save features
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Profile tab */}
       {tab === 'profile' && (

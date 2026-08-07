@@ -11,6 +11,8 @@ import {
   addSchoolAdminController,
   resetSchoolAdminPasswordController,
   listAuditLogsController,
+  getSchoolEntitlementsController,
+  setSchoolEntitlementsController,
 } from '../controllers/superAdmin.controller.js';
 import {
   getAiSettingsController,
@@ -63,6 +65,10 @@ superAdminRouter.patch('/schools/:id', updateSchoolController);
 superAdminRouter.patch('/schools/:id/active', setSchoolActiveController);
 superAdminRouter.post('/schools/:id/admins', addSchoolAdminController);
 superAdminRouter.post('/schools/:id/admins/:userId/reset-password', resetSchoolAdminPasswordController);
+
+// ── Feature entitlements (what the school bought) ────────────
+superAdminRouter.get('/schools/:id/entitlements', getSchoolEntitlementsController);
+superAdminRouter.put('/schools/:id/entitlements', setSchoolEntitlementsController);
 
 // ── Audit log ───────────────────────────────────────────────
 // Cross-school student directory. Bulk writes stay school-scoped via

@@ -20,12 +20,21 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
 
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('user_profiles')
-      .select('role, school_id, is_active, last_seen_at')
+      .select('role, school_id, is_active, last_seen_at, schools(is_active)')
       .eq('id', authData.user.id)
       .single();
 
     if (profileError || !profile) throw new ApiError('UNAUTHORIZED', 'No profile for this account');
     if (!profile.is_active) throw new ApiError('FORBIDDEN', 'Account has been deactivated');
+
+    // A school suspended by the Super Admin (non-payment, policy violation, off-
+    // boarding) must lock out every already-logged-in session immediately, not
+    // just block future logins — this check runs on every request, not only at
+    // sign-in. super_admin has no school_id and is exempt.
+    const school = Array.isArray(profile.schools) ? profile.schools[0] : profile.schools;
+    if (profile.school_id && school && !school.is_active) {
+      throw new ApiError('FORBIDDEN', "This school's access has been suspended by EduAI. Contact your administrator.");
+    }
 
     req.user = {
       id: authData.user.id,

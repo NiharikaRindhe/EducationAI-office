@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import { useAuth, type FeatureKey } from '../../context/AuthContext';
 import { Sidebar, NavItem } from '../../components/shared/Sidebar';
 import { TopBar } from '../../components/shared/TopBar';
 
@@ -8,6 +9,7 @@ export const Batch2Layout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { batchId, currentClass, studentAvatar, studentName } = useApp();
+  const { hasFeature } = useAuth();
 
   useEffect(() => {
     if (currentClass < 5 || currentClass > 8) {
@@ -15,20 +17,21 @@ export const Batch2Layout: React.FC = () => {
     }
   }, [batchId, currentClass, navigate]);
 
-  const navItems: NavItem[] = [
+  const navItems: NavItem[] = ([
     { href: '/batch2/home', label: 'Home', iconName: 'home' },
     { href: '/batch2/subjects', label: 'Subjects', iconName: 'library_books' },
-    { href: '/batch2/chat', label: 'AI Doubt Tutor', iconName: 'chat' },
+    { href: '/batch2/chat', label: 'AI Doubt Tutor', iconName: 'chat', feature: 'ai_tutor' },
     { href: '/batch2/exams', label: 'Exams & Mocks', iconName: 'edit_document' },
     { href: '/batch2/tasks', label: 'My Tasks', iconName: 'assignment_turned_in' },
     { href: '/batch2/notes', label: 'Study Notes', iconName: 'sticky_note_2' },
-    { href: '/batch2/pyq', label: 'PYQ Hub', iconName: 'bookmark' },
+    { href: '/batch2/pyq', label: 'PYQ Hub', iconName: 'bookmark', feature: 'pyq_hub' },
     { href: '/batch2/daily-challenges', label: 'Daily Challenges', iconName: 'electric_bolt' },
     { href: '/batch2/streak', label: 'Streak Tracker', iconName: 'local_fire_department' },
     { href: '/batch2/badges', label: 'My Badges', iconName: 'military_tech' },
     { href: '/batch2/profile', label: 'Profile', iconName: 'person' },
     { href: '/batch2/help', label: 'Report an Issue', iconName: 'confirmation_number' }
-  ];
+  ] as (NavItem & { feature?: FeatureKey })[])
+    .filter((item) => !item.feature || hasFeature(item.feature));
 
   const getHeaderDetails = () => {
     const path = location.pathname;

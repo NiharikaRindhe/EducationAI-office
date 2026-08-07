@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 import {
   activeSessionForStudentController,
   joinSessionController,
@@ -56,16 +57,16 @@ studentRouter.get('/streak-calendar', getStudentStreakCalendarController);
 studentRouter.get('/profile', getStudentProfileController);
 studentRouter.patch('/profile/avatar', updateStudentAvatarController);
 studentRouter.get('/daily-challenges', getDailyChallengesController);
-studentRouter.get('/pyq', listPyqsController);
+studentRouter.get('/pyq', requireFeature('pyq_hub'), listPyqsController);
 
-studentRouter.get('/games', listGamesForStudentController);
-studentRouter.post('/games/:gameId/attempts', submitGameAttemptController);
+studentRouter.get('/games', requireFeature('games'), listGamesForStudentController);
+studentRouter.post('/games/:gameId/attempts', requireFeature('games'), submitGameAttemptController);
 
 // Paths mirror the original EducationAI-Games-master FastAPI endpoints so the
 // ported Chemistry Lab UI calls them with only its base-URL constant changed.
 const chemistryLimiter = rateLimit({ windowMs: 60 * 60_000, max: 40, keyFn: (req) => `chem:${req.user!.id}` });
-studentRouter.post('/chemistry/craft_compound', chemistryLimiter, craftCompoundController);
-studentRouter.post('/chemistry/free_react', chemistryLimiter, freeReactController);
+studentRouter.post('/chemistry/craft_compound', requireFeature('virtual_labs'), chemistryLimiter, craftCompoundController);
+studentRouter.post('/chemistry/free_react', requireFeature('virtual_labs'), chemistryLimiter, freeReactController);
 
 studentRouter.get('/sessions/active', activeSessionForStudentController);
 studentRouter.post('/sessions/join', joinSessionController);
@@ -87,13 +88,13 @@ studentRouter.get('/notes', listNotesController);
 studentRouter.put('/notes/:id', updateNoteController);
 studentRouter.delete('/notes/:id', deleteNoteController);
 
-studentRouter.get('/leaderboard', getLeaderboardForStudentController);
+studentRouter.get('/leaderboard', requireFeature('leaderboard'), getLeaderboardForStudentController);
 
 studentRouter.get('/exams/:examId/admit-card', downloadOwnAdmitCardController);
 
-studentRouter.get('/english/items', getItemsController);
-studentRouter.post('/english/submit', submitAttemptController);
-studentRouter.get('/english/progress', getProgressController);
+studentRouter.get('/english/items', requireFeature('games'), getItemsController);
+studentRouter.post('/english/submit', requireFeature('games'), submitAttemptController);
+studentRouter.get('/english/progress', requireFeature('games'), getProgressController);
 
 studentRouter.get('/subjects', listMySubjectsController);
 studentRouter.get('/curriculum', getStudentCurriculumController);
@@ -105,9 +106,12 @@ studentRouter.get('/timetable/occurrences', getMyStudentOccurrencesController);
 
 const chatLimiter = rateLimit({ windowMs: 24 * 60 * 60_000, max: 50, keyFn: (req) => `chat:${req.user!.id}` });
 
-studentRouter.post('/chat/sessions', createSessionController);
-studentRouter.get('/chat/sessions', listSessionsController);
-studentRouter.patch('/chat/sessions/:id', renameSessionController);
-studentRouter.delete('/chat/sessions/:id', deleteSessionController);
-studentRouter.get('/chat/sessions/:id/history', getHistoryController);
-studentRouter.post('/chat/sessions/:id/message', chatLimiter, sendMessageController);
+// Every chat path is gated, not just the message send — listing or creating
+// a session for a feature the school hasn't bought would leave the tutor UI
+// looking half-alive rather than cleanly unavailable.
+studentRouter.post('/chat/sessions', requireFeature('ai_tutor'), createSessionController);
+studentRouter.get('/chat/sessions', requireFeature('ai_tutor'), listSessionsController);
+studentRouter.patch('/chat/sessions/:id', requireFeature('ai_tutor'), renameSessionController);
+studentRouter.delete('/chat/sessions/:id', requireFeature('ai_tutor'), deleteSessionController);
+studentRouter.get('/chat/sessions/:id/history', requireFeature('ai_tutor'), getHistoryController);
+studentRouter.post('/chat/sessions/:id/message', requireFeature('ai_tutor'), chatLimiter, sendMessageController);

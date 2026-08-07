@@ -2,6 +2,12 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
 import { generatePassword } from '../lib/credentials.js';
 import { sendSchoolAdminWelcomeEmail } from '../lib/mailer.js';
+import {
+  seedEntitlementsFromPackage,
+  invalidateEntitlementsCache,
+  FEATURE_KEYS,
+  type FeatureKey,
+} from '../lib/entitlements.js';
 import type { CreateSchoolInput } from '../schemas/superAdmin.schema.js';
 
 export async function createSchool(input: CreateSchoolInput) {
@@ -32,6 +38,21 @@ export async function createSchool(input: CreateSchoolInput) {
     .single();
 
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to create school', error.message);
+
+  // Grant exactly what the chosen package includes. Must happen before the
+  // school is usable — a school with no entitlement rows is treated as fully
+  // entitled (the grandfathering rule), so skipping this would silently hand
+  // a Starter school the whole Enterprise feature set.
+  try {
+    await seedEntitlementsFromPackage(school.id as string, input.plan);
+  } catch (seedError) {
+    await supabaseAdmin.from('schools').delete().eq('id', school.id);
+    throw new ApiError(
+      'INTERNAL_ERROR',
+      'Failed to provision school features',
+      seedError instanceof Error ? seedError.message : String(seedError),
+    );
+  }
 
   // Optionally provision the school's admin account in the same step —
   // the generated password is returned exactly once, for the credential slip.
@@ -260,7 +281,86 @@ export async function updateSchool(schoolId: string, patch: UpdateSchoolInput) {
 
   const { data, error } = await supabaseAdmin.from('schools').update(updates).eq('id', schoolId).select().single();
   if (error || !data) throw new ApiError('NOT_FOUND', 'School not found');
+
+  // Moving a school onto a named package re-seeds its entitlements to that
+  // package's contents — otherwise "upgrade this school to Enterprise" would
+  // change a label and grant nothing. 'custom' is the explicit opt-out: it
+  // preserves whatever hand-picked set the Super Admin has already built.
+  if (patch.plan !== undefined && patch.plan !== 'custom') {
+    await seedEntitlementsFromPackage(schoolId, patch.plan);
+  }
+
   return data;
+}
+
+/**
+ * Every feature in the catalog with this school's current grant state —
+ * the shape the Super Admin entitlements panel renders directly.
+ */
+export async function getSchoolEntitlements(schoolId: string) {
+  const [catalogRes, grantedRes, schoolRes] = await Promise.all([
+    supabaseAdmin.from('feature_catalog').select('key, label, description, sort_order').order('sort_order'),
+    supabaseAdmin.from('school_entitlements').select('feature_key, enabled, updated_at').eq('school_id', schoolId),
+    supabaseAdmin.from('schools').select('id, name, plan').eq('id', schoolId).single(),
+  ]);
+
+  if (schoolRes.error || !schoolRes.data) throw new ApiError('NOT_FOUND', 'School not found');
+
+  const grantedBy = new Map(
+    (grantedRes.data ?? []).map((r) => [r.feature_key as string, r]),
+  );
+
+  return {
+    school: schoolRes.data,
+    // A school with no rows at all is fully entitled (grandfathering), so the
+    // panel must show that truthfully rather than a wall of unchecked boxes.
+    features: (catalogRes.data ?? []).map((f) => {
+      const row = grantedBy.get(f.key as string);
+      return {
+        key: f.key,
+        label: f.label,
+        description: f.description,
+        enabled: row ? (row.enabled as boolean) : grantedBy.size === 0,
+        updatedAt: row?.updated_at ?? null,
+      };
+    }),
+  };
+}
+
+/**
+ * Replace a school's entitlement set. Writes every catalog key explicitly so
+ * a school can never be left with a partial row set that the grandfathering
+ * rule would then read as "fully entitled".
+ */
+export async function setSchoolEntitlements(
+  schoolId: string,
+  features: Record<string, boolean>,
+  updatedBy: string,
+) {
+  const { data: school } = await supabaseAdmin.from('schools').select('id').eq('id', schoolId).maybeSingle();
+  if (!school) throw new ApiError('NOT_FOUND', 'School not found');
+
+  const unknown = Object.keys(features).filter((k) => !FEATURE_KEYS.includes(k as FeatureKey));
+  if (unknown.length > 0) {
+    throw new ApiError('VALIDATION_ERROR', `Unknown feature key(s): ${unknown.join(', ')}`);
+  }
+
+  const rows = FEATURE_KEYS.map((key) => ({
+    school_id: schoolId,
+    feature_key: key,
+    enabled: features[key] ?? false,
+    updated_by: updatedBy,
+    updated_at: new Date().toISOString(),
+  }));
+
+  const { error } = await supabaseAdmin.from('school_entitlements').upsert(rows);
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to save entitlements', error.message);
+
+  // Hand-picked sets no longer correspond to a named package.
+  await supabaseAdmin.from('schools').update({ plan: 'custom' }).eq('id', schoolId);
+
+  invalidateEntitlementsCache();
+  return getSchoolEntitlements(schoolId);
 }
 
 export async function addSchoolAdmin(schoolId: string, input: { fullName: string; email: string }) {

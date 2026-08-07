@@ -61,12 +61,20 @@ export async function login({ email, password }: LoginInput): Promise<LoginResul
 
   const { data: profile, error: profileError } = await supabaseAdmin
     .from('user_profiles')
-    .select('role, school_id, full_name, is_active, has_logged_in_ever, student_profiles(batch_id)')
+    .select('role, school_id, full_name, is_active, has_logged_in_ever, student_profiles(batch_id), schools(is_active)')
     .eq('id', authData.user.id)
     .single();
 
   if (profileError || !profile) throw new ApiError('UNAUTHORIZED', 'No profile for this account');
   if (!profile.is_active) throw new ApiError('FORBIDDEN', 'This account has been deactivated');
+
+  // Suspending a school (non-payment, policy violation, off-boarding) is
+  // meant to lock out everyone at that school, not just be a label in the
+  // Super Admin's schools table. super_admin has no school_id and is exempt.
+  const loginSchool = Array.isArray(profile.schools) ? profile.schools[0] : profile.schools;
+  if (profile.school_id && loginSchool && !loginSchool.is_active) {
+    throw new ApiError('FORBIDDEN', "This school's access has been suspended by EduAI. Contact your administrator.");
+  }
 
   if (!profile.has_logged_in_ever) {
     await supabaseAdmin
@@ -99,6 +107,12 @@ export async function login({ email, password }: LoginInput): Promise<LoginResul
 //  outside class time there is nothing to log into.
 // ─────────────────────────────────────────────────────────────
 async function requireActiveSessionFor(schoolId: string, classNum: number, section: string) {
+  // .limit(1) rather than .maybeSingle() — see liveSession.service.ts
+  // getActiveSessionForStudent for why: this gate must degrade to "found a
+  // live session" rather than hard-error the moment more than one row ever
+  // matches, which is exactly the failure this reproduced (a stale session
+  // from a different, unrelated teacher made every genuinely-live class in
+  // that section read as "nothing is live").
   const { data } = await supabaseAdmin
     .from('live_sessions')
     .select('id')
@@ -106,14 +120,19 @@ async function requireActiveSessionFor(schoolId: string, classNum: number, secti
     .eq('class_num', classNum)
     .eq('section', section)
     .eq('is_active', true)
-    .maybeSingle();
+    .limit(1);
 
-  if (!data) throw new ApiError('FORBIDDEN', 'No class is live right now — ask your teacher to start the session');
+  if (!data || data.length === 0) {
+    throw new ApiError('FORBIDDEN', 'No class is live right now — ask your teacher to start the session');
+  }
 }
 
 async function resolveSchoolId(schoolCode: string): Promise<string> {
-  const { data, error } = await supabaseAdmin.from('schools').select('id').eq('code', schoolCode).single();
+  const { data, error } = await supabaseAdmin.from('schools').select('id, is_active').eq('code', schoolCode).single();
   if (error || !data) throw new ApiError('SCHOOL_INVALID', 'Unknown school code');
+  // Same suspension enforcement as email/password login (auth.service.ts login()) —
+  // a suspended school's lab kiosk must stop offering PIN login too.
+  if (!data.is_active) throw new ApiError('FORBIDDEN', "This school's access has been suspended by EduAI.");
   return data.id as string;
 }
 

@@ -82,6 +82,7 @@ import { SuperAdminOverview } from './routes/super-admin/Overview';
 import { SuperAdminAiConsole } from './routes/super-admin/AiConsole';
 import { SuperAdminTickets } from './routes/super-admin/Tickets';
 import { SuperAdminSchoolDetail } from './routes/super-admin/SchoolDetail';
+import { SuperAdminSchoolOnboarding } from './routes/super-admin/SchoolOnboarding';
 import { SuperAdminAuditLog } from './routes/super-admin/AuditLog';
 import { SuperAdminStudents } from './routes/super-admin/Students';
 
@@ -280,6 +281,8 @@ function App() {
               <Route path="dashboard" element={<Navigate to="/super-admin/overview" replace />} />
               <Route path="overview" element={<SuperAdminOverview />} />
               <Route path="schools" element={<SuperAdminSchools />} />
+              {/* Declared before :schoolId so "new" isn't captured as an id. */}
+              <Route path="schools/new" element={<SuperAdminSchoolOnboarding />} />
               <Route path="schools/:schoolId" element={<SuperAdminSchoolDetail />} />
               <Route path="students" element={<SuperAdminStudents />} />
               <Route path="content" element={<SuperAdminContentPortal />} />

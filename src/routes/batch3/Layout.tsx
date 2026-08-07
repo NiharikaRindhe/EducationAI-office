@@ -2,6 +2,7 @@ import React, { useEffect, Suspense, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { useAuth, type FeatureKey } from '../../context/AuthContext';
 import { Sidebar, NavItem } from '../../components/shared/Sidebar';
 import { TopBar } from '../../components/shared/TopBar';
 
@@ -18,6 +19,7 @@ export const Batch3Layout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { batchId, currentClass, studentAvatar, studentName } = useApp();
+  const { hasFeature } = useAuth();
   const [navCollapsed, setNavCollapsed] = useState(false);
   const [labFocusMode, setLabFocusMode] = useState(false);
 
@@ -27,23 +29,27 @@ export const Batch3Layout: React.FC = () => {
     }
   }, [batchId, currentClass, navigate]);
 
-  const navItems: NavItem[] = [
+  // Nav entries for features the school hasn't bought are dropped rather than
+  // shown disabled — a student shouldn't be advertised their school's billing.
+  // This is presentation only; each route's API is gated independently.
+  const navItems: NavItem[] = ([
     { href: '/batch3/home', label: 'Home', iconName: 'home' },
     { href: '/batch3/subjects', label: 'Subjects', iconName: 'library_books' },
     { href: '/batch3/concept-map', label: 'Concept Map', iconName: 'schema' },
-    { href: '/batch3/labs', label: 'Science Labs', iconName: 'science' },
+    { href: '/batch3/labs', label: 'Science Labs', iconName: 'science', feature: 'virtual_labs' },
     { href: '/batch3/board-prep', label: 'Board Prep', iconName: 'event_upcoming' },
-    { href: '/batch3/chat', label: 'AI Doubt Tutor', iconName: 'chat' },
+    { href: '/batch3/chat', label: 'AI Doubt Tutor', iconName: 'chat', feature: 'ai_tutor' },
     { href: '/batch3/daily-challenges', label: 'Daily Challenges', iconName: 'electric_bolt' },
     { href: '/batch3/exams', label: 'Exams & Mocks', iconName: 'edit_document' },
     { href: '/batch3/tasks', label: 'My Tasks', iconName: 'assignment_turned_in' },
     { href: '/batch3/notes', label: 'Study Notes', iconName: 'sticky_note_2' },
-    { href: '/batch3/pyq', label: 'Board PYQ Hub', iconName: 'bookmark' },
+    { href: '/batch3/pyq', label: 'Board PYQ Hub', iconName: 'bookmark', feature: 'pyq_hub' },
     { href: '/batch3/pomodoro', label: 'Pomodoro Timer', iconName: 'timer' },
     { href: '/batch3/streak', label: 'Streak', iconName: 'local_fire_department' },
     { href: '/batch3/profile', label: 'Profile', iconName: 'person' },
     { href: '/batch3/help', label: 'Report an Issue', iconName: 'confirmation_number' }
-  ];
+  ] as (NavItem & { feature?: FeatureKey })[])
+    .filter((item) => !item.feature || hasFeature(item.feature));
 
   const getHeaderDetails = () => {
     const path = location.pathname;

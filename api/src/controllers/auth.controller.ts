@@ -3,6 +3,7 @@ import { loginSchema, pinLoginSchema, pinRosterQuerySchema } from '../schemas/au
 import * as authService from '../services/auth.service.js';
 import { ApiError } from '../lib/errors.js';
 import { supabaseAdmin } from '../lib/supabase.js';
+import { getSchoolFeatures } from '../lib/entitlements.js';
 
 export async function loginController(req: Request, res: Response, next: NextFunction) {
   try {
@@ -60,7 +61,12 @@ export async function meController(req: Request, res: Response, next: NextFuncti
       .single();
 
     if (error || !data) throw new ApiError('NOT_FOUND', 'Profile not found');
-    res.json(data);
+
+    // Which paid features this school has. Purely so the UI can hide nav for
+    // things the school never bought — the API gates each one independently
+    // via requireFeature(), so this list is a convenience, never the control.
+    const features = await getSchoolFeatures(req.user.schoolId);
+    res.json({ ...data, features });
   } catch (err) {
     next(err);
   }

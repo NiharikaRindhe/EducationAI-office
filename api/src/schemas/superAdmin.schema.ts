@@ -75,3 +75,9 @@ export const addClassSubjectSchema = z.object({
   classNum: z.coerce.number().int().min(1).max(10),
   subject: z.enum(MASTER_SUBJECTS),
 });
+
+// Feature entitlements. A partial map is rejected in the service rather than
+// here — the service needs the catalog to decide what "missing" means.
+export const setEntitlementsSchema = z.object({
+  features: z.record(z.string(), z.boolean()),
+});

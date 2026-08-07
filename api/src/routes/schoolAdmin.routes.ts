@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 import {
   importStudentsController,
   importTeachersController,
@@ -97,10 +98,10 @@ schoolAdminRouter.patch('/class-sections/:id', updateSectionController);
 schoolAdminRouter.get('/subjects', listClassSubjectsController);
 
 // ── Content library (own school's supplementary books) ────────
-schoolAdminRouter.get('/ncert/jobs', listSchoolIngestionJobsController);
-schoolAdminRouter.post('/ncert/upload', pdfUpload.single('file'), uploadSchoolNcertPdfController);
-schoolAdminRouter.post('/ncert/jobs/:id/retry', retrySchoolIngestionJobController);
-schoolAdminRouter.delete('/ncert/jobs/:id', deleteSchoolIngestionJobController);
+schoolAdminRouter.get('/ncert/jobs', requireFeature('school_content_upload'), listSchoolIngestionJobsController);
+schoolAdminRouter.post('/ncert/upload', requireFeature('school_content_upload'), pdfUpload.single('file'), uploadSchoolNcertPdfController);
+schoolAdminRouter.post('/ncert/jobs/:id/retry', requireFeature('school_content_upload'), retrySchoolIngestionJobController);
+schoolAdminRouter.delete('/ncert/jobs/:id', requireFeature('school_content_upload'), deleteSchoolIngestionJobController);
 
 schoolAdminRouter.get('/teaching-assignments', listTeachingAssignmentsController);
 schoolAdminRouter.post('/teaching-assignments', addTeachingAssignmentController);

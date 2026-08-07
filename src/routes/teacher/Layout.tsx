@@ -1,14 +1,17 @@
 import React from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth, type FeatureKey } from '../../context/AuthContext';
 import { Sidebar, NavItem } from '../../components/shared/Sidebar';
 import { TopBar } from '../../components/shared/TopBar';
 
 export const TeacherLayout: React.FC = () => {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, hasFeature } = useAuth();
 
-  const navItems: NavItem[] = [
+  // Entries whose feature the school hasn't bought are dropped. Create Exam
+  // stays — manual exam creation is core; only the AI generator inside it is
+  // gated, so the page itself must remain reachable.
+  const navItems: NavItem[] = ([
     { href: '/teacher/dashboard', label: 'Dashboard', iconName: 'dashboard' },
     { href: '/teacher/live-session', label: 'Live Session', iconName: 'cast_for_education' },
     { href: '/teacher/timetable', label: 'Timetable', iconName: 'calendar_month' },
@@ -16,9 +19,10 @@ export const TeacherLayout: React.FC = () => {
     { href: '/teacher/assign-tasks', label: 'Assign Tasks', iconName: 'assignment_add' },
     { href: '/teacher/create-exam', label: 'Create Exam', iconName: 'edit_note' },
     { href: '/teacher/question-bank', label: 'Question Bank', iconName: 'library_books' },
-    { href: '/teacher/reports', label: 'Reports & Analytics', iconName: 'analytics' },
+    { href: '/teacher/reports', label: 'Reports & Analytics', iconName: 'analytics', feature: 'reports_analytics' },
     { href: '/teacher/tickets', label: 'Report an Issue', iconName: 'confirmation_number' }
-  ];
+  ] as (NavItem & { feature?: FeatureKey })[])
+    .filter((item) => !item.feature || hasFeature(item.feature));
 
   const getHeaderDetails = () => {
     const path = location.pathname;
