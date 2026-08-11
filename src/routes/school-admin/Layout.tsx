@@ -16,6 +16,7 @@ export const SchoolAdminLayout: React.FC = () => {
     { href: '/school-admin/content', label: 'Content Library', iconName: 'menu_book' },
     { href: '/school-admin/lab-incharges', label: 'Lab In-charges', iconName: 'support_agent' },
     { href: '/school-admin/feature-toggles', label: 'Feature Toggles', iconName: 'toggle_on' },
+    { href: '/school-admin/branding', label: 'School Branding', iconName: 'image' },
     { href: '/school-admin/principal-report', label: 'Principal Report', iconName: 'summarize' },
     { href: '/school-admin/promotion', label: 'Promotion Wizard', iconName: 'trending_up' },
     { href: '/school-admin/tickets', label: 'Support Tickets', iconName: 'confirmation_number' },
@@ -31,6 +32,7 @@ export const SchoolAdminLayout: React.FC = () => {
     if (path.includes('/content')) return { title: 'Content Library', sub: "Upload supplementary books for your school's own AI tutor." };
     if (path.includes('/lab-incharges')) return { title: 'Lab In-charges', sub: 'Add lab in-charges who can reset logins without touching grades.' };
     if (path.includes('/tickets')) return { title: 'Support Tickets', sub: 'Resolve reported issues, or escalate to the Super Admin.' };
+    if (path.includes('/branding')) return { title: 'School Branding', sub: 'Upload your school logo — it appears for every teacher and student.' };
     return { title: 'School Admin', sub: 'Set up and manage your school on EduAI.' };
   };
 

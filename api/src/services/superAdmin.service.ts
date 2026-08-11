@@ -2,6 +2,7 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
 import { generatePassword } from '../lib/credentials.js';
 import { sendSchoolAdminWelcomeEmail } from '../lib/mailer.js';
+import { revokeUserSessions, revokeSessionsForUsers } from '../lib/sessions.js';
 import {
   seedEntitlementsFromPackage,
   invalidateEntitlementsCache,
@@ -103,7 +104,7 @@ export async function listSchools() {
   const { data, error } = await supabaseAdmin
     .from('schools')
     .select(
-      'id, name, code, address, city, state, pincode, board, plan, contact_name, contact_email, contact_phone, is_active, created_at',
+      'id, name, code, address, city, state, pincode, board, plan, logo_path, contact_name, contact_email, contact_phone, is_active, created_at',
     )
     .order('created_at', { ascending: false });
 
@@ -176,6 +177,19 @@ export async function setSchoolActive(schoolId: string, isActive: boolean) {
     .single();
 
   if (error) throw new ApiError('NOT_FOUND', 'School not found', error.message);
+
+  // requireAuth already refuses a suspended school on the next request, so
+  // access dies within one call either way. Revoking as well stops the
+  // refresh loop quietly renewing tokens for a school that has been cut off
+  // — e.g. for non-payment — for as long as a tab stays open.
+  if (!isActive) {
+    const { data: members } = await supabaseAdmin
+      .from('user_profiles')
+      .select('id')
+      .eq('school_id', schoolId);
+    await revokeSessionsForUsers((members ?? []).map((m) => m.id as string), 'school_suspended');
+  }
+
   return data;
 }
 
@@ -189,7 +203,7 @@ export async function getSchoolDetail(schoolId: string) {
   const [schoolRes, profilesRes, loginsRes, aiRes] = await Promise.all([
     supabaseAdmin
       .from('schools')
-      .select('id, name, code, address, city, state, pincode, board, plan, contact_name, contact_email, contact_phone, is_active, created_at')
+      .select('id, name, code, address, city, state, pincode, board, plan, logo_path, contact_name, contact_email, contact_phone, is_active, created_at')
       .eq('id', schoolId)
       .single(),
     supabaseAdmin
@@ -414,6 +428,9 @@ export async function resetSchoolAdminPassword(schoolId: string, userId: string)
   const password = generatePassword(12);
   const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, { password });
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to reset password', error.message);
+
+  // The old credential is dead; any session still holding it must be too.
+  await revokeUserSessions(userId, 'credential_reset');
 
   return { fullName: profile.full_name, email: authUser.user?.email ?? '', password };
 }

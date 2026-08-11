@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { randomUUID } from 'node:crypto';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
+import { revokeUserSessions } from '../lib/sessions.js';
 import { generatePassword, generatePin, generateUsername } from '../lib/credentials.js';
 import { ensureSectionExists } from './classSection.service.js';
 import {
@@ -403,6 +404,10 @@ export async function resetLabInchargePassword(schoolId: string, id: string): Pr
   const { error: pwError } = await supabaseAdmin.auth.admin.updateUserById(id, { password });
   if (pwError) throw new ApiError('INTERNAL_ERROR', 'Failed to reset password', pwError.message);
 
+  // The old credential is dead — any session still holding it must die too,
+  // or a reset prompted by a leaked password leaves the leaker signed in.
+  await revokeUserSessions(id, 'credential_reset');
+
   return { fullName: profile.full_name, username, password };
 }
 
@@ -448,12 +453,14 @@ export async function resetStudentCredential(schoolId: string, studentId: string
       .update({ pin_hash: pinHash })
       .eq('user_id', studentId);
     if (pinError) throw new ApiError('INTERNAL_ERROR', 'Failed to reset PIN', pinError.message);
+    await revokeUserSessions(studentId, 'pin_reset');
     return { fullName: profile.full_name, classNum: sp.class_num, section: sp.section, username, pin };
   }
 
   const password = generatePassword(8);
   const { error: pwError } = await supabaseAdmin.auth.admin.updateUserById(studentId, { password });
   if (pwError) throw new ApiError('INTERNAL_ERROR', 'Failed to reset password', pwError.message);
+  await revokeUserSessions(studentId, 'credential_reset');
   return { fullName: profile.full_name, classNum: sp.class_num, section: sp.section, username, password };
 }
 
@@ -473,6 +480,8 @@ export async function resetTeacherPassword(schoolId: string, teacherId: string):
   const password = generatePassword(10);
   const { error: pwError } = await supabaseAdmin.auth.admin.updateUserById(teacherId, { password });
   if (pwError) throw new ApiError('INTERNAL_ERROR', 'Failed to reset password', pwError.message);
+
+  await revokeUserSessions(teacherId, 'credential_reset');
 
   return { fullName: profile.full_name, username, password };
 }

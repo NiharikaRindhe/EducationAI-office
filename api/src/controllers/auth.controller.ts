@@ -56,7 +56,9 @@ export async function meController(req: Request, res: Response, next: NextFuncti
 
     const { data, error } = await supabaseAdmin
       .from('user_profiles')
-      .select('id, role, school_id, full_name, student_profiles(class_num, section, batch_id, avatar, xp, streak)')
+      .select(
+        'id, role, school_id, full_name, student_profiles(class_num, section, batch_id, avatar, xp, streak), schools(name, code, logo_path)',
+      )
       .eq('id', req.user.id)
       .single();
 
@@ -66,7 +68,23 @@ export async function meController(req: Request, res: Response, next: NextFuncti
     // things the school never bought — the API gates each one independently
     // via requireFeature(), so this list is a convenience, never the control.
     const features = await getSchoolFeatures(req.user.schoolId);
-    res.json({ ...data, features });
+
+    // The school's own name/logo, so every portal can brand itself for the
+    // school its user belongs to. Super Admin has no school and gets null,
+    // keeping the platform-level EduAI identity.
+    const joined = data.schools as unknown;
+    const schoolRow = (Array.isArray(joined) ? joined[0] : joined) as
+      | { name: string; code: string; logo_path: string | null }
+      | null
+      | undefined;
+
+    res.json({
+      ...data,
+      features,
+      school: schoolRow
+        ? { name: schoolRow.name, code: schoolRow.code, logoPath: schoolRow.logo_path }
+        : null,
+    });
   } catch (err) {
     next(err);
   }

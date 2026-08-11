@@ -15,6 +15,10 @@ import {
   setSchoolEntitlementsController,
 } from '../controllers/superAdmin.controller.js';
 import {
+  uploadSchoolLogoController,
+  removeSchoolLogoController,
+} from '../controllers/schoolBranding.controller.js';
+import {
   getAiSettingsController,
   updateAiSettingsController,
   getAiUsageController,
@@ -50,6 +54,8 @@ const upload = multer({
   limits: { fileSize: 150 * 1024 * 1024 },
 });
 
+const logoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
+
 export const superAdminRouter = Router();
 
 superAdminRouter.use(requireAuth, requireRole('super_admin'));
@@ -69,6 +75,10 @@ superAdminRouter.post('/schools/:id/admins/:userId/reset-password', resetSchoolA
 // ── Feature entitlements (what the school bought) ────────────
 superAdminRouter.get('/schools/:id/entitlements', getSchoolEntitlementsController);
 superAdminRouter.put('/schools/:id/entitlements', setSchoolEntitlementsController);
+
+// ── School branding ─────────────────────────────────────────
+superAdminRouter.post('/schools/:id/logo', logoUpload.single('file'), uploadSchoolLogoController);
+superAdminRouter.delete('/schools/:id/logo', removeSchoolLogoController);
 
 // ── Audit log ───────────────────────────────────────────────
 // Cross-school student directory. Bulk writes stay school-scoped via

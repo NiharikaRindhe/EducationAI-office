@@ -13,7 +13,11 @@ async function getOrCreateSubmission(studentId: string, examId: string) {
     .maybeSingle();
   if (!assignment) throw new ApiError('FORBIDDEN', 'This exam was not assigned to you');
 
-  const { data: exam } = await supabaseAdmin.from('exams').select('status, starts_at, ends_at').eq('id', examId).single();
+  const { data: exam } = await supabaseAdmin
+    .from('exams')
+    .select('status, starts_at, ends_at, duration_min')
+    .eq('id', examId)
+    .single();
   if (!exam || exam.status !== 'published') throw new ApiError('EXAM_CLOSED', 'This exam is not currently open');
 
   // Per-section window (on the assignment) wins; the exam-level window is
@@ -39,9 +43,28 @@ async function getOrCreateSubmission(studentId: string, examId: string) {
     return existing;
   }
 
+  // Stamp the deadline ONCE, at the moment the attempt opens. Recomputing it
+  // per request let a mid-attempt edit to duration_min or the window move a
+  // student's deadline while they were writing.
+  const startedAt = new Date();
+  const durationLimit = exam.duration_min
+    ? new Date(startedAt.getTime() + Number(exam.duration_min) * 60_000)
+    : null;
+  const windowLimit = endsAt ? new Date(endsAt) : null;
+  const deadline =
+    durationLimit && windowLimit
+      ? new Date(Math.min(durationLimit.getTime(), windowLimit.getTime()))
+      : (durationLimit ?? windowLimit);
+
   const { data: created, error } = await supabaseAdmin
     .from('exam_submissions')
-    .insert({ exam_id: examId, student_id: studentId, question_seed: `${examId}-${studentId}` })
+    .insert({
+      exam_id: examId,
+      student_id: studentId,
+      question_seed: `${examId}-${studentId}`,
+      started_at: startedAt.toISOString(),
+      deadline_at: deadline ? deadline.toISOString() : null,
+    })
     .select()
     .single();
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to start exam', error.message);
@@ -159,15 +182,33 @@ export async function getExamPaper(studentId: string, examId: string) {
 export async function saveAnswer(studentId: string, examSubmissionId: string, input: SaveAnswerInput) {
   const { data: submission } = await supabaseAdmin
     .from('exam_submissions')
-    .select('id, submitted_at')
+    .select('id, exam_id, started_at, submitted_at, deadline_at')
     .eq('id', examSubmissionId)
     .eq('student_id', studentId)
     .single();
   if (!submission) throw new ApiError('NOT_FOUND', 'Exam submission not found');
   if (submission.submitted_at) throw new ApiError('EXAM_ALREADY_SUBMITTED', 'Exam already submitted');
 
-  const { data: question } = await supabaseAdmin.from('questions').select('id').eq('id', input.questionId).single();
-  if (!question) throw new ApiError('NOT_FOUND', 'Question not found');
+  // SECURITY: enforce the time limit on the server, from the deadline stamped
+  // when the attempt opened. Reading the stored value rather than recomputing
+  // means an edit to the exam mid-attempt cannot move a student's deadline.
+  // The on-screen countdown runs on a clock the student controls and must
+  // never be what actually closes the paper.
+  const deadlineAt = submission.deadline_at as string | null;
+  if (deadlineAt && Date.now() > new Date(deadlineAt).getTime()) {
+    throw new ApiError('EXAM_CLOSED', 'Time is up — this exam is no longer accepting answers');
+  }
+
+  // SECURITY: the question must belong to THIS submission's exam. Without
+  // this the question id was trusted blindly, so an answer could be written
+  // against a question from any other exam, including unassigned ones.
+  const { data: question } = await supabaseAdmin
+    .from('questions')
+    .select('id')
+    .eq('id', input.questionId)
+    .eq('exam_id', submission.exam_id)
+    .maybeSingle();
+  if (!question) throw new ApiError('NOT_FOUND', 'Question not found on this exam');
 
   // marks are read via the questions FK at grading time, not duplicated here
   const { error } = await supabaseAdmin.from('exam_answers').upsert(
@@ -215,7 +256,12 @@ export async function logProctorEvent(studentId: string, examSubmissionId: strin
   return { autoSubmitted: shouldAutoSubmit, switchCount };
 }
 
-export async function submitExam(studentId: string, examSubmissionId: string, autoSubmitted = false) {
+export async function submitExam(
+  studentId: string,
+  examSubmissionId: string,
+  autoSubmitted = false,
+  autoSubmitReason: 'expired' | 'proctoring' | null = null,
+) {
   const { data: submission } = await supabaseAdmin
     .from('exam_submissions')
     .select('id, submitted_at')
@@ -225,11 +271,25 @@ export async function submitExam(studentId: string, examSubmissionId: string, au
   if (!submission) throw new ApiError('NOT_FOUND', 'Exam submission not found');
   if (submission.submitted_at) return; // idempotent — a double-submit (e.g. proctor auto-submit racing a manual click) is a no-op
 
+  // The submission is committed on its own, and grading is left queued for
+  // the worker. Grading inline meant a slow or failing AI provider surfaced
+  // to the student as a FAILED SUBMIT — for a paper that was already safely
+  // stored. An AI outage must delay a score, never lose an exam.
   const { error } = await supabaseAdmin
     .from('exam_submissions')
-    .update({ submitted_at: new Date().toISOString(), auto_submitted: autoSubmitted })
+    .update({
+      submitted_at: new Date().toISOString(),
+      auto_submitted: autoSubmitted,
+      auto_submit_reason: autoSubmitReason,
+      grading_status: 'pending',
+    })
     .eq('id', examSubmissionId);
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to submit exam', error.message);
 
-  await gradeSubmission(examSubmissionId);
+  // Best-effort fast path so a healthy provider still grades immediately.
+  // Any failure is swallowed: the row stays 'pending' and the worker's
+  // grading sweep retries it.
+  void gradeSubmission(examSubmissionId).catch(() => {
+    /* worker retries — never surface to the submitting student */
+  });
 }

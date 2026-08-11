@@ -246,6 +246,9 @@ services:
       SUPABASE_URL: http://kong:8000
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      # env.ts requires SUPABASE_JWT_SECRET specifically and exits if it is
+      # absent — passing only JWT_SECRET meant the container never booted.
+      SUPABASE_JWT_SECRET: ${JWT_SECRET}
       JWT_SECRET: ${JWT_SECRET}
       FRONTEND_URL: ${SITE_URL}
       OLLAMA_URL: http://ollama:11434
@@ -292,6 +295,9 @@ services:
       SUPABASE_URL: http://kong:8000
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      # env.ts requires SUPABASE_JWT_SECRET specifically and exits if it is
+      # absent — passing only JWT_SECRET meant the container never booted.
+      SUPABASE_JWT_SECRET: ${JWT_SECRET}
       JWT_SECRET: ${JWT_SECRET}
       FRONTEND_URL: ${SITE_URL}
       OLLAMA_URL: http://ollama:11434

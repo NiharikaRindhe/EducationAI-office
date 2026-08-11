@@ -4,6 +4,7 @@ import { logger } from './lib/logger.js';
 import { startStreakResetJob } from './jobs/streakReset.job.js';
 import { startLeaderboardRecomputeJob } from './jobs/leaderboardRecompute.job.js';
 import { startIngestionWorker, stopIngestionWorker } from './jobs/ingestionWorker.job.js';
+import { startExamSweeper, stopExamSweeper } from './jobs/examSweeper.job.js';
 
 // ─────────────────────────────────────────────────────────────
 //  BACKGROUND WORKER — every scheduled/queued job, in a process
@@ -35,6 +36,7 @@ import { startIngestionWorker, stopIngestionWorker } from './jobs/ingestionWorke
 startStreakResetJob();
 startLeaderboardRecomputeJob();
 startIngestionWorker();
+startExamSweeper();
 
 // Minimal health endpoint so Docker/orchestrators can tell a live worker from
 // a crash-looping one. Deliberately not Express — this serves one route and
@@ -57,6 +59,7 @@ healthServer.listen(env.workerPort, () => {
 async function shutdown(signal: string) {
   logger.info({ signal }, 'Worker shutting down…');
   healthServer.close();
+  stopExamSweeper();
   await stopIngestionWorker();
   logger.info('Worker stopped cleanly');
   process.exit(0);

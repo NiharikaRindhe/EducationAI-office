@@ -2,9 +2,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   Loader2, AlertCircle, ArrowLeft, Users, GraduationCap, Radio, Bot,
-  KeyRound, UserPlus, Copy, Check, X, Save, Power,
+  KeyRound, UserPlus, Copy, Check, X, Save, Power, Upload, Image as ImageIcon,
 } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
+import { schoolLogoUrl } from '../../lib/assets';
 
 interface SchoolProfile {
   id: string;
@@ -16,6 +17,7 @@ interface SchoolProfile {
   pincode: string | null;
   board: string;
   plan: string;
+  logo_path: string | null;
   contact_name: string | null;
   contact_email: string | null;
   contact_phone: string | null;
@@ -112,6 +114,40 @@ export const SuperAdminSchoolDetail: React.FC = () => {
       setError(err instanceof ApiClientError ? err.message : 'Failed to load school');
     }
   }, [schoolId]);
+
+  const logoInputRef = React.useRef<HTMLInputElement>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+
+  const uploadLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !schoolId) return;
+    setIsUploadingLogo(true);
+    setError('');
+    try {
+      await api.upload(`/super-admin/schools/${schoolId}/logo`, file);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Failed to upload logo');
+    } finally {
+      setIsUploadingLogo(false);
+      // Clear the input so re-picking the same file still fires onChange.
+      if (logoInputRef.current) logoInputRef.current.value = '';
+    }
+  };
+
+  const removeLogo = async () => {
+    if (!schoolId) return;
+    setIsUploadingLogo(true);
+    setError('');
+    try {
+      await api.delete(`/super-admin/schools/${schoolId}/logo`);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Failed to remove logo');
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
 
   const loadEntitlements = useCallback(async () => {
     if (!schoolId) return;
@@ -485,6 +521,44 @@ export const SuperAdminSchoolDetail: React.FC = () => {
       {/* Profile tab */}
       {tab === 'profile' && (
         <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
+          {/* Logo — EduAI can set branding on the school's behalf during
+              onboarding, before their admin has ever signed in. */}
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-4">
+            <div className="w-14 h-14 shrink-0 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
+              {school.logo_path ? (
+                <img src={schoolLogoUrl(school.logo_path)} alt="" className="w-full h-full object-contain" />
+              ) : (
+                <ImageIcon size={18} className="text-slate-300" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-[13px] font-semibold text-slate-800">School logo</h3>
+              <p className="text-[12px] text-slate-400 mt-0.5">
+                {school.logo_path ? 'Shown to every user at this school.' : 'Not set — the school can also upload their own.'}
+              </p>
+            </div>
+            <div className="ml-auto flex items-center gap-2 shrink-0">
+              <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadLogo} className="hidden" />
+              <button
+                onClick={() => logoInputRef.current?.click()}
+                disabled={isUploadingLogo}
+                className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-600 border border-slate-200 px-3 py-1.5 rounded-lg hover:border-slate-400 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {isUploadingLogo ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                {school.logo_path ? 'Replace' : 'Upload'}
+              </button>
+              {school.logo_path && (
+                <button
+                  onClick={() => void removeLogo()}
+                  disabled={isUploadingLogo}
+                  className="text-[12px] font-semibold text-rose-600 border border-rose-200 px-3 py-1.5 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
             <h2 className="text-[14px] font-semibold text-slate-800">School profile</h2>
             {!isEditing && (

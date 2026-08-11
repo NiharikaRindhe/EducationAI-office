@@ -24,6 +24,14 @@ export type FeatureKey =
   | 'reports_analytics'
   | 'school_content_upload';
 
+/** The signed-in user's school, for branding the portal. Null for
+ *  super_admin, who belongs to no school and keeps EduAI's own identity. */
+export interface AuthSchool {
+  name: string;
+  code: string;
+  logoPath: string | null;
+}
+
 export interface AuthUser {
   id: string;
   role: Role;
@@ -31,6 +39,7 @@ export interface AuthUser {
   full_name: string;
   student_profiles: StudentProfile | null;
   features: FeatureKey[];
+  school: AuthSchool | null;
 }
 
 interface LoginResponse {

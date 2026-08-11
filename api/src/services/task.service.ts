@@ -7,8 +7,43 @@ import type { CreateTaskInput } from '../schemas/task.schema.js';
 const STATUS_ORDER = ['not_started', 'in_progress', 'in_review', 'completed'] as const;
 type Status = (typeof STATUS_ORDER)[number];
 
-async function resolveStudentIds(schoolId: string, assignTo: CreateTaskInput['assignTo']): Promise<string[]> {
-  if (assignTo.mode === 'students') return assignTo.studentIds;
+async function resolveStudentIds(
+  teacherId: string,
+  schoolId: string,
+  assignTo: CreateTaskInput['assignTo'],
+): Promise<string[]> {
+  if (assignTo.mode === 'students') {
+    // SECURITY: these ids arrive from the client. Returned unvalidated, a
+    // crafted request could assign a task to any student in ANY school.
+    // Same rule the 'sections' mode enforces: the student must sit in a
+    // section this teacher actually teaches.
+    const scope = await getTeachingScope(teacherId, schoolId);
+    if (scope.sections.length === 0) {
+      throw new ApiError('FORBIDDEN', 'You have no assigned sections to assign tasks to');
+    }
+
+    const pairs = scope.sections
+      .map((s) => `and(class_num.eq.${s.classNum},section.eq.${String(s.section).replace(/[^A-Za-z0-9]/g, '')})`)
+      .join(',');
+
+    const { data: allowed, error } = await supabaseAdmin
+      .from('user_profiles')
+      .select('id, student_profiles!inner(class_num, section)')
+      .eq('school_id', schoolId)
+      .eq('role', 'student')
+      .or(pairs, { referencedTable: 'student_profiles' });
+    if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to resolve teaching scope', error.message);
+
+    const allowedIds = new Set((allowed ?? []).map((r) => r.id as string));
+    const rejected = assignTo.studentIds.filter((id) => !allowedIds.has(id));
+    if (rejected.length > 0) {
+      throw new ApiError(
+        'FORBIDDEN',
+        `You can only assign tasks to students you teach (${rejected.length} of ${assignTo.studentIds.length} selected are outside your sections)`,
+      );
+    }
+    return assignTo.studentIds;
+  }
 
   let query = supabaseAdmin
     .from('user_profiles')
@@ -52,7 +87,7 @@ export async function createAndAssignTask(teacherId: string, schoolId: string, i
     }
   }
 
-  const studentIds = await resolveStudentIds(schoolId, input.assignTo);
+  const studentIds = await resolveStudentIds(teacherId, schoolId, input.assignTo);
   if (studentIds.length === 0) throw new ApiError('VALIDATION_ERROR', 'No students matched the assignment target');
 
   const batchId = input.assignTo.mode === 'batch' ? input.assignTo.batchId : null;

@@ -63,11 +63,25 @@ export async function addQuestion(teacherId: string, examId: string, input: AddQ
 export async function addQuestionsFromBank(teacherId: string, examId: string, bankIds: string[]) {
   const exam = await requireDraftExamOwnedByTeacher(teacherId, examId);
 
+  // SECURITY: bankIds are client-supplied. Without a scope filter a teacher
+  // could name any question_bank row id and copy another SCHOOL's private
+  // questions into their own paper. Only EduAI's global bank and this
+  // school's own questions are reachable.
   const { data: bankQuestions, error: bankError } = await supabaseAdmin
     .from('question_bank')
     .select('*')
-    .in('id', bankIds);
+    .in('id', bankIds)
+    .or(`scope.eq.global,school_id.eq.${exam.school_id}`);
   if (bankError) throw new ApiError('INTERNAL_ERROR', 'Failed to load bank questions', bankError.message);
+
+  // Silently copying only the permitted subset would hand back a paper with
+  // missing questions and no explanation — fail loudly instead.
+  if ((bankQuestions ?? []).length !== bankIds.length) {
+    throw new ApiError(
+      'FORBIDDEN',
+      'Some selected questions are not available to your school',
+    );
+  }
 
   const { count } = await supabaseAdmin
     .from('questions')
@@ -178,6 +192,29 @@ async function resolveAssignments(
   assignTo: PublishExamInput['assignTo'],
 ): Promise<AssignmentRow[]> {
   if (assignTo.mode === 'students') {
+    // SECURITY: these ids come straight from the client. Unvalidated, a
+    // crafted request could assign an exam to any student in ANY school —
+    // the other two modes below already scope properly, this one did not.
+    // Same rule as 'sections': the student must sit in a section this
+    // teacher actually teaches, of this exam's class.
+    const scope = await getTeachingScope(teacherId, schoolId);
+    const sectionsOfExamClass = scope.sections.filter((s) => s.classNum === exam.class_num);
+
+    const allowedIds = new Set<string>();
+    for (const s of sectionsOfExamClass) {
+      for (const id of await studentsInSection(schoolId, s.classNum, s.section)) {
+        allowedIds.add(id);
+      }
+    }
+
+    const rejected = assignTo.studentIds.filter((id) => !allowedIds.has(id));
+    if (rejected.length > 0) {
+      throw new ApiError(
+        'FORBIDDEN',
+        `You can only assign this exam to students you teach in Class ${exam.class_num} (${rejected.length} of ${assignTo.studentIds.length} selected are outside your classes)`,
+      );
+    }
+
     return assignTo.studentIds.map((studentId) => ({ exam_id: exam.id, student_id: studentId }));
   }
 
@@ -242,24 +279,24 @@ export async function publishExam(teacherId: string, schoolId: string, examId: s
   const assignments = await resolveAssignments(teacherId, schoolId, exam, input.assignTo);
   if (assignments.length === 0) throw new ApiError('VALIDATION_ERROR', 'No students matched the assignment target');
 
-  const { error: settingsError } = await supabaseAdmin.from('proctoring_settings').upsert({
-    exam_id: exam.id,
-    randomize_questions: input.randomizeQuestions,
-    shuffle_options: input.shuffleOptions,
-    auto_submit_on_switch: input.autoSubmitOnSwitch,
-    switch_limit: input.switchLimit,
+  // Settings, assignments and the status flip commit together or not at all.
+  // As three separate writes, a failure part-way through left a DRAFT exam
+  // that students were already assigned to, and a retry duplicated every
+  // assignment. The RPC is idempotent, so retrying converges.
+  const { data: published, error: publishError } = await supabaseAdmin.rpc('publish_exam', {
+    p_exam_id: exam.id,
+    p_teacher_id: teacherId,
+    p_assignments: assignments.map((a) => ({
+      student_id: a.student_id,
+      class_section_id: a.class_section_id ?? null,
+      starts_at: a.starts_at ?? null,
+      ends_at: a.ends_at ?? null,
+    })),
+    p_randomize_questions: input.randomizeQuestions,
+    p_shuffle_options: input.shuffleOptions,
+    p_auto_submit_on_switch: input.autoSubmitOnSwitch,
+    p_switch_limit: input.switchLimit,
   });
-  if (settingsError) throw new ApiError('INTERNAL_ERROR', 'Failed to save proctoring settings', settingsError.message);
-
-  const { error: assignError } = await supabaseAdmin.from('exam_assignments').insert(assignments);
-  if (assignError) throw new ApiError('INTERNAL_ERROR', 'Failed to assign exam', assignError.message);
-
-  const { data: published, error: publishError } = await supabaseAdmin
-    .from('exams')
-    .update({ status: 'published' })
-    .eq('id', exam.id)
-    .select()
-    .single();
   if (publishError) throw new ApiError('INTERNAL_ERROR', 'Failed to publish exam', publishError.message);
 
   return { exam: published, assignedCount: assignments.length };

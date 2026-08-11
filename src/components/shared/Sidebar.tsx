@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
+import { schoolLogoUrl } from '../../lib/assets';
 import {
   ChevronDown, ChevronRight, LogOut, PanelLeftClose, PanelLeftOpen,
   BookOpen, Trophy, Calendar, CheckSquare,
@@ -42,6 +43,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { studentName, studentAvatar, studentXP, studentStreak } = useApp();
   const { user, logout: authLogout } = useAuth();
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+
+  // A school's logo is uploaded content and lives in a public bucket — if the
+  // object is missing or corrupt the <img> would render as a broken icon in
+  // every page of the portal, so fall back to the lettered tile instead.
+  const [logoFailed, setLogoFailed] = useState(false);
+  const school = user?.school ?? null;
+  useEffect(() => { setLogoFailed(false); }, [school?.logoPath]);
+
+  const brandName = school?.name ?? logoText;
+  // EduAI stays visible under the school's name — this is their portal, but
+  // it is not their product.
+  const brandSubtitle = school ? 'Powered by EduAI' : 'K-12 PORTAL';
+  const schoolLogoSrc = school?.logoPath ? schoolLogoUrl(school.logoPath) : null;
 
   const toggleSubnav = (label: string) => {
     setExpandedItems(prev => ({
@@ -147,14 +161,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </button>
       )}
       <div className={`flex flex-col gap-8 overflow-y-auto ${collapsed ? '' : 'pr-1'}`}>
-        {/* Brand Logo */}
-        <Link to="/" className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`} title={collapsed ? logoText : undefined}>
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-display font-bold text-lg ${currentTheme.logoBg}`}>
-            {logoText.charAt(0)}
-          </div>
-          <div className={collapsed ? 'hidden' : ''}>
-            <span className="font-display font-bold text-lg text-slate-800 block leading-tight">{logoText}</span>
-            <span className="text-[10px] text-slate-400 font-label-caps tracking-wider block">K-12 PORTAL</span>
+        {/* Brand — the school's own identity when the user belongs to one,
+            falling back to EduAI's for the Super Admin (no school) and for
+            schools that haven't uploaded a logo yet. */}
+        <Link
+          to="/"
+          className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}
+          title={collapsed ? brandName : undefined}
+        >
+          {schoolLogoSrc && !logoFailed ? (
+            <img
+              src={schoolLogoSrc}
+              alt={`${brandName} logo`}
+              onError={() => setLogoFailed(true)}
+              className="w-10 h-10 rounded-xl object-contain bg-white border border-slate-200 shrink-0"
+            />
+          ) : (
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-display font-bold text-lg shrink-0 ${currentTheme.logoBg}`}>
+              {brandName.charAt(0)}
+            </div>
+          )}
+          <div className={collapsed ? 'hidden' : 'min-w-0'}>
+            {/* Real school names ("Springfield Public School") overflow a
+                sidebar at the platform's own 18px wordmark size, so school
+                branding wraps to two lines at a smaller size instead of
+                truncating to something unrecognisable. */}
+            <span
+              className={`font-display font-bold text-slate-800 block leading-tight ${
+                school ? 'text-[13px] line-clamp-2' : 'text-lg truncate'
+              }`}
+              title={brandName}
+            >
+              {brandName}
+            </span>
+            <span className="text-[10px] text-slate-400 font-label-caps tracking-wider block truncate mt-0.5">
+              {brandSubtitle}
+            </span>
           </div>
         </Link>
 

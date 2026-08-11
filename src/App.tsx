@@ -113,6 +113,7 @@ import { SchoolAdminPrincipalReport } from './routes/school-admin/PrincipalRepor
 import { SchoolAdminPromotion } from './routes/school-admin/Promotion';
 import { SchoolAdminTickets } from './routes/school-admin/Tickets';
 import { SchoolAdminContentLibrary } from './routes/school-admin/ContentLibrary';
+import { SchoolAdminBranding } from './routes/school-admin/Branding';
 
 // Import Lab In-charge Pages
 import { LabInchargeLayout } from './routes/lab-incharge/Layout';
@@ -263,6 +264,7 @@ function App() {
               <Route path="timetable" element={<SchoolAdminTimetable />} />
               <Route path="content" element={<SchoolAdminContentLibrary />} />
               <Route path="feature-toggles" element={<SchoolAdminFeatureToggles />} />
+              <Route path="branding" element={<SchoolAdminBranding />} />
               <Route path="principal-report" element={<SchoolAdminPrincipalReport />} />
               <Route path="promotion" element={<SchoolAdminPromotion />} />
               <Route path="tickets" element={<SchoolAdminTickets />} />

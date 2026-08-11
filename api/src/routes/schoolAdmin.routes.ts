@@ -61,11 +61,18 @@ import {
   generateQuestionsController,
   saveGeneratedQuestionsController,
 } from '../controllers/examGenerator.controller.js';
+import {
+  uploadOwnLogoController,
+  removeOwnLogoController,
+} from '../controllers/schoolBranding.controller.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 // PDFs run far larger than the CSV/XLSX imports above — same 150MB ceiling
 // as the Super Admin's NCERT upload (see superAdmin.routes.ts).
 const pdfUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 150 * 1024 * 1024 } });
+// Logos are small; the service re-checks size and MIME so this is only the
+// outer guard that stops a huge upload being buffered into memory at all.
+const logoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
 
 export const schoolAdminRouter = Router();
 
@@ -138,3 +145,9 @@ schoolAdminRouter.get('/timetable/occurrences', getSchoolOccurrencesController);
 schoolAdminRouter.get('/exam-generator/chapters', listGeneratableChaptersController);
 schoolAdminRouter.post('/exam-generator/generate', generateQuestionsController);
 schoolAdminRouter.post('/exam-generator/save', saveGeneratedQuestionsController);
+
+// ── School branding (own school's logo) ───────────────────────
+// Not gated by an entitlement: a school's own identity in the portal
+// isn't a paid add-on, it's table stakes for feeling like their platform.
+schoolAdminRouter.post('/logo', logoUpload.single('file'), uploadOwnLogoController);
+schoolAdminRouter.delete('/logo', removeOwnLogoController);

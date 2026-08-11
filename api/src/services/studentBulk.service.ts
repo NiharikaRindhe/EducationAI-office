@@ -2,6 +2,7 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
 import { resetStudentCredential } from './schoolAdmin.service.js';
 import { assertStudentsInSchool } from './studentDirectory.service.js';
+import { revokeSessionsForUsers } from '../lib/sessions.js';
 import type { StudentCredential } from './schoolAdmin.service.js';
 
 /**
@@ -107,6 +108,13 @@ export async function bulkSetStudentActive(
     .update({ is_active: isActive, updated_at: new Date().toISOString() })
     .in('id', studentIds);
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to update student accounts', error.message);
+
+  // requireAuth re-reads is_active per request, so a deactivated student is
+  // refused on their very next call regardless. Revoking as well closes the
+  // token they are still holding on a shared lab machine right now.
+  if (!isActive) {
+    await revokeSessionsForUsers(studentIds, 'account_deactivated');
+  }
 
   return { succeeded: studentIds.length, failed: [] };
 }

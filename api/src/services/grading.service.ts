@@ -82,13 +82,50 @@ async function scoreSubjectiveWithAI(
 }
 
 /** Runs once at submit time: grades every answered question, objective instantly and subjective via AI if configured. */
+/**
+ * Grades one submission and records the outcome as state on the row.
+ *
+ * Callers must NOT depend on this succeeding inline — submitExam() fires it
+ * best-effort and the worker's sweep retries anything left 'pending' or
+ * 'failed'. Marking state here is what makes that retry loop terminate.
+ */
 export async function gradeSubmission(examSubmissionId: string) {
   const { data: submission } = await supabaseAdmin
     .from('exam_submissions')
-    .select('id, exam_id, student_id, exams(class_num, subject)')
+    .select('id, exam_id, student_id, grading_attempts, exams(class_num, subject)')
     .eq('id', examSubmissionId)
     .single();
   if (!submission) return;
+
+  await supabaseAdmin
+    .from('exam_submissions')
+    .update({
+      grading_status: 'in_progress',
+      grading_attempts: Number(submission.grading_attempts ?? 0) + 1,
+    })
+    .eq('id', examSubmissionId);
+
+  try {
+    await runGrading(examSubmissionId, submission);
+    await supabaseAdmin
+      .from('exam_submissions')
+      .update({ grading_status: 'graded', grading_error: null })
+      .eq('id', examSubmissionId);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error({ examSubmissionId, err: message }, 'Grading failed — will be retried by the worker');
+    await supabaseAdmin
+      .from('exam_submissions')
+      .update({ grading_status: 'failed', grading_error: message.slice(0, 500) })
+      .eq('id', examSubmissionId);
+    throw err;
+  }
+}
+
+async function runGrading(
+  examSubmissionId: string,
+  submission: { exam_id: unknown; student_id: unknown; exams: unknown },
+) {
 
   const exam = Array.isArray(submission.exams) ? submission.exams[0] : submission.exams;
 

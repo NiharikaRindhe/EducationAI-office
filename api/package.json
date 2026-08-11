@@ -14,7 +14,10 @@
     "typecheck": "tsc --noEmit",
     "seed:super-admin": "tsx scripts/seedSuperAdmin.ts",
     "seed:school-admin": "tsx scripts/seedSchoolAdmin.ts",
-    "assets:upload-lab": "tsx scripts/uploadLabAssets.ts"
+    "assets:upload-lab": "tsx scripts/uploadLabAssets.ts",
+    "test": "vitest run",
+    "test:security": "vitest run tests/security.test.ts",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
@@ -50,6 +53,7 @@
     "eslint": "^9.9.0",
     "pino-pretty": "^11.2.2",
     "tsx": "^4.19.0",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "vitest": "^4.1.10"
   }
 }
