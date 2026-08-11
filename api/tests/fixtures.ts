@@ -218,25 +218,83 @@ export async function provisionFixtures(): Promise<Fixtures> {
 }
 
 /**
- * Remove everything provisioned above.
+ * Tables that reference student_profiles WITHOUT on delete cascade. Deleting an
+ * auth user cascades as far as student_profiles and stops dead at any of these,
+ * so they have to be cleared first.
  *
- * Deleting the two schools cascades to sections and teaching assignments, and
- * deleting the auth users cascades to their profiles — but english attempts and
- * chat sessions reference students without ON DELETE CASCADE, so they are
- * cleared first. Each step is independent: one failure must not strand the rest.
+ * Some are populated by the tests themselves; others by background jobs that
+ * happen to run mid-suite — leaderboard_snapshots is the one that actually bit,
+ * because a snapshot picked up the fixture students and pinned them in place.
+ */
+const STUDENT_DEPENDENTS = [
+  'session_participants',
+  'task_assignments',
+  'exam_assignments',
+  'exam_submissions',
+  'student_badges',
+  'notes',
+  'subject_progress',
+  'streak_logs',
+  'leaderboard_snapshots',
+  'chat_sessions',
+  'english_assessment_attempts',
+  'game_attempts',
+  'student_daily_challenges',
+] as const;
+
+/** Same problem on the teacher side. */
+const TEACHER_DEPENDENTS = ['live_sessions', 'announcements'] as const;
+
+/**
+ * Remove everything provisioned above, and VERIFY it is gone.
+ *
+ * The first version of this swallowed every error (`.catch(() => {})` on a
+ * client that returns errors rather than throwing) and checked nothing. It had
+ * been failing on every run for a day, leaving twenty fixture schools in the
+ * developer's database, and said nothing. A teardown that cannot fail loudly is
+ * not a teardown.
  */
 export async function teardownFixtures(f: Fixtures): Promise<void> {
   const sb = admin();
   const studentIds = [f.studentA1.id, f.studentA2.id, f.studentB1.id];
+  const problems: string[] = [];
 
-  await sb.from('english_assessment_attempts').delete().in('student_id', studentIds);
   await sb.from('chat_messages').delete().in('session_id', [f.chatIdA1, f.chatIdA2, f.chatIdB1]);
-  await sb.from('chat_sessions').delete().in('student_id', studentIds);
+
+  for (const table of STUDENT_DEPENDENTS) {
+    const { error } = await sb.from(table).delete().in('student_id', studentIds);
+    if (error) problems.push(`${table}: ${error.message}`);
+  }
+
+  // Exams and tasks reference the teacher through created_by, not teacher_id.
+  for (const table of ['exams', 'tasks'] as const) {
+    const { error } = await sb.from(table).delete().eq('created_by', f.teacherA.id);
+    if (error) problems.push(`${table}: ${error.message}`);
+  }
+  for (const table of TEACHER_DEPENDENTS) {
+    const { error } = await sb.from(table).delete().eq('teacher_id', f.teacherA.id);
+    if (error) problems.push(`${table}: ${error.message}`);
+  }
+
   await sb.from('english_assessment_items').delete().like('content', `${PREFIX}%`);
 
   for (const id of [...studentIds, f.teacherA.id, f.schoolAdminA.id, f.superAdmin.id]) {
-    await sb.auth.admin.deleteUser(id).catch(() => {});
+    const { error } = await sb.auth.admin.deleteUser(id);
+    if (error) problems.push(`deleteUser(${id}): ${error.message || JSON.stringify(error)}`);
   }
+
   // Cascades to sections, teaching assignments, entitlements and class features.
-  await sb.from('schools').delete().in('id', [f.schoolAId, f.schoolBId]);
+  const { error: schoolError } = await sb.from('schools').delete().in('id', [f.schoolAId, f.schoolBId]);
+  if (schoolError) problems.push(`schools: ${schoolError.message}`);
+
+  // Confirm, rather than assume. A leaked school is invisible until someone
+  // opens the Super Admin list and finds twenty of them.
+  const { data: survivors } = await sb.from('schools').select('code').in('id', [f.schoolAId, f.schoolBId]);
+  if (survivors && survivors.length > 0) {
+    problems.push(`schools still present: ${survivors.map((s) => s.code).join(', ')}`);
+  }
+
+  if (problems.length > 0) {
+    throw new Error(`Fixture teardown incomplete — test data left behind:\n  ${problems.join('\n  ')}`);
+  }
 }
