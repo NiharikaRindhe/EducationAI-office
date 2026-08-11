@@ -33,7 +33,7 @@ export async function listTeachersController(req: Request, res: Response, next: 
 export async function resetStudentCredentialController(req: Request, res: Response, next: NextFunction) {
   try {
     const schoolId = requireSchoolId(req);
-    res.json(await schoolAdminService.resetStudentCredential(schoolId, req.params.id!));
+    res.json(await schoolAdminService.resetStudentCredential(schoolId, req.params.id!, req.user!.id));
   } catch (err) {
     next(err);
   }
@@ -42,7 +42,7 @@ export async function resetStudentCredentialController(req: Request, res: Respon
 export async function resetTeacherPasswordController(req: Request, res: Response, next: NextFunction) {
   try {
     const schoolId = requireSchoolId(req);
-    res.json(await schoolAdminService.resetTeacherPassword(schoolId, req.params.id!));
+    res.json(await schoolAdminService.resetTeacherPassword(schoolId, req.params.id!, req.user!.id));
   } catch (err) {
     next(err);
   }

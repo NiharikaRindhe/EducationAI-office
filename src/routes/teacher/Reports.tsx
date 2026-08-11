@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Download, Printer, BarChart3, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Loader2, Download, Printer, AlertTriangle } from 'lucide-react';
 import { api } from '../../lib/api';
 
 interface Section {
@@ -175,7 +175,7 @@ export const TeacherReports: React.FC = () => {
         ].map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
+            onClick={() => setActiveTab(tab.id as 'heatmap' | 'english' | 'tasks')}
             className={`py-2 px-5 rounded-full font-sans text-xs font-bold transition-all cursor-pointer ${
               activeTab === tab.id 
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' 

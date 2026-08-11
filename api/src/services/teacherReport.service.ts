@@ -2,6 +2,9 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
 import { getTeachingScope } from './teacher.service.js';
 
+/** The status values `task_assignments.status` is constrained to in the schema. */
+type TaskStatus = 'completed' | 'in_progress' | 'not_started' | 'in_review';
+
 async function verifySectionAccess(teacherId: string, schoolId: string, classNum: number, section: string) {
   const scope = await getTeachingScope(teacherId, schoolId);
   const hasAccess = scope.legacyFallback
@@ -250,7 +253,7 @@ export async function getTaskCompletionMatrix(
   if (aErr) throw new ApiError('INTERNAL_ERROR', 'Failed to fetch task assignments', aErr.message);
 
   const uniqueTasksMap = new Map<string, { id: string; title: string; subject: string }>();
-  const studentTaskStatusMap = new Map<string, 'completed' | 'in_progress' | 'not_started' | 'in_review'>();
+  const studentTaskStatusMap = new Map<string, TaskStatus>();
 
   assignments?.forEach((a) => {
     const taskData = Array.isArray(a.tasks) ? a.tasks[0] : a.tasks;
@@ -261,7 +264,7 @@ export async function getTaskCompletionMatrix(
         subject: taskData.subject,
       });
     }
-    studentTaskStatusMap.set(`${a.student_id}_${a.task_id}`, a.status as any);
+    studentTaskStatusMap.set(`${a.student_id}_${a.task_id}`, a.status as TaskStatus);
   });
 
   const tasksList = [...uniqueTasksMap.values()];

@@ -38,6 +38,28 @@ const labelCls = 'block text-[12px] font-medium text-slate-600 mb-1';
 const selectCls =
   'px-3 py-2 text-[13px] text-slate-700 bg-white border border-slate-300 rounded-lg outline-none cursor-pointer focus:border-slate-500';
 
+/**
+ * Defined at module scope on purpose. When this lived inside the page
+ * component it was a NEW component type on every render, so React tore down
+ * and rebuilt each sortable header on any state change — losing focus mid-
+ * interaction. Sort state comes in as props instead of via closure.
+ */
+const SortHeader: React.FC<{
+  label: string;
+  k: SortKey;
+  sortKey: SortKey;
+  sortAsc: boolean;
+  onSort: (k: SortKey) => void;
+}> = ({ label, k, sortKey, sortAsc, onSort }) => (
+  <button
+    onClick={() => onSort(k)}
+    className="inline-flex items-center gap-1 uppercase tracking-wider font-semibold cursor-pointer hover:text-slate-700"
+  >
+    {label}
+    {sortKey === k && (sortAsc ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+  </button>
+);
+
 function tp(t: TeacherRow) {
   return Array.isArray(t.teacher_profiles) ? (t.teacher_profiles as unknown as TeacherRow['teacher_profiles'][])[0] : t.teacher_profiles;
 }
@@ -205,13 +227,6 @@ export const SchoolAdminTeachers: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  const SortHeader: React.FC<{ label: string; k: SortKey }> = ({ label, k }) => (
-    <button onClick={() => toggleSort(k)} className="inline-flex items-center gap-1 uppercase tracking-wider font-semibold cursor-pointer hover:text-slate-700">
-      {label}
-      {sortKey === k && (sortAsc ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
-    </button>
-  );
-
   return (
     <div className="flex flex-col gap-5">
       <PortalPageHeader
@@ -322,9 +337,9 @@ export const SchoolAdminTeachers: React.FC = () => {
               <table className="portal-table w-full">
                 <thead>
                   <tr className="bg-slate-50 text-left text-[11px] text-slate-500">
-                    <th className="px-4 py-3 whitespace-nowrap"><SortHeader label="Teacher" k="name" /></th>
-                    <th className="px-4 py-3 whitespace-nowrap"><SortHeader label="Employee ID" k="employee" /></th>
-                    <th className="px-4 py-3 whitespace-nowrap"><SortHeader label="Specialization" k="specialization" /></th>
+                    <th className="px-4 py-3 whitespace-nowrap"><SortHeader label="Teacher" k="name" sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} /></th>
+                    <th className="px-4 py-3 whitespace-nowrap"><SortHeader label="Employee ID" k="employee" sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} /></th>
+                    <th className="px-4 py-3 whitespace-nowrap"><SortHeader label="Specialization" k="specialization" sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} /></th>
                     <th className="px-4 py-3 uppercase tracking-wider font-semibold whitespace-nowrap">Classes taught</th>
                     <th className="px-4 py-3 uppercase tracking-wider font-semibold whitespace-nowrap">Status</th>
                     <th className="px-4 py-3" />

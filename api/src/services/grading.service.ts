@@ -22,7 +22,7 @@ function normalize(s: string | null | undefined): string {
 
 /** MCQ/True-False/Fill-blank: instant, deterministic — no AI needed or wanted here. */
 function gradeObjective(question: QuestionRow, selectedOptionId: string | null, studentAnswer: string | null) {
-  let isCorrect = false;
+  let isCorrect: boolean;
   if (question.type === 'mcq') {
     // The correct choice lives as a flag on the option itself. Builder-written
     // questions use `isCorrect`, bank-seeded ones `is_correct` — accept both,

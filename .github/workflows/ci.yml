@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch makes the in-flight run irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast feedback: types and lint need no database, so they must not wait
+  # behind a Supabase boot that takes a couple of minutes.
+  static:
+    name: Types and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            api/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install API dependencies
+        working-directory: api
+        run: npm ci
+
+      - name: Typecheck frontend
+        run: npx tsc --noEmit -p tsconfig.app.json
+
+      - name: Typecheck API
+        working-directory: api
+        run: npm run typecheck
+
+      # Warnings are documented, pre-existing debt (see eslint.config.js).
+      # Errors are not: any new error fails the build.
+      - name: Lint frontend
+        run: npx eslint src --ext .ts,.tsx
+
+      - name: Lint API
+        working-directory: api
+        run: npm run lint
+
+  # The point of this job: build the database from migrations ONLY — no
+  # developer's seed data, no hand-fixed rows — and prove the RLS policies
+  # hold against it. The suites provision their own schools and roles.
+  security:
+    name: Security and isolation tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase (applies every migration to a clean database)
+        run: supabase start
+
+      - name: Export stack credentials
+        run: |
+          {
+            echo "SUPABASE_URL=$(supabase status -o json | jq -r '.API_URL')"
+            echo "SUPABASE_ANON_KEY=$(supabase status -o json | jq -r '.ANON_KEY')"
+            echo "SUPABASE_SERVICE_KEY=$(supabase status -o json | jq -r '.SERVICE_ROLE_KEY')"
+            echo "SUPABASE_JWT_SECRET=$(supabase status -o json | jq -r '.JWT_SECRET')"
+          } >> "$GITHUB_ENV"
+
+      - name: Install API dependencies
+        working-directory: api
+        run: npm ci
+
+      - name: Build API
+        working-directory: api
+        run: npm run build
+
+      - name: Start API
+        working-directory: api
+        env:
+          NODE_ENV: test
+          PORT: 4000
+        run: |
+          node dist/index.js > /tmp/api.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4000/health > /dev/null; then
+              echo "API up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "API failed to start:"; cat /tmp/api.log; exit 1
+
+      - name: Run security and isolation suites
+        working-directory: api
+        env:
+          TEST_API_URL: http://localhost:4000/api
+          TEST_SUPABASE_URL: http://127.0.0.1:54321
+        run: npm test
+
+      # The API log is the only way to tell a genuine policy failure from the
+      # API having fallen over mid-run.
+      - name: API log
+        if: failure()
+        run: cat /tmp/api.log

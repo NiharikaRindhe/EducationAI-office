@@ -1,5 +1,19 @@
 import { supabaseAdmin } from './supabase.js';
 import { logger } from './logger.js';
+import { writeAuditLog } from '../services/auditLog.service.js';
+
+/**
+ * Who caused a revocation, for the audit trail.
+ *
+ * Optional because a few revocations are system-initiated (a sweep, a
+ * suspension cascade) and have no human actor. When absent the audit entry
+ * records the affected user as their own actor rather than being dropped —
+ * losing the record entirely would be worse than an imprecise one.
+ */
+export interface RevocationContext {
+  actorId?: string;
+  schoolId?: string | null;
+}
 
 /**
  * Force every existing session for a user to end.
@@ -24,27 +38,55 @@ import { logger } from './logger.js';
  * believing the credential is unchanged when it is not. Logged loudly
  * instead.
  */
-export async function revokeUserSessions(userId: string, reason: string): Promise<void> {
+export async function revokeUserSessions(
+  userId: string,
+  reason: string,
+  ctx: RevocationContext = {},
+): Promise<void> {
+  let revoked = false;
+  let sessionsDeleted = 0;
   try {
-    const { error } = await supabaseAdmin.auth.admin.signOut(userId, 'global');
+    // NOT auth.admin.signOut(): that takes a JWT, not a user id, so calling it
+    // with an id failed on every invocation. This deletes the user's rows in
+    // auth.sessions, which cascades to their refresh tokens.
+    const { data, error } = await supabaseAdmin.rpc('revoke_user_sessions', { p_user_id: userId });
     if (error) {
       logger.error({ userId, reason, err: error.message }, 'Failed to revoke sessions');
-      return;
+    } else {
+      revoked = true;
+      sessionsDeleted = Number(data ?? 0);
+      logger.info({ userId, reason, sessionsDeleted }, 'Revoked all sessions for user');
     }
-    logger.info({ userId, reason }, 'Revoked all sessions for user');
   } catch (err) {
     logger.error(
       { userId, reason, err: err instanceof Error ? err.message : String(err) },
       'Failed to revoke sessions',
     );
   }
+
+  // Audited here rather than at each of the nine call sites, so no future
+  // caller can forget. The attempt is recorded even when it failed — "we tried
+  // to cut this session off and could not" is exactly what an investigation
+  // needs to know. writeAuditLog never throws.
+  await writeAuditLog({
+    schoolId: ctx.schoolId ?? null,
+    actorId: ctx.actorId ?? userId,
+    action: revoked ? 'session.revoked' : 'session.revoke_failed',
+    entity: 'user',
+    entityId: userId,
+    metadata: { reason, sessionsDeleted },
+  });
 }
 
 /** Bulk variant for school suspension / bulk deactivation. Sequential on
  *  purpose: this runs rarely and a burst of parallel admin calls against
  *  GoTrue is more likely to rate-limit than to finish faster. */
-export async function revokeSessionsForUsers(userIds: string[], reason: string): Promise<void> {
+export async function revokeSessionsForUsers(
+  userIds: string[],
+  reason: string,
+  ctx: RevocationContext = {},
+): Promise<void> {
   for (const id of userIds) {
-    await revokeUserSessions(id, reason);
+    await revokeUserSessions(id, reason, ctx);
   }
 }

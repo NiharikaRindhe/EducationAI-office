@@ -80,7 +80,7 @@ export async function bulkResetCredentialsController(req: Request, res: Response
   try {
     const schoolId = requireSchoolId(req);
     const { studentIds } = bulkIdsSchema.parse(req.body);
-    res.json(await bulk.bulkResetStudentCredentials(schoolId, studentIds));
+    res.json(await bulk.bulkResetStudentCredentials(schoolId, studentIds, req.user!.id));
   } catch (err) {
     next(err);
   }
@@ -100,7 +100,7 @@ export async function bulkSetActiveController(req: Request, res: Response, next:
   try {
     const schoolId = requireSchoolId(req);
     const { studentIds, isActive } = bulkActiveSchema.parse(req.body);
-    res.json(await bulk.bulkSetStudentActive(schoolId, studentIds, isActive));
+    res.json(await bulk.bulkSetStudentActive(schoolId, studentIds, isActive, req.user!.id));
   } catch (err) {
     next(err);
   }
@@ -226,7 +226,7 @@ export async function superAdminBulkSetActiveController(req: Request, res: Respo
     const schoolId = typeof req.query.schoolId === 'string' ? req.query.schoolId : undefined;
     if (!schoolId) throw new ApiError('VALIDATION_ERROR', 'schoolId is required for a bulk action');
 
-    const result = await bulk.bulkSetStudentActive(schoolId, studentIds, isActive);
+    const result = await bulk.bulkSetStudentActive(schoolId, studentIds, isActive, req.user!.id);
 
     // Disabling accounts locks children out of the platform; the school must
     // be able to see that a platform operator did it, and to whom.

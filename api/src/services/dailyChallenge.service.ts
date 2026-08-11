@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
-import { addXp } from './gamification.service.js';
+import { addXp, type BadgeAward } from './gamification.service.js';
 
 async function getMetricValueToday(studentId: string, metric: string, today: string): Promise<number> {
   const startDate = new Date(today + 'T00:00:00.000Z');
@@ -107,7 +107,7 @@ export async function getOrCreateDailyChallenges(studentId: string) {
       completedAt = new Date().toISOString();
     }
 
-    let newBadges: any[] = [];
+    let newBadges: BadgeAward[] = [];
     if (isCompleted && !xpAwarded) {
       const awardResult = await addXp(studentId, template.xp_reward);
       xpAwarded = true;

@@ -29,5 +29,45 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // ---------------------------------------------------------------------
+      // KNOWN DEBT — warn, not error, so CI can gate on genuinely new problems
+      // instead of failing on day one against ~50 pre-existing sites.
+      //
+      // `set-state-in-effect` (47 sites): every route loads its data with
+      // `useEffect(() => { api.get(...).then(setState) }, [])`. Fixing it means
+      // moving the app onto a data-loading library — a real migration, not a
+      // lint pass, and one that should not be attempted while there are no
+      // browser E2E tests to catch a regression on a screen that works today.
+      //
+      // `only-export-components` (3 sites): the context modules export both a
+      // provider component and its hook. This costs a full reload instead of a
+      // hot update in dev, and nothing in production.
+      //
+      // `preserve-manual-memoization` (2 sites): informational — the React
+      // Compiler declined to compile two blocks in Games.tsx.
+      //
+      // Do not add to these counts. Anything else must be fixed, not demoted.
+      // ---------------------------------------------------------------------
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-refresh/only-export-components': 'warn',
+      'react-hooks/preserve-manual-memoization': 'warn',
+    },
+  },
+  {
+    // The API is Node, not browser. It also has signatures it cannot shorten:
+    // Express only recognises a middleware as an ERROR handler if it declares
+    // four parameters, so `next` must stay even when unused. Allowing a `_`
+    // prefix marks those deliberately, rather than switching the rule off.
+    files: ['api/**/*.ts'],
+    languageOptions: {
+      globals: globals.node,
+    },
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
+    },
   },
 ])

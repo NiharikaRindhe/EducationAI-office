@@ -190,7 +190,7 @@ export async function getStreakCalendar(studentId: string, days = 60) {
   };
 }
 
-interface BadgeAward {
+export interface BadgeAward {
   id: string;
   name: string;
   icon: string | null;

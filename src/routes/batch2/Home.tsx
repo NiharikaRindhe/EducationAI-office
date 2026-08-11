@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { Loader2, ChevronRight } from 'lucide-react';
 import { TodayPanel } from '../../components/shared/TodayPanel';
@@ -21,7 +21,6 @@ interface DailyChallengeItem {
 }
 
 export const Batch2Home: React.FC = () => {
-  const navigate = useNavigate();
   const { studentName, studentXP, studentStreak, currentClass } = useApp();
 
   const [subjects, setSubjects] = useState<SyllabusSubject[] | null>(null);

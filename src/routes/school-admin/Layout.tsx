@@ -40,7 +40,7 @@ export const SchoolAdminLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen flex bg-slate-50/50">
-      <Sidebar navItems={navItems} batchColor="schoolAdmin" logoText="EduAI" logoIcon="apartment" />
+      <Sidebar navItems={navItems} batchColor="schoolAdmin" logoText="EduAI" />
       <div className="flex-1 flex flex-col min-w-0">
         <TopBar greeting="Welcome," subtitle={header.sub} batchColor="schoolAdmin" profileHref="/school-admin/dashboard" />
         <main className="flex-1 p-8 overflow-y-auto max-w-7xl w-full mx-auto">

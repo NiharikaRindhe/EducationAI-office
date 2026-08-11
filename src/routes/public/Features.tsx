@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ChevronRight, Check } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 export const Features: React.FC = () => {
   const featuresList = [

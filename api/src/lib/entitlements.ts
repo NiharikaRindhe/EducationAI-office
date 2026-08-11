@@ -1,4 +1,5 @@
 import { supabaseAdmin } from './supabase.js';
+import { logger } from './logger.js';
 
 /**
  * Per-school feature entitlements — what a school actually bought.
@@ -28,28 +29,75 @@ export const FEATURE_KEYS = [
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 
 const CACHE_TTL_MS = 30_000;
+
+/**
+ * How long a cache may keep being served after the database stopped
+ * answering. Past this the data is too old to call an entitlement decision,
+ * and FAILURE_MODE takes over.
+ */
+const MAX_STALE_MS = 5 * 60_000;
+
+/**
+ * What to do once entitlements are genuinely unknown — the database is
+ * unreachable AND the cache is beyond MAX_STALE_MS.
+ *
+ *   'open'   — treat every feature as entitled. A database outage does not
+ *              also become a feature outage for every school mid-lab-period.
+ *              The cost is that paid features are briefly free.
+ *   'closed' — refuse gated features. Revenue enforcement is never lost;
+ *              the cost is that a database blip disables the AI tutor and
+ *              labs for every school at once.
+ *
+ * This is a commercial decision, not a technical one, so it is configuration
+ * rather than a value buried in a function. It defaults to 'open' because a
+ * lab period with 40 children in it is the wrong place to discover the
+ * entitlements table is unreachable — but a deployment that cares more about
+ * billing integrity than availability can set ENTITLEMENTS_FAILURE_MODE=closed.
+ */
+const FAILURE_MODE: 'open' | 'closed' =
+  process.env.ENTITLEMENTS_FAILURE_MODE === 'closed' ? 'closed' : 'open';
+
 /** school_id -> set of enabled feature keys */
 let cache: Map<string, Set<string>> | null = null;
 let cachedAt = 0;
+/** Schools already warned about, so a missing-entitlements log is not per-request. */
+const warnedMissing = new Set<string>();
 
-async function loadEntitlements(): Promise<Map<string, Set<string>>> {
+interface Entitlements {
+  map: Map<string, Set<string>>;
+  /** True when the answer is a guess rather than data — see FAILURE_MODE. */
+  degraded: boolean;
+}
+
+async function loadEntitlements(forceRefresh = false): Promise<Entitlements> {
   const now = Date.now();
-  if (cache && now - cachedAt < CACHE_TTL_MS) return cache;
+  if (!forceRefresh && cache && now - cachedAt < CACHE_TTL_MS) return { map: cache, degraded: false };
 
   const { data, error } = await supabaseAdmin
     .from('school_entitlements')
     .select('school_id, feature_key')
     .eq('enabled', true);
 
-  const map = new Map<string, Set<string>>();
   if (error) {
-    // Fail OPEN on a transient DB error rather than locking every school
-    // out of every paid feature at once. A stale cache is served if we
-    // have one; otherwise the caller sees "entitled" and the request
-    // proceeds. Losing revenue enforcement for 30s beats a platform-wide
-    // outage triggered by one failed query.
-    return cache ?? new Map();
+    const staleFor = now - cachedAt;
+    if (cache && staleFor < MAX_STALE_MS) {
+      // Recent enough to still be trustworthy. Serve it, but say so — a
+      // silent fallback here is how a broken entitlements query survives
+      // unnoticed for a week.
+      logger.warn(
+        { err: error.message, staleForMs: staleFor },
+        'Entitlements query failed; serving cached entitlements',
+      );
+      return { map: cache, degraded: false };
+    }
+    logger.error(
+      { err: error.message, staleForMs: cache ? staleFor : null, failureMode: FAILURE_MODE },
+      'Entitlements unavailable and cache too old — applying failure mode',
+    );
+    return { map: new Map(), degraded: true };
   }
+
+  const map = new Map<string, Set<string>>();
   for (const row of data ?? []) {
     const key = row.school_id as string;
     if (!map.has(key)) map.set(key, new Set());
@@ -57,12 +105,73 @@ async function loadEntitlements(): Promise<Map<string, Set<string>>> {
   }
   cache = map;
   cachedAt = now;
-  return map;
+  return { map, degraded: false };
 }
 
 /** Invalidate immediately after a write so the console reflects its own change. */
 export function invalidateEntitlementsCache(): void {
   cache = null;
+  cachedAt = 0;
+  confirmedMissing.clear();
+  warnedMissing.clear();
+}
+
+/** Schools confirmed to have no rows by a fresh read -> when that was confirmed. */
+const confirmedMissing = new Map<string, number>();
+const MISSING_RECHECK_MS = 5 * 60_000;
+
+/**
+ * The entitlement set for one school, or null if it genuinely has none.
+ *
+ * The subtlety: a school missing from the cached map means one of two very
+ * different things — it truly has no rows (grandfathered), or the cache was
+ * built BEFORE the school existed. Treating the second as the first hands a
+ * newly onboarded school every paid feature for free until the cache expires.
+ * So a miss forces one fresh read before concluding anything.
+ *
+ * Schools confirmed empty are remembered for a few minutes, otherwise every
+ * request from a genuinely grandfathered school would re-query the database.
+ */
+async function entitlementsFor(schoolId: string): Promise<{ features: Set<string> | null; degraded: boolean }> {
+  const first = await loadEntitlements();
+  if (first.degraded) return { features: null, degraded: true };
+
+  const hit = first.map.get(schoolId);
+  if (hit) return { features: hit, degraded: false };
+
+  const confirmedAt = confirmedMissing.get(schoolId);
+  if (confirmedAt !== undefined && Date.now() - confirmedAt < MISSING_RECHECK_MS) {
+    return { features: null, degraded: false };
+  }
+
+  const fresh = await loadEntitlements(true);
+  if (fresh.degraded) return { features: null, degraded: true };
+
+  const afterRefresh = fresh.map.get(schoolId);
+  if (afterRefresh) return { features: afterRefresh, degraded: false };
+
+  confirmedMissing.set(schoolId, Date.now());
+  return { features: null, degraded: false };
+}
+
+/**
+ * A school with NO entitlement rows is grandfathered into everything.
+ *
+ * That is correct for schools that predate the entitlements migration, but it
+ * is indistinguishable from a school whose seeding FAILED during onboarding —
+ * which would hand out every paid feature for free, permanently and silently.
+ * So the answer stays "entitled", and the situation gets logged once per
+ * school per process so it is findable instead of invisible.
+ */
+function grandfathered(schoolId: string): boolean {
+  if (!warnedMissing.has(schoolId)) {
+    warnedMissing.add(schoolId);
+    logger.warn(
+      { schoolId },
+      'School has no entitlement rows — granting all features. Seed its package from the Super Admin console.',
+    );
+  }
+  return true;
 }
 
 /**
@@ -70,27 +179,22 @@ export function invalidateEntitlementsCache(): void {
  *
  * A null schoolId means super_admin (no school) — always true; the Super
  * Admin is never gated by a customer's package.
- *
- * A school with NO rows at all is treated as fully entitled. That is the
- * safe reading: every existing school is grandfathered by the migration,
- * and a school created before entitlement seeding existed must not
- * silently lose features.
  */
 export async function isFeatureEnabled(schoolId: string | null, feature: FeatureKey): Promise<boolean> {
   if (!schoolId) return true;
-  const all = await loadEntitlements();
-  const forSchool = all.get(schoolId);
-  if (!forSchool) return true;
-  return forSchool.has(feature);
+  const { features, degraded } = await entitlementsFor(schoolId);
+  if (degraded) return FAILURE_MODE === 'open';
+  if (!features) return grandfathered(schoolId);
+  return features.has(feature);
 }
 
 /** Every enabled feature for a school — used by the /me payload so the UI can hide nav. */
 export async function getSchoolFeatures(schoolId: string | null): Promise<FeatureKey[]> {
   if (!schoolId) return [...FEATURE_KEYS];
-  const all = await loadEntitlements();
-  const forSchool = all.get(schoolId);
-  if (!forSchool) return [...FEATURE_KEYS];
-  return FEATURE_KEYS.filter((k) => forSchool.has(k));
+  const { features, degraded } = await entitlementsFor(schoolId);
+  if (degraded) return FAILURE_MODE === 'open' ? [...FEATURE_KEYS] : [];
+  if (!features) return grandfathered(schoolId) ? [...FEATURE_KEYS] : [];
+  return FEATURE_KEYS.filter((k) => features.has(k));
 }
 
 /**

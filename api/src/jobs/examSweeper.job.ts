@@ -107,12 +107,28 @@ async function retryPendingGrading(): Promise<number> {
   return graded;
 }
 
+/**
+ * Rate-limit windows are worthless once closed, and nothing else deletes them.
+ * Cheap enough to run on every sweep; the function itself keeps an hour of
+ * grace so a lockout report can still be investigated.
+ */
+let lastPrune = 0;
+const PRUNE_INTERVAL_MS = 15 * 60_000;
+
+async function pruneRateLimits(): Promise<void> {
+  if (Date.now() - lastPrune < PRUNE_INTERVAL_MS) return;
+  lastPrune = Date.now();
+  const { error } = await supabaseAdmin.rpc('prune_rate_limit_counters');
+  if (error) logger.warn({ err: error.message }, '[exam-sweeper] rate-limit prune failed');
+}
+
 async function sweep() {
   if (running) return; // a slow AI batch must not stack overlapping sweeps
   running = true;
   try {
     await autoSubmitExpired();
     await retryPendingGrading();
+    await pruneRateLimits();
   } catch (err) {
     logger.error({ err: err instanceof Error ? err.message : String(err) }, '[exam-sweeper] sweep failed');
   } finally {

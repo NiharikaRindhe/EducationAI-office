@@ -10,7 +10,6 @@ interface ClassFeature {
 
 export const SchoolAdminFeatureToggles: React.FC = () => {
   const [features, setFeatures] = useState<ClassFeature[] | null>(null);
-  const [loading, setLoading] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
 
   useEffect(() => {

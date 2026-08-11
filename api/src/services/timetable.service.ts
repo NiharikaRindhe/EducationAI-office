@@ -7,12 +7,55 @@ const SLOT_SELECT =
   'id, class_section_id, day_of_week, period_no, starts_at, ends_at, subject, teacher_id, lab_id, ' +
   'class_sections(class_num, section_label), teacher_profiles(user_profiles(full_name)), labs(name, seat_capacity)';
 
-function shapeSlot(row: any) {
-  const cs = row.class_sections as { class_num: number; section_label: string } | null;
-  const tp = row.teacher_profiles as { user_profiles: { full_name: string } | { full_name: string }[] | null } | null;
-  const up = tp?.user_profiles ? (Array.isArray(tp.user_profiles) ? tp.user_profiles[0] : tp.user_profiles) : null;
-  const lab = row.labs as { name: string; seat_capacity: number } | { name: string; seat_capacity: number }[] | null;
-  const labRow = Array.isArray(lab) ? lab[0] : lab;
+/**
+ * PostgREST returns an embedded relation as an object for a to-one join but as
+ * an array when it cannot prove cardinality from the foreign keys, so every
+ * embed has to be read defensively.
+ */
+type Embedded<T> = T | T[] | null;
+
+function one<T>(value: Embedded<T> | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+/** A row shaped by SLOT_SELECT. */
+interface SlotRow {
+  id: string;
+  class_section_id: string;
+  day_of_week: number;
+  period_no: number;
+  starts_at: string;
+  ends_at: string;
+  subject: string;
+  teacher_id: string | null;
+  lab_id: string | null;
+  class_sections: Embedded<{ class_num: number; section_label: string }>;
+  teacher_profiles: Embedded<{ user_profiles: Embedded<{ full_name: string }> }>;
+  labs: Embedded<{ name: string; seat_capacity: number }>;
+}
+
+/** A row of `timetable_exceptions` as selected by getOccurrences. */
+interface ExceptionRow {
+  id: string;
+  timetable_slot_id: string;
+  exception_date: string;
+  status: 'cancelled' | 'rescheduled';
+  reason: string | null;
+  new_date: string | null;
+  new_period_no: number | null;
+  new_lab_id: string | null;
+  labs: Embedded<{ name: string }>;
+}
+
+// The project does not generate Supabase DB types, so a select with embeds
+// comes back untyped. Cast once here rather than at all six call sites; the
+// shape is asserted in one place and the body below is fully typed.
+function shapeSlot(raw: unknown) {
+  const row = raw as SlotRow;
+  const cs = one(row.class_sections);
+  const up = one(one(row.teacher_profiles)?.user_profiles);
+  const labRow = one(row.labs);
   return {
     id: row.id,
     classSectionId: row.class_section_id,
@@ -344,8 +387,8 @@ export async function getOccurrences(
     );
   if (excErr) throw new ApiError('INTERNAL_ERROR', 'Failed to load schedule changes', excErr.message);
 
-  const byOriginalDate = new Map<string, any>(); // key: slotId|date
-  const rescheduledIn: any[] = [];
+  const byOriginalDate = new Map<string, ExceptionRow>(); // key: slotId|date
+  const rescheduledIn: ExceptionRow[] = [];
   for (const e of excRows ?? []) {
     byOriginalDate.set(`${e.timetable_slot_id}|${e.exception_date}`, e);
     if (e.status === 'rescheduled' && e.new_date && e.new_date >= fromDate && e.new_date <= toDate) {

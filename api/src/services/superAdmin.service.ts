@@ -3,6 +3,7 @@ import { ApiError } from '../lib/errors.js';
 import { generatePassword } from '../lib/credentials.js';
 import { sendSchoolAdminWelcomeEmail } from '../lib/mailer.js';
 import { revokeUserSessions, revokeSessionsForUsers } from '../lib/sessions.js';
+import { writeAuditLog } from './auditLog.service.js';
 import {
   seedEntitlementsFromPackage,
   invalidateEntitlementsCache,
@@ -168,7 +169,7 @@ export async function getOverview() {
   };
 }
 
-export async function setSchoolActive(schoolId: string, isActive: boolean) {
+export async function setSchoolActive(schoolId: string, isActive: boolean, actorId: string) {
   const { data, error } = await supabaseAdmin
     .from('schools')
     .update({ is_active: isActive })
@@ -182,13 +183,28 @@ export async function setSchoolActive(schoolId: string, isActive: boolean) {
   // access dies within one call either way. Revoking as well stops the
   // refresh loop quietly renewing tokens for a school that has been cut off
   // — e.g. for non-payment — for as long as a tab stays open.
+  let affected = 0;
   if (!isActive) {
     const { data: members } = await supabaseAdmin
       .from('user_profiles')
       .select('id')
       .eq('school_id', schoolId);
-    await revokeSessionsForUsers((members ?? []).map((m) => m.id as string), 'school_suspended');
+    const ids = (members ?? []).map((m) => m.id as string);
+    affected = ids.length;
+    await revokeSessionsForUsers(ids, 'school_suspended', { actorId, schoolId });
   }
+
+  // Suspending a school cuts off every child, teacher and admin in it at once.
+  // It is the single widest-blast-radius action on the platform and must be
+  // attributable.
+  await writeAuditLog({
+    schoolId,
+    actorId,
+    action: isActive ? 'school.reactivated' : 'school.suspended',
+    entity: 'school',
+    entityId: schoolId,
+    metadata: isActive ? {} : { sessionsRevoked: affected },
+  });
 
   return data;
 }
@@ -359,6 +375,14 @@ export async function setSchoolEntitlements(
     throw new ApiError('VALIDATION_ERROR', `Unknown feature key(s): ${unknown.join(', ')}`);
   }
 
+  // Captured before the write so the audit entry can show what actually
+  // changed — an entitlement diff is the evidence behind a billing dispute.
+  const { data: previous } = await supabaseAdmin
+    .from('school_entitlements')
+    .select('feature_key, enabled')
+    .eq('school_id', schoolId);
+  const before = new Map((previous ?? []).map((r) => [r.feature_key as string, r.enabled as boolean]));
+
   const rows = FEATURE_KEYS.map((key) => ({
     school_id: schoolId,
     feature_key: key,
@@ -372,6 +396,19 @@ export async function setSchoolEntitlements(
 
   // Hand-picked sets no longer correspond to a named package.
   await supabaseAdmin.from('schools').update({ plan: 'custom' }).eq('id', schoolId);
+
+  const changes = rows
+    .filter((r) => before.get(r.feature_key) !== r.enabled)
+    .map((r) => ({ feature: r.feature_key, from: before.get(r.feature_key) ?? null, to: r.enabled }));
+
+  await writeAuditLog({
+    schoolId,
+    actorId: updatedBy,
+    action: 'entitlements.changed',
+    entity: 'school',
+    entityId: schoolId,
+    metadata: { changes, planSetTo: 'custom' },
+  });
 
   invalidateEntitlementsCache();
   return getSchoolEntitlements(schoolId);
@@ -414,7 +451,7 @@ export async function addSchoolAdmin(schoolId: string, input: { fullName: string
   return { fullName: input.fullName, email: input.email, password };
 }
 
-export async function resetSchoolAdminPassword(schoolId: string, userId: string) {
+export async function resetSchoolAdminPassword(schoolId: string, userId: string, actorId: string) {
   const { data: profile } = await supabaseAdmin
     .from('user_profiles')
     .select('id, full_name, role')
@@ -430,7 +467,15 @@ export async function resetSchoolAdminPassword(schoolId: string, userId: string)
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to reset password', error.message);
 
   // The old credential is dead; any session still holding it must be too.
-  await revokeUserSessions(userId, 'credential_reset');
+  await revokeUserSessions(userId, 'credential_reset', { actorId, schoolId });
+  await writeAuditLog({
+    schoolId,
+    actorId,
+    action: 'credential.reset',
+    entity: 'school_admin',
+    entityId: userId,
+    metadata: { method: 'password', byPlatformOperator: true },
+  });
 
   return { fullName: profile.full_name, email: authUser.user?.email ?? '', password };
 }

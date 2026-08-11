@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
 import { revokeUserSessions } from '../lib/sessions.js';
+import { writeAuditLog } from './auditLog.service.js';
 import { generatePassword, generatePin, generateUsername } from '../lib/credentials.js';
 import { ensureSectionExists } from './classSection.service.js';
 import {
@@ -387,7 +388,11 @@ export async function listLabIncharges(schoolId: string) {
   return data;
 }
 
-export async function resetLabInchargePassword(schoolId: string, id: string): Promise<TeacherCredential> {
+export async function resetLabInchargePassword(
+  schoolId: string,
+  id: string,
+  actorId: string,
+): Promise<TeacherCredential> {
   const { data: profile, error } = await supabaseAdmin
     .from('user_profiles')
     .select('id, full_name')
@@ -406,7 +411,16 @@ export async function resetLabInchargePassword(schoolId: string, id: string): Pr
 
   // The old credential is dead — any session still holding it must die too,
   // or a reset prompted by a leaked password leaves the leaker signed in.
-  await revokeUserSessions(id, 'credential_reset');
+  await revokeUserSessions(id, 'credential_reset', { actorId, schoolId });
+  // Records THAT a credential was reset and by whom. Never the credential.
+  await writeAuditLog({
+    schoolId,
+    actorId,
+    action: 'credential.reset',
+    entity: 'lab_incharge',
+    entityId: id,
+    metadata: { method: 'password' },
+  });
 
   return { fullName: profile.full_name, username, password };
 }
@@ -428,7 +442,11 @@ export async function listTeachers(schoolId: string) {
 //  (and later the lab in-charge) needs a one-click regenerate that
 //  returns the new credential for a fresh printed slip.
 // ─────────────────────────────────────────────────────────────
-export async function resetStudentCredential(schoolId: string, studentId: string): Promise<StudentCredential> {
+export async function resetStudentCredential(
+  schoolId: string,
+  studentId: string,
+  actorId: string,
+): Promise<StudentCredential> {
   const { data: profile, error } = await supabaseAdmin
     .from('user_profiles')
     .select('id, full_name, school_id, role, student_profiles(class_num, section)')
@@ -453,18 +471,38 @@ export async function resetStudentCredential(schoolId: string, studentId: string
       .update({ pin_hash: pinHash })
       .eq('user_id', studentId);
     if (pinError) throw new ApiError('INTERNAL_ERROR', 'Failed to reset PIN', pinError.message);
-    await revokeUserSessions(studentId, 'pin_reset');
+    await revokeUserSessions(studentId, 'pin_reset', { actorId, schoolId });
+    await writeAuditLog({
+      schoolId,
+      actorId,
+      action: 'credential.reset',
+      entity: 'student',
+      entityId: studentId,
+      metadata: { method: 'pin', classNum: sp.class_num, section: sp.section },
+    });
     return { fullName: profile.full_name, classNum: sp.class_num, section: sp.section, username, pin };
   }
 
   const password = generatePassword(8);
   const { error: pwError } = await supabaseAdmin.auth.admin.updateUserById(studentId, { password });
   if (pwError) throw new ApiError('INTERNAL_ERROR', 'Failed to reset password', pwError.message);
-  await revokeUserSessions(studentId, 'credential_reset');
+  await revokeUserSessions(studentId, 'credential_reset', { actorId, schoolId });
+  await writeAuditLog({
+    schoolId,
+    actorId,
+    action: 'credential.reset',
+    entity: 'student',
+    entityId: studentId,
+    metadata: { method: 'password', classNum: sp.class_num, section: sp.section },
+  });
   return { fullName: profile.full_name, classNum: sp.class_num, section: sp.section, username, password };
 }
 
-export async function resetTeacherPassword(schoolId: string, teacherId: string): Promise<TeacherCredential> {
+export async function resetTeacherPassword(
+  schoolId: string,
+  teacherId: string,
+  actorId: string,
+): Promise<TeacherCredential> {
   const { data: profile, error } = await supabaseAdmin
     .from('user_profiles')
     .select('id, full_name')
@@ -481,7 +519,15 @@ export async function resetTeacherPassword(schoolId: string, teacherId: string):
   const { error: pwError } = await supabaseAdmin.auth.admin.updateUserById(teacherId, { password });
   if (pwError) throw new ApiError('INTERNAL_ERROR', 'Failed to reset password', pwError.message);
 
-  await revokeUserSessions(teacherId, 'credential_reset');
+  await revokeUserSessions(teacherId, 'credential_reset', { actorId, schoolId });
+  await writeAuditLog({
+    schoolId,
+    actorId,
+    action: 'credential.reset',
+    entity: 'teacher',
+    entityId: teacherId,
+    metadata: { method: 'password' },
+  });
 
   return { fullName: profile.full_name, username, password };
 }

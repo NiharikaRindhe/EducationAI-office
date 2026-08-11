@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Flame, Calendar } from 'lucide-react';
+import { Loader2, Calendar } from 'lucide-react';
 import { api } from '../../lib/api';
 
 type Accent = 'amber' | 'indigo' | 'sky';

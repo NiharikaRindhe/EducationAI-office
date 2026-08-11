@@ -59,7 +59,6 @@ export const Batch2Layout: React.FC = () => {
         navItems={navItems}
         batchColor="indigo"
         logoText="EduAI"
-        logoIcon="school"
       />
 
       {/* Main content wrapper */}

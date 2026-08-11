@@ -3,6 +3,7 @@ import { ApiError } from '../lib/errors.js';
 import { resetStudentCredential } from './schoolAdmin.service.js';
 import { assertStudentsInSchool } from './studentDirectory.service.js';
 import { revokeSessionsForUsers } from '../lib/sessions.js';
+import { writeAuditLog } from './auditLog.service.js';
 import type { StudentCredential } from './schoolAdmin.service.js';
 
 /**
@@ -31,6 +32,7 @@ export interface BulkOutcome {
 export async function bulkResetStudentCredentials(
   schoolId: string,
   studentIds: string[],
+  actorId: string,
 ): Promise<BulkOutcome & { credentials: StudentCredential[] }> {
   await assertStudentsInSchool(studentIds, schoolId);
 
@@ -39,7 +41,7 @@ export async function bulkResetStudentCredentials(
 
   for (const studentId of studentIds) {
     try {
-      credentials.push(await resetStudentCredential(schoolId, studentId));
+      credentials.push(await resetStudentCredential(schoolId, studentId, actorId));
     } catch (err) {
       failed.push({
         studentId,
@@ -100,6 +102,7 @@ export async function bulkSetStudentActive(
   schoolId: string,
   studentIds: string[],
   isActive: boolean,
+  actorId: string,
 ): Promise<BulkOutcome> {
   await assertStudentsInSchool(studentIds, schoolId);
 
@@ -109,11 +112,21 @@ export async function bulkSetStudentActive(
     .in('id', studentIds);
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to update student accounts', error.message);
 
+  // One entry for the batch, not one per student: this is a single
+  // administrative decision, and a 300-row burst would bury the log.
+  await writeAuditLog({
+    schoolId,
+    actorId,
+    action: isActive ? 'student.reactivated' : 'student.deactivated',
+    entity: 'student',
+    metadata: { count: studentIds.length, studentIds },
+  });
+
   // requireAuth re-reads is_active per request, so a deactivated student is
   // refused on their very next call regardless. Revoking as well closes the
   // token they are still holding on a shared lab machine right now.
   if (!isActive) {
-    await revokeSessionsForUsers(studentIds, 'account_deactivated');
+    await revokeSessionsForUsers(studentIds, 'account_deactivated', { actorId, schoolId });
   }
 
   return { succeeded: studentIds.length, failed: [] };

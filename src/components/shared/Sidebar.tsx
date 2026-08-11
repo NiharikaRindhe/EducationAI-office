@@ -3,14 +3,9 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { schoolLogoUrl } from '../../lib/assets';
-import {
-  ChevronDown, ChevronRight, LogOut, PanelLeftClose, PanelLeftOpen,
-  BookOpen, Trophy, Calendar, CheckSquare,
-  Gamepad, Award, Camera, ShieldAlert,
-  Users, ClipboardList, PenTool, BarChart3,
-  HelpCircle, Sparkles, MessageSquare, Compass,
-  BookMarked, Flame, Home, Clock, Layers
-} from 'lucide-react';
+// Nav icons are Material Symbols now (NavItem.iconName), so the long lucide
+// icon list this file used to carry is gone; only the chrome icons remain.
+import { ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 export interface NavItem {
   href: string;
@@ -23,7 +18,6 @@ interface SidebarProps {
   navItems: NavItem[];
   batchColor: 'amber' | 'indigo' | 'sky' | 'slate' | 'emerald' | 'teacher' | 'schoolAdmin' | 'superAdmin' | 'labIncharge';
   logoText: string;
-  logoIcon: string; // Material symbol name
   collapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
 }
@@ -34,7 +28,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   navItems,
   batchColor,
   logoText,
-  logoIcon,
   collapsed = false,
   onCollapsedChange,
 }) => {

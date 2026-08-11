@@ -6,7 +6,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Star, ArrowLeft } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getClassTheme, getSubjectCardColors } from './theme';
-import { QuestEngine } from './QuestEngine';
+import { QuestEngine, type QuestParams } from './QuestEngine';
 import { NumberHopEngine } from './games/NumberHopEngine';
 import { NumberSlideEngine } from './games/NumberSlideEngine';
 import { WordBuildEngine } from './games/WordBuildEngine';
@@ -619,7 +619,7 @@ export const Batch1Games: React.FC = () => {
       case 'quest':
         return (
           <QuestEngine
-            game={{ gameId: activeGame.gameId, name: activeGame.name, icon: activeGame.icon, params: activeGame.params as Record<string, any> }}
+            game={{ gameId: activeGame.gameId, name: activeGame.name, icon: activeGame.icon, params: activeGame.params as QuestParams }}
             numChoices={numChoices}
             isPreReader={isPreReader}
             onFinish={submitAttempt}

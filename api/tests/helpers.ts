@@ -25,9 +25,14 @@ export interface Actor {
  * Log in, backing off through the login rate limiter.
  *
  * The limiter is deliberately aggressive (it defends the PIN/password
- * endpoints), and a suite that logs in four actors trips it as soon as it is
- * run twice in a minute. Retrying on 429 keeps the suite usable locally and
- * in CI without weakening the limit that protects production.
+ * endpoints) and is now backed by a SHARED, PERSISTENT counter — it no longer
+ * resets when the API restarts. A suite that signs in ten actors from one IP
+ * therefore trips it routinely on a developer machine, and a local run can
+ * take half a minute waiting out a window. That is the limiter working.
+ *
+ * Retrying on 429 keeps the suite usable without weakening the limit that
+ * protects production. In CI the database starts empty, so no counter is
+ * carried over and the suite runs at full speed.
  */
 export async function login(email: string, password: string): Promise<Actor> {
   let res!: Response;

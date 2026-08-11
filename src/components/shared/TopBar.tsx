@@ -47,18 +47,6 @@ export const TopBar: React.FC<TopBarProps> = ({
     labIncharge: 'text-teal-600'
   };
 
-  const ringColors = {
-    amber: 'focus:ring-amber-500/20 focus:border-amber-500',
-    indigo: 'focus:ring-indigo-500/20 focus:border-indigo-500',
-    sky: 'focus:ring-sky-500/20 focus:border-sky-500',
-    slate: 'focus:ring-purple-500/20 focus:border-purple-500',
-    emerald: 'focus:ring-emerald-500/20 focus:border-emerald-500',
-    teacher: 'focus:ring-indigo-500/20 focus:border-indigo-500',
-    schoolAdmin: 'focus:ring-rose-500/20 focus:border-rose-500',
-    superAdmin: 'focus:ring-slate-500/20 focus:border-slate-500',
-    labIncharge: 'focus:ring-teal-500/20 focus:border-teal-500'
-  };
-
   return (
     <header className="h-20 border-b border-slate-100 bg-white/80 backdrop-blur-md px-8 flex items-center justify-between sticky top-0 z-40">
       {/* Greetings */}

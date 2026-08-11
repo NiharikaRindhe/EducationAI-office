@@ -44,7 +44,6 @@ export const TeacherLayout: React.FC = () => {
         navItems={navItems}
         batchColor="teacher"
         logoText="EduAI"
-        logoIcon="dashboard_customize"
       />
 
       {/* Main content wrapper */}

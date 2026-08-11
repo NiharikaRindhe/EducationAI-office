@@ -76,18 +76,21 @@ export const Batch3Layout: React.FC = () => {
 
   const header = getHeaderDetails();
 
-  if (currentClass < 9 || currentClass > 10) return null;
-
   /* The science labs manage their own scrolling and internal panels, so they
      get a full-bleed content area pinned to the viewport height instead of the
      usual padded, max-width, page-scrolling <main>. */
   const isLabRoute = location.pathname.startsWith('/batch3/labs');
   const isLab = location.pathname.includes('/labs/');
 
+  // Must stay ABOVE the class guard below: this effect used to sit after an
+  // early `return null`, so a student whose class moved in or out of 9-10
+  // changed the hook count between renders, which React treats as an error.
   useEffect(() => {
     setNavCollapsed(isLabRoute);
     if (!isLabRoute) setLabFocusMode(false);
   }, [isLabRoute]);
+
+  if (currentClass < 9 || currentClass > 10) return null;
 
   return (
     <div className={`flex bg-slate-50/50 ${isLab ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
@@ -97,7 +100,6 @@ export const Batch3Layout: React.FC = () => {
           navItems={navItems}
           batchColor="sky"
           logoText="EduAI"
-          logoIcon="auto_stories"
           collapsed={isLabRoute && navCollapsed}
           onCollapsedChange={isLabRoute ? setNavCollapsed : undefined}
         />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Play, Pause, RotateCcw, Clock, BookOpen } from 'lucide-react';
+import { Play, Pause, RotateCcw, BookOpen } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface SessionLog {
@@ -42,22 +42,9 @@ export const Batch3Pomodoro: React.FC = () => {
     setIsBreak(false);
   }, [preset]);
 
-  // Timer interval
-  useEffect(() => {
-    if (!isRunning) return;
-
-    if (timeLeft <= 0) {
-      handleSessionFinish();
-      return;
-    }
-
-    const timer = setInterval(() => {
-      setTimeLeft(prev => prev - 1);
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [isRunning, timeLeft]);
-
+  // Declared before the timer effect that calls it: as a `const` arrow it is in
+  // its temporal dead zone until this line, so an effect defined above could
+  // only reach it by luck of when the effect happened to run.
   const handleSessionFinish = () => {
     setIsRunning(false);
     const workMins = parseInt(preset.split('/')[0]);
@@ -90,6 +77,22 @@ export const Batch3Pomodoro: React.FC = () => {
       alert('Break complete! Let’s focus on the next chapter. 🚀');
     }
   };
+
+  // Timer interval
+  useEffect(() => {
+    if (!isRunning) return;
+
+    if (timeLeft <= 0) {
+      handleSessionFinish();
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setTimeLeft(prev => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isRunning, timeLeft]);
 
   const handleStartPause = () => {
     setIsRunning(!isRunning);

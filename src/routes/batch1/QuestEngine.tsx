@@ -28,11 +28,32 @@ interface Round {
   answer: number; // index into options
 }
 
+/**
+ * Tuning knobs read from `games_catalog.params` (a JSONB column), so every key
+ * is optional and each generator below reads only the ones it understands.
+ * `level` is deliberately `number | string`: the pattern generator grades
+ * difficulty numerically while the clock generator uses it as a mode flag.
+ */
+export interface QuestParams {
+  generator?: string;
+  max?: number;
+  steps?: number[];
+  tables?: number[];
+  divisorMax?: number;
+  maxItems?: number;
+  level?: number | string;
+  mode?: string;
+  maxAmount?: number;
+  parts?: number[];
+  words?: { w: string; e: string }[];
+  questions?: { q: string; o: string[]; a: number }[];
+}
+
 interface QuestGame {
   gameId: string;
   name: string;
   icon: string;
-  params: Record<string, any>;
+  params: QuestParams;
 }
 
 interface QuestProps {
@@ -69,13 +90,6 @@ function numberDistractors(correct: number, count: number, min = 0): number[] {
 
 const FRUIT = ['🍎', '🍌', '⭐', '🐟', '🐥', '🌸', '🧁', '⚽'];
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const DAYTIME_QS = [
-  { q: 'When do we see the sun rise? 🌅', o: ['🌅 morning', '🌙 night', '🌆 evening'], a: 0 },
-  { q: 'When do we sleep? 😴', o: ['🌙 night', '🌞 noon', '🌅 morning'], a: 0 },
-  { q: 'Which comes first in a day?', o: ['🌅 morning', '🌆 evening', '🌙 night'], a: 0 },
-  { q: 'When is the sky dark?', o: ['🌙 night', '🌞 noon', '🌅 morning'], a: 0 },
-  { q: 'When do we eat breakfast? 🍳', o: ['🌅 morning', '🌙 night', '🌆 evening'], a: 0 },
-];
 const METRIC_QS = [
   { q: '1 metre = ? centimetres', o: ['100', '10', '1000'], a: 0 },
   { q: '1 kilogram = ? grams', o: ['1000', '100', '10'], a: 0 },
@@ -100,7 +114,7 @@ const CAPACITY_SETS = [
   { most: '🫙 jug', rest: ['🥤 cup', '🥄 spoon'] },
 ];
 
-function makeRound(gen: string, params: Record<string, any>, numChoices: number): Round {
+function makeRound(gen: string, params: QuestParams, numChoices: number): Round {
   switch (gen) {
     case 'counting': {
       const max = Math.min(params.max ?? 10, 20);
@@ -161,7 +175,9 @@ function makeRound(gen: string, params: Record<string, any>, numChoices: number)
     case 'patterns': {
       const pools = [['🔴', '🔵'], ['🔺', '🟨'], ['🌸', '🍀'], ['⭐', '🌙'], ['🟦', '🟧', '🟩']];
       const pool = pick(pools);
-      const level: number = params.level ?? 1;
+      // `level` is shared with the clock generator, which stores a string —
+      // guard rather than trusting the JSONB column to hold a number here.
+      const level: number = typeof params.level === 'number' ? params.level : 1;
       const unit = level >= 3 && pool.length > 2 ? pool : pool.slice(0, 2);
       const patternTypes = level === 1 ? ['AB'] : level === 2 ? ['AB', 'AAB'] : ['AB', 'AAB', 'ABB', 'ABC'];
       const type = pick(patternTypes);

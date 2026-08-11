@@ -1,5 +1,5 @@
 import React from 'react';
-import { Zap, Flame, User, FileText, AlertTriangle } from 'lucide-react';
+import { Zap, Flame, User, FileText } from 'lucide-react';
 import { SyllabusView } from '../../components/shared/SyllabusView';
 import { ExamCenter } from '../../components/shared/ExamCenter';
 import { ChatCenter } from '../../components/shared/ChatCenter';

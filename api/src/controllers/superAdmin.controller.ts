@@ -36,7 +36,7 @@ export async function setSchoolActiveController(req: Request, res: Response, nex
     const { id } = req.params;
     if (!id) throw new ApiError('VALIDATION_ERROR', 'Missing school id in path');
     const { isActive } = req.body as { isActive: boolean };
-    const school = await superAdminService.setSchoolActive(id, isActive);
+    const school = await superAdminService.setSchoolActive(id, isActive, req.user!.id);
     res.json(school);
   } catch (err) {
     next(err);
@@ -82,7 +82,7 @@ export async function resetSchoolAdminPasswordController(req: Request, res: Resp
   try {
     const { id, userId } = req.params;
     if (!id || !userId) throw new ApiError('VALIDATION_ERROR', 'Missing school or user id in path');
-    const credential = await superAdminService.resetSchoolAdminPassword(id, userId);
+    const credential = await superAdminService.resetSchoolAdminPassword(id, userId, req.user!.id);
     res.json(credential);
   } catch (err) {
     next(err);

@@ -25,7 +25,7 @@ export const LabInchargeLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen flex bg-slate-50/50">
-      <Sidebar navItems={navItems} batchColor="labIncharge" logoText="EduAI" logoIcon="support_agent" />
+      <Sidebar navItems={navItems} batchColor="labIncharge" logoText="EduAI" />
       <div className="flex-1 flex flex-col min-w-0">
         <TopBar
           greeting="Welcome,"

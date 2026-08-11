@@ -78,7 +78,7 @@ export const TeacherQuestionBank: React.FC = () => {
 
   const fetchQuestions = () => {
     setQuestions(null);
-    const query: Record<string, any> = {};
+    const query: Record<string, string | number | boolean | undefined> = {};
     if (classNum) query.classNum = classNum;
     if (subject) query.subject = subject;
     if (type) query.type = type;

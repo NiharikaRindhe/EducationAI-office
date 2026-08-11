@@ -66,7 +66,7 @@ export async function importTeachersController(req: Request, res: Response, next
 export async function resetStudentCredentialController(req: Request, res: Response, next: NextFunction) {
   try {
     const schoolId = requireSchoolId(req);
-    const credential = await schoolAdminService.resetStudentCredential(schoolId, req.params.id!);
+    const credential = await schoolAdminService.resetStudentCredential(schoolId, req.params.id!, req.user!.id);
     res.json(credential);
   } catch (err) {
     next(err);
@@ -76,7 +76,7 @@ export async function resetStudentCredentialController(req: Request, res: Respon
 export async function resetTeacherPasswordController(req: Request, res: Response, next: NextFunction) {
   try {
     const schoolId = requireSchoolId(req);
-    const credential = await schoolAdminService.resetTeacherPassword(schoolId, req.params.id!);
+    const credential = await schoolAdminService.resetTeacherPassword(schoolId, req.params.id!, req.user!.id);
     res.json(credential);
   } catch (err) {
     next(err);
@@ -105,7 +105,7 @@ export async function addSingleLabInchargeController(req: Request, res: Response
 export async function resetLabInchargePasswordController(req: Request, res: Response, next: NextFunction) {
   try {
     const schoolId = requireSchoolId(req);
-    const credential = await schoolAdminService.resetLabInchargePassword(schoolId, req.params.id!);
+    const credential = await schoolAdminService.resetLabInchargePassword(schoolId, req.params.id!, req.user!.id);
     res.json(credential);
   } catch (err) {
     next(err);

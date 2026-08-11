@@ -84,12 +84,14 @@ export async function submitAttempt(studentId: string, input: SubmitEnglishAttem
     .single();
   if (error || !item) throw new ApiError('NOT_FOUND', 'English assessment item not found');
 
-  let xpEarned = 0;
+  // xpEarned and feedback are assigned on every branch below; initialising them
+  // here only hides a future branch that forgets to.
+  let xpEarned: number;
+  let feedback: string;
   let accuracyScore: number | null = null;
   let fluencyScore: number | null = null;
   let wpm: number | null = null;
   let result: 'correct' | 'close' | 'incorrect' | null = null;
-  let feedback = '';
 
   if (WORD_TYPES.has(item.type)) {
     const scored = await scoreWord(item.content, input.transcript);

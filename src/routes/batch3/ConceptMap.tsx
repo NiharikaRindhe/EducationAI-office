@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ZoomIn, ZoomOut, Download, Sparkles, AlertCircle } from 'lucide-react';
+import { ZoomIn, ZoomOut, Download } from 'lucide-react';
 
 interface Node {
   id: string;
@@ -72,7 +72,7 @@ export const Batch3ConceptMap: React.FC = () => {
           <select
             value={subject}
             onChange={(e) => {
-              setSubject(e.target.value as any);
+              setSubject(e.target.value as 'Maths' | 'Science');
               setChapter(e.target.value === 'Maths' ? 'Triangles' : 'Light Reflection');
               setSelectedNode(null);
             }}
