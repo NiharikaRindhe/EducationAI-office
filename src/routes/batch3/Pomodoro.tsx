@@ -26,12 +26,21 @@ export const Batch3Pomodoro: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [isBreak, setIsBreak] = useState(false);
 
-  // Focus time logs
-  const [totalFocusTime, setTotalFocusTime] = useState(70); // mins
-  const [sessionLogs, setSessionLogs] = useState<SessionLog[]>([
-    { id: 'l1', subject: 'Science', duration: 25, time: '10:15 AM' },
-    { id: 'l2', subject: 'Mathematics', duration: 45, time: '11:30 AM' }
-  ]);
+  /*
+   * Focus log for THIS sitting only, and it starts empty.
+   *
+   * This page used to open claiming 70 minutes already studied and two
+   * completed sessions ("Science 25 min at 10:15 AM", "Mathematics 45 min at
+   * 11:30 AM") that never happened. A student checking their own focus time
+   * would have been reading fiction, and a teacher reviewing it would have
+   * been reading fiction about a child.
+   *
+   * Nothing here is persisted yet — there is no timer endpoint — so the log
+   * resets on navigation and the UI says so, rather than implying history it
+   * does not have.
+   */
+  const [totalFocusTime, setTotalFocusTime] = useState(0); // mins, this sitting
+  const [sessionLogs, setSessionLogs] = useState<SessionLog[]>([]);
 
   const totalSeconds = getSecondsFromPreset(preset);
   const strokeDashoffset = ((totalSeconds - timeLeft) / totalSeconds) * 283;
@@ -197,15 +206,20 @@ export const Batch3Pomodoro: React.FC = () => {
         <div className="bento-card border border-sky-100 bg-white p-5 text-center flex flex-col gap-2">
           <span className="text-3xl select-none">🍅</span>
           <span className="font-display font-extrabold text-3xl text-sky-500">{totalFocusTime} Mins</span>
-          <span className="font-sans text-xs font-bold text-slate-500 uppercase tracking-wide">Total Focus Today</span>
+          <span className="font-sans text-xs font-bold text-slate-500 uppercase tracking-wide">Focus This Session</span>
           <p className="text-[9px] text-slate-400">Earned +1 XP for every minute focused!</p>
         </div>
 
         {/* Sessions log list */}
         <div className="bento-card border border-sky-100 bg-white p-5">
-          <span className="font-display font-bold text-xs text-slate-700 block mb-3">Today's Focus Log</span>
-          
+          <span className="font-display font-bold text-xs text-slate-700 block mb-3">Focus Log</span>
+
           <div className="flex flex-col gap-2.5 font-sans text-xs">
+            {sessionLogs.length === 0 && (
+              <p className="py-6 text-center text-[11px] text-slate-400">
+                No focus sessions yet. Start the timer to log one.
+              </p>
+            )}
             {sessionLogs.map((log) => (
               <div 
                 key={log.id}

@@ -53,10 +53,55 @@ function redirectPathFor(role: Role, batchId: number | null): string {
   }
 }
 
+/**
+ * Did GoTrue actually reject the credential, as opposed to failing to answer?
+ *
+ * Deliberately allow-list rather than deny-list. An unrecognised failure is
+ * treated as an outage, because the two mistakes are not equally costly: a
+ * genuine wrong password reported as "temporarily unavailable" is a mild
+ * annoyance the user resolves by retrying, whereas an outage reported as a
+ * wrong password sends a whole school chasing credentials that were never
+ * broken.
+ *
+ * GoTrue answers a bad credential with 400 `invalid_credentials`, and an
+ * unverified address with 400 `email_not_confirmed`; a transport failure
+ * surfaces with no status at all.
+ */
+function isCredentialRejection(error: { status?: number; code?: string; message?: string } | null): boolean {
+  if (!error) return true; // no error but no session — treat as a rejection
+  if (error.status === 400 || error.status === 401) {
+    const code = (error.code ?? '').toLowerCase();
+    const message = (error.message ?? '').toLowerCase();
+    return (
+      code.includes('invalid_credentials') ||
+      code.includes('invalid_grant') ||
+      code.includes('email_not_confirmed') ||
+      message.includes('invalid login credentials') ||
+      message.includes('email not confirmed')
+    );
+  }
+  return false;
+}
+
 export async function login({ email, password }: LoginInput): Promise<LoginResult> {
   const { data: authData, error: authError } = await supabaseAnon.auth.signInWithPassword({ email, password });
   if (authError || !authData.session || !authData.user) {
-    throw new ApiError('UNAUTHORIZED', 'Invalid email or password');
+    // Only a genuine credential rejection may be reported as one.
+    //
+    // This used to collapse EVERY failure into "Invalid email or password" —
+    // including the auth service being unreachable. That is the worst possible
+    // message for an outage: a school reads it as "I typed it wrong", and
+    // spends the morning resetting passwords that were never wrong, while the
+    // real fault goes unreported. Observed exactly that during a local
+    // Postgres outage.
+    if (isCredentialRejection(authError)) {
+      throw new ApiError('UNAUTHORIZED', 'Invalid email or password');
+    }
+    throw new ApiError(
+      'SERVICE_UNAVAILABLE',
+      'Sign-in is temporarily unavailable. This is not a problem with your password — please try again shortly.',
+      authError?.message,
+    );
   }
 
   const { data: profile, error: profileError } = await supabaseAdmin

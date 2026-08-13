@@ -15,6 +15,10 @@ export type ErrorCode =
   | 'AI_BAD_OUTPUT'
   // The action needs indexed source material that hasn't been uploaded yet.
   | 'NO_CONTENT'
+  // A dependency the request cannot proceed without (the auth service, the
+  // database) is unreachable. Kept distinct from UNAUTHORIZED so an outage is
+  // never reported to a user as a rejected credential.
+  | 'SERVICE_UNAVAILABLE'
   | 'EXAM_NOT_OPEN'
   | 'EXAM_CLOSED'
   | 'EXAM_ALREADY_SUBMITTED'
@@ -36,6 +40,7 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   AI_UNAVAILABLE: 503,
   AI_BAD_OUTPUT: 502,
   NO_CONTENT: 422,
+  SERVICE_UNAVAILABLE: 503,
   EXAM_NOT_OPEN: 400,
   EXAM_CLOSED: 400,
   EXAM_ALREADY_SUBMITTED: 400,

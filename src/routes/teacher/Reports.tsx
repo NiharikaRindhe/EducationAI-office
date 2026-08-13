@@ -1,62 +1,117 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Download, Printer, AlertTriangle } from 'lucide-react';
+import { Loader2, Printer, AlertTriangle } from 'lucide-react';
 import { api } from '../../lib/api';
 
-interface Section {
-  id: string;
-  class_num: number;
-  section_name: string;
+/**
+ * A section as `/teacher/my-sections` actually returns it.
+ *
+ * This page previously declared `{ id, class_num, section_name }` and typed the
+ * whole response as an array. The endpoint returns an OBJECT
+ * (`{ sections, legacyFallback, subjectsByClass }`) whose entries are keyed
+ * `classSectionId` / `classNum` / `section` — so `res.length` was undefined, no
+ * section was ever selected, and no report could load at all.
+ */
+interface TeachingSection {
+  classSectionId: string;
+  classNum: number;
+  section: string;
+  subjects: string[];
+  isClassTeacher: boolean;
 }
 
+interface MySectionsResponse {
+  sections: TeachingSection[];
+}
+
+/*
+ * The interfaces below mirror what the API RETURNS.
+ *
+ * They previously described something else entirely — `name` where the API
+ * sends `fullName`, `classAvg` where it sends `classAverages`, a keyed object
+ * where it sends a flat array of cells. Combined with the wrong endpoint and
+ * the wrong response shape from /my-sections, this page could never have
+ * rendered a single row against this backend. Verified field-by-field against
+ * live responses for Class 7-B.
+ */
+
 interface HeatmapStudent {
-  name: string;
-  avatar: string;
-  scores: Record<string, number | null>;
-  avg: number;
+  id: string;
+  fullName: string;
+  rollNumber: string | null;
+  xp: number;
+  averageScorePct: number | null;
 }
 
 interface HeatmapExam {
   id: string;
   title: string;
-  subject: string;
+  averageScorePct: number | null;
+}
+
+/** One student x one exam. Flat list, not a nested map. */
+interface HeatmapCell {
+  studentId: string;
+  examId: string;
+  scorePct: number | null;
+  submitted: boolean;
 }
 
 interface HeatmapReport {
   students: HeatmapStudent[];
   exams: HeatmapExam[];
+  matrix: HeatmapCell[];
 }
 
 interface EnglishStudent {
-  name: string;
-  avatar: string;
-  accuracy: number;
-  fluency: number;
-  wpm: number;
-  needsAttention: boolean;
+  studentId: string;
+  fullName: string;
+  rollNumber: string | null;
+  avgAccuracy: number | null;
+  avgFluency: number | null;
+  avgWpm: number | null;
+  totalAttempts: number;
+  status: string;
 }
 
 interface EnglishReport {
   students: EnglishStudent[];
-  classAvg: {
-    accuracy: number;
-    fluency: number;
-    wpm: number;
+  classAverages: {
+    avgAccuracy: number | null;
+    avgFluency: number | null;
+    avgWpm: number | null;
   };
+  needsAttention: EnglishStudent[];
 }
 
 interface TaskInfo {
   id: string;
   title: string;
+  subject: string;
+}
+
+interface TaskStudent {
+  id: string;
+  fullName: string;
+  rollNumber: string | null;
+  completedCount: number;
+  totalCount: number;
+  completionRatePct: number;
+}
+
+interface TaskCell {
+  studentId: string;
+  taskId: string;
+  status: 'completed' | 'in_progress' | 'not_started' | 'in_review';
 }
 
 interface TaskReport {
-  students: { id: string; name: string; avatar: string }[];
+  students: TaskStudent[];
   tasks: TaskInfo[];
-  matrix: Record<string, Record<string, 'completed' | 'in_progress' | 'not_started'>>;
+  matrix: TaskCell[];
 }
 
 export const TeacherReports: React.FC = () => {
-  const [sections, setSections] = useState<Section[] | null>(null);
+  const [sections, setSections] = useState<TeachingSection[] | null>(null);
   const [selectedSection, setSelectedSection] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'heatmap' | 'english' | 'tasks'>('heatmap');
 
@@ -65,45 +120,76 @@ export const TeacherReports: React.FC = () => {
   const [taskData, setTaskData] = useState<TaskReport | null>(null);
 
   const [loading, setLoading] = useState(false);
+  /**
+   * Held separately from "no data" on purpose. Every fetch here used to end in
+   * `.catch(() => setX(null))`, which renders identically to a section that
+   * genuinely has no exams yet — so a 404 looked like an empty class and the
+   * page appeared to work while being completely broken.
+   */
+  const [error, setError] = useState<string | null>(null);
 
   // Load sections on mount
   useEffect(() => {
-    api.get<Section[]>('/teacher/my-sections')
+    api.get<MySectionsResponse>('/teacher/my-sections')
       .then(res => {
-        setSections(res);
-        if (res.length > 0) {
-          setSelectedSection(res[0]!.id);
-        }
+        const list = res.sections ?? [];
+        setSections(list);
+        if (list.length > 0) setSelectedSection(list[0]!.classSectionId);
       })
-      .catch(() => setSections([]));
+      .catch(() => {
+        setSections([]);
+        setError('Could not load your class sections.');
+      });
   }, []);
 
   // Fetch report data when section or tab changes
   useEffect(() => {
-    if (!selectedSection) return;
+    if (!selectedSection || !sections) return;
+    const current = sections.find(s => s.classSectionId === selectedSection);
+    if (!current) return;
+
+    // The reports API is keyed by class + section, not by class_section_id.
+    const query = { classNum: current.classNum, section: current.section };
 
     setLoading(true);
-    if (activeTab === 'heatmap') {
-      api.get<HeatmapReport>('/teacher/reports/heatmap', { sectionId: selectedSection })
-        .then(setHeatmapData)
-        .catch(() => setHeatmapData(null))
-        .finally(() => setLoading(false));
-    } else if (activeTab === 'english') {
-      api.get<EnglishReport>('/teacher/reports/english', { sectionId: selectedSection })
-        .then(setEnglishData)
-        .catch(() => setEnglishData(null))
-        .finally(() => setLoading(false));
-    } else if (activeTab === 'tasks') {
-      api.get<TaskReport>('/teacher/reports/tasks', { sectionId: selectedSection })
-        .then(setTaskData)
-        .catch(() => setTaskData(null))
-        .finally(() => setLoading(false));
-    }
-  }, [selectedSection, activeTab]);
+    setError(null);
+
+    // NOTE: the endpoint is `/reports/performance`. This page called
+    // `/reports/heatmap`, which has never existed, and swallowed the 404.
+    const request =
+      activeTab === 'heatmap'
+        ? api.get<HeatmapReport>('/teacher/reports/performance', query).then(setHeatmapData)
+        : activeTab === 'english'
+          ? api.get<EnglishReport>('/teacher/reports/english', query).then(setEnglishData)
+          : api.get<TaskReport>('/teacher/reports/tasks', query).then(setTaskData);
+
+    request
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : 'Could not load this report.');
+        if (activeTab === 'heatmap') setHeatmapData(null);
+        else if (activeTab === 'english') setEnglishData(null);
+        else setTaskData(null);
+      })
+      .finally(() => setLoading(false));
+  }, [selectedSection, activeTab, sections]);
 
   const handlePrint = () => {
     window.print();
   };
+
+  /* The API returns the grids as flat cell lists; index them once per render
+     rather than scanning the array inside every table cell. */
+  const heatmapMatrix = React.useMemo(() => {
+    const m = new Map<string, HeatmapCell>();
+    for (const c of heatmapData?.matrix ?? []) m.set(`${c.studentId}|${c.examId}`, c);
+    return m;
+  }, [heatmapData]);
+
+  const taskMatrix = React.useMemo(() => {
+    const m = new Map<string, TaskCell['status']>();
+    for (const c of taskData?.matrix ?? []) m.set(`${c.studentId}|${c.taskId}`, c.status);
+    return m;
+  }, [taskData]);
 
   const getHeatmapColorClass = (score: number | null) => {
     if (score === null || score === undefined) return 'bg-slate-100 text-slate-400';
@@ -158,7 +244,9 @@ export const TeacherReports: React.FC = () => {
                 <option value="">No sections mapped</option>
               ) : (
                 sections.map(s => (
-                  <option key={s.id} value={s.id}>Class {s.class_num}-{s.section_name}</option>
+                  <option key={s.classSectionId} value={s.classSectionId}>
+                    Class {s.classNum}-{s.section}
+                  </option>
                 ))
               )}
             </select>
@@ -193,13 +281,12 @@ export const TeacherReports: React.FC = () => {
           >
             <Printer size={14} /> Print Report
           </button>
-          <a
-            href={`${import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api'}/teacher/reports/${activeTab}?sectionId=${selectedSection}&format=csv`}
-            download
-            className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold"
-          >
-            <Download size={14} /> Export CSV
-          </a>
+          {/* An "Export CSV" button used to sit here pointing at
+              `/teacher/reports/{tab}?format=csv`. No reports endpoint supports
+              a `format` parameter, and a plain <a href> cannot carry the bearer
+              token anyway, so it could only ever have 404'd or 401'd. Removed
+              rather than left as a button that does nothing; Print below is
+              real and works today. */}
         </div>
       </div>
 
@@ -207,6 +294,12 @@ export const TeacherReports: React.FC = () => {
       <div className="print-card">
         {loading ? (
           <div className="flex justify-center py-16"><Loader2 className="animate-spin text-indigo-600" size={32} /></div>
+        ) : error ? (
+          <div className="flex flex-col items-center gap-2 py-16 text-center">
+            <AlertTriangle size={28} className="text-amber-500" strokeWidth={1.5} />
+            <p className="text-[13px] font-semibold text-slate-700">This report could not be loaded.</p>
+            <p className="text-[12px] text-slate-400">{error}</p>
+          </div>
         ) : !selectedSection ? (
           <div className="text-center py-16 text-slate-400 font-semibold">Select a section from the dropdown above to generate reports.</div>
         ) : (
@@ -231,7 +324,7 @@ export const TeacherReports: React.FC = () => {
                       <tr className="border-b border-slate-100 text-slate-400 font-bold">
                         <th className="py-2 pb-3 text-left">Student</th>
                         {heatmapData.exams.map(ex => (
-                          <th key={ex.id} className="py-2 pb-3 truncate max-w-[120px]" title={`${ex.title} (${ex.subject})`}>
+                          <th key={ex.id} className="py-2 pb-3 truncate max-w-[120px]" title={ex.title}>
                             {ex.title}
                           </th>
                         ))}
@@ -239,25 +332,28 @@ export const TeacherReports: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="font-semibold">
-                      {heatmapData.students.map((stud, sIdx) => (
-                        <tr key={sIdx} className="border-b border-slate-50 hover:bg-slate-50/50">
-                          <td className="py-3 text-left font-bold text-slate-800 flex items-center gap-2">
-                            <span>{stud.avatar || '🦊'}</span>
-                            <span>{stud.name}</span>
+                      {heatmapData.students.map((stud) => (
+                        <tr key={stud.id} className="border-b border-slate-50 hover:bg-slate-50/50">
+                          <td className="py-3 text-left font-bold text-slate-800">
+                            {stud.fullName}
+                            {stud.rollNumber && (
+                              <span className="ml-2 font-mono text-[10px] font-normal text-slate-400">#{stud.rollNumber}</span>
+                            )}
                           </td>
                           {heatmapData.exams.map(ex => {
-                            const score = stud.scores[ex.id];
+                            const cell = heatmapMatrix.get(`${stud.id}|${ex.id}`);
+                            const score = cell?.scorePct ?? null;
                             return (
                               <td key={ex.id} className="py-3">
                                 <span className={`p-1 px-2.5 rounded-lg font-bold ${getHeatmapColorClass(score)}`}>
-                                  {score !== null ? `${Math.round(score)}%` : '—'}
+                                  {score !== null ? `${Math.round(score)}%` : cell?.submitted ? '—' : 'Not sat'}
                                 </span>
                               </td>
                             );
                           })}
                           <td className="py-3">
                             <span className="p-1 px-2.5 rounded-lg font-black bg-slate-100 text-slate-800">
-                              {Math.round(stud.avg)}%
+                              {stud.averageScorePct !== null ? `${Math.round(stud.averageScorePct)}%` : '—'}
                             </span>
                           </td>
                         </tr>
@@ -286,25 +382,35 @@ export const TeacherReports: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="font-semibold">
-                        {englishData.students.map((stud, sIdx) => (
-                          <tr key={sIdx} className="border-b border-slate-50 hover:bg-slate-50/50">
-                            <td className="py-3 font-bold text-slate-800 flex items-center gap-2">
-                              <span>{stud.avatar || '🦊'}</span>
-                              <span>{stud.name}</span>
+                        {englishData.students.map((stud) => (
+                          <tr key={stud.studentId} className="border-b border-slate-50 hover:bg-slate-50/50">
+                            <td className="py-3 font-bold text-slate-800">
+                              {stud.fullName}
+                              {stud.rollNumber && (
+                                <span className="ml-2 font-mono text-[10px] font-normal text-slate-400">#{stud.rollNumber}</span>
+                              )}
                             </td>
                             <td className="py-3 text-center">
-                              <span className="flex items-center justify-center gap-1.5">
-                                {getThresholdIcon(stud.accuracy)} {Math.round(stud.accuracy)}%
-                              </span>
+                              {stud.avgAccuracy === null ? <span className="text-slate-300">—</span> : (
+                                <span className="flex items-center justify-center gap-1.5">
+                                  {getThresholdIcon(stud.avgAccuracy)} {Math.round(stud.avgAccuracy)}%
+                                </span>
+                              )}
                             </td>
                             <td className="py-3 text-center">
-                              <span className="flex items-center justify-center gap-1.5">
-                                {getThresholdIcon(stud.fluency)} {Math.round(stud.fluency)}%
-                              </span>
+                              {stud.avgFluency === null ? <span className="text-slate-300">—</span> : (
+                                <span className="flex items-center justify-center gap-1.5">
+                                  {getThresholdIcon(stud.avgFluency)} {Math.round(stud.avgFluency)}%
+                                </span>
+                              )}
                             </td>
-                            <td className="py-3 text-center text-slate-600">{stud.wpm} WPM</td>
+                            <td className="py-3 text-center text-slate-600">
+                              {stud.avgWpm === null ? <span className="text-slate-300">—</span> : `${stud.avgWpm} WPM`}
+                            </td>
                             <td className="py-3 text-center">
-                              {stud.needsAttention ? (
+                              {stud.totalAttempts === 0 ? (
+                                <span className="badge text-[9px] font-bold text-slate-400">No attempts yet</span>
+                              ) : stud.status === 'needs_attention' ? (
                                 <span className="badge pill-rose text-[9px] font-black uppercase">Needs Attention</span>
                               ) : (
                                 <span className="badge pill-green text-[9px] font-bold">On Track</span>
@@ -312,12 +418,20 @@ export const TeacherReports: React.FC = () => {
                             </td>
                           </tr>
                         ))}
-                        {/* Class averages row */}
+                        {/* Class averages row. Every value is nullable: with no
+                            attempts recorded there is no average to state, and
+                            printing 0% would read as "the class scored zero". */}
                         <tr className="bg-slate-50 font-black text-slate-800 border-t border-slate-200">
                           <td className="py-3 pl-3">Class Average</td>
-                          <td className="py-3 text-center">{Math.round(englishData.classAvg.accuracy)}%</td>
-                          <td className="py-3 text-center">{Math.round(englishData.classAvg.fluency)}%</td>
-                          <td className="py-3 text-center">{englishData.classAvg.wpm} WPM</td>
+                          <td className="py-3 text-center">
+                            {englishData.classAverages.avgAccuracy === null ? '—' : `${Math.round(englishData.classAverages.avgAccuracy)}%`}
+                          </td>
+                          <td className="py-3 text-center">
+                            {englishData.classAverages.avgFluency === null ? '—' : `${Math.round(englishData.classAverages.avgFluency)}%`}
+                          </td>
+                          <td className="py-3 text-center">
+                            {englishData.classAverages.avgWpm === null ? '—' : `${englishData.classAverages.avgWpm} WPM`}
+                          </td>
                           <td className="py-3"></td>
                         </tr>
                       </tbody>
@@ -326,19 +440,19 @@ export const TeacherReports: React.FC = () => {
                 </div>
 
                 {/* Needs Attention callout list */}
-                {englishData.students.some(s => s.needsAttention) && (
+                {englishData.needsAttention.length > 0 && (
                   <div className="bg-rose-50 border border-rose-100 rounded-3xl p-5 flex flex-col gap-3">
                     <h4 className="font-display font-bold text-xs text-rose-800 flex items-center gap-1.5">
                       <AlertTriangle size={15} /> Students flagged for speech/speaking revision
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {englishData.students.filter(s => s.needsAttention).map((stud, idx) => (
-                        <div key={idx} className="bg-white border border-rose-100 p-3 rounded-2xl flex items-center justify-between text-xs font-semibold text-slate-700">
-                          <span className="flex items-center gap-2">
-                            <span>{stud.avatar || '🦊'}</span>
-                            <span>{stud.name}</span>
+                      {englishData.needsAttention.map((stud) => (
+                        <div key={stud.studentId} className="bg-white border border-rose-100 p-3 rounded-2xl flex items-center justify-between text-xs font-semibold text-slate-700">
+                          <span>{stud.fullName}</span>
+                          <span className="text-[10px] text-rose-600">
+                            Acc: {stud.avgAccuracy === null ? '—' : `${Math.round(stud.avgAccuracy)}%`}
+                            {stud.avgWpm !== null && ` · ${stud.avgWpm} WPM`}
                           </span>
-                          <span className="text-[10px] text-rose-600">Acc: {Math.round(stud.accuracy)}% · {stud.wpm} WPM</span>
                         </div>
                       ))}
                     </div>
@@ -368,24 +482,30 @@ export const TeacherReports: React.FC = () => {
                         <tr className="border-b border-slate-100 text-slate-400 font-bold">
                           <th className="py-2 pb-3 text-left">Student</th>
                           {taskData.tasks.map(t => (
-                            <th key={t.id} className="py-2 pb-3 truncate max-w-[120px]" title={t.title}>
+                            <th key={t.id} className="py-2 pb-3 truncate max-w-[120px]" title={`${t.title} (${t.subject})`}>
                               {t.title}
                             </th>
                           ))}
+                          <th className="py-2 pb-3">Completed</th>
                         </tr>
                       </thead>
                       <tbody className="font-semibold">
                         {taskData.students.map((stud) => (
                           <tr key={stud.id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                            <td className="py-3 text-left font-bold text-slate-800 flex items-center gap-2">
-                              <span>{stud.avatar || '🦊'}</span>
-                              <span>{stud.name}</span>
+                            <td className="py-3 text-left font-bold text-slate-800">
+                              {stud.fullName}
+                              {stud.rollNumber && (
+                                <span className="ml-2 font-mono text-[10px] font-normal text-slate-400">#{stud.rollNumber}</span>
+                              )}
                             </td>
                             {taskData.tasks.map(t => (
                               <td key={t.id} className="py-3 text-base">
-                                {getTaskStatusLabel(taskData.matrix[stud.id]?.[t.id])}
+                                {getTaskStatusLabel(taskMatrix.get(`${stud.id}|${t.id}`))}
                               </td>
                             ))}
+                            <td className="py-3 text-slate-600">
+                              {stud.completedCount}/{stud.totalCount}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
