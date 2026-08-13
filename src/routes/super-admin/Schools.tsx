@@ -39,6 +39,8 @@ const inputCls =
 
 export const SuperAdminSchools: React.FC = () => {
   const [schools, setSchools] = useState<School[]>([]);
+  /** Server-side total, so the header can say when the list is truncated. */
+  const [totalSchools, setTotalSchools] = useState(0);
   const [counts, setCounts] = useState<Map<string, OverviewSchool>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -56,11 +58,18 @@ export const SuperAdminSchools: React.FC = () => {
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [schoolList, overview] = await Promise.all([
-        api.get<School[]>('/super-admin/schools'),
+      // The endpoint is paginated (rows/total/page/pageSize). This screen still
+      // filters and searches client-side over the whole set, so it asks for one
+      // large page rather than pretending to page through the results — with a
+      // hard ceiling so it can never again fetch an unbounded list.
+      // TODO: when a customer passes ~100 schools, move the search box and the
+      // status filter server-side and add a pager here.
+      const [schoolPage, overview] = await Promise.all([
+        api.get<{ rows: School[]; total: number }>('/super-admin/schools', { pageSize: 100 }),
         api.get<{ schools: OverviewSchool[] }>('/super-admin/overview'),
       ]);
-      setSchools(schoolList);
+      setSchools(schoolPage.rows);
+      setTotalSchools(schoolPage.total);
       setCounts(new Map(overview.schools.map((s) => [s.id, s])));
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : 'Failed to load schools');
@@ -176,6 +185,14 @@ export const SuperAdminSchools: React.FC = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
+            {/* Says so out loud when the server holds more than this screen
+                fetched, rather than quietly showing a partial list as if it
+                were everything. */}
+            {totalSchools > schools.length && (
+              <p className="px-4 py-2 text-[11px] text-amber-700 bg-amber-50 border-b border-amber-100">
+                Showing the {schools.length} most recent of {totalSchools} schools.
+              </p>
+            )}
             <table className="w-full">
               <thead>
                 <tr className="bg-slate-50 text-left">

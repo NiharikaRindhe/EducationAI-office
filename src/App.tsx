@@ -4,6 +4,7 @@ import { AppProvider } from './context/AppContext';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/shared/ProtectedRoute';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
+import { EnvironmentBanner } from './components/shared/EnvironmentBanner';
 
 // Import Auth/Public Pages
 import { Landing } from './routes/public/Landing';
@@ -124,6 +125,10 @@ import { LabInchargeTeachers } from './routes/lab-incharge/Teachers';
 function App() {
   return (
     <ErrorBoundary>
+      {/* Outside the Router so it renders on every route, including login and
+          the public marketing pages. Renders nothing when VITE_ENV_LABEL is
+          unset, which is what production does. */}
+      <EnvironmentBanner />
       <AuthProvider>
         <AppProvider>
           <Router>

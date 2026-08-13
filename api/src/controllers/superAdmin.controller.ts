@@ -1,5 +1,12 @@
 import type { Request, Response, NextFunction } from 'express';
-import { createSchoolSchema, updateSchoolSchema, addSchoolAdminSchema, auditLogQuerySchema, setEntitlementsSchema } from '../schemas/superAdmin.schema.js';
+import {
+  createSchoolSchema,
+  updateSchoolSchema,
+  addSchoolAdminSchema,
+  auditLogQuerySchema,
+  auditLogExportQuerySchema,
+  setEntitlementsSchema,
+} from '../schemas/superAdmin.schema.js';
 import * as superAdminService from '../services/superAdmin.service.js';
 import { ApiError } from '../lib/errors.js';
 
@@ -13,10 +20,12 @@ export async function createSchoolController(req: Request, res: Response, next: 
   }
 }
 
-export async function listSchoolsController(_req: Request, res: Response, next: NextFunction) {
+export async function listSchoolsController(req: Request, res: Response, next: NextFunction) {
   try {
-    const schools = await superAdminService.listSchools();
-    res.json(schools);
+    const page = req.query.page ? Number(req.query.page) : undefined;
+    const pageSize = req.query.pageSize ? Number(req.query.pageSize) : undefined;
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+    res.json(await superAdminService.listSchools({ page, pageSize, search }));
   } catch (err) {
     next(err);
   }
@@ -94,6 +103,29 @@ export async function listAuditLogsController(req: Request, res: Response, next:
     const query = auditLogQuerySchema.parse(req.query);
     const logs = await superAdminService.listAuditLogs(query);
     res.json(logs);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function listAuditActionsController(_req: Request, res: Response, next: NextFunction) {
+  try {
+    res.json(await superAdminService.listAuditActions());
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function exportAuditLogsController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const query = auditLogExportQuerySchema.parse(req.query);
+    const csv = await superAdminService.exportAuditLogsCsv(query);
+    const stamp = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="eduai-audit-log-${stamp}.csv"`);
+    // BOM so Excel opens UTF-8 names (Hindi, accented) correctly instead of
+    // rendering them as mojibake — these exports go to non-technical readers.
+    res.send('﻿' + csv);
   } catch (err) {
     next(err);
   }

@@ -39,6 +39,42 @@ export const addSingleTeacherSchema = z.object({
   classesTaught: z.array(z.number().int().min(1).max(10)).default([]),
 });
 
+/**
+ * Edits to an existing student.
+ *
+ * Every field is optional — this is a partial update, so a form that only
+ * changes a roll number must not blank out the section. `.refine` rejects an
+ * empty body rather than silently succeeding while doing nothing.
+ *
+ * Note what is NOT editable here: role, school_id, xp, streak and login
+ * credentials. Those are either privilege boundaries (a School Admin must not
+ * be able to move a child into another school) or earned state that an
+ * administrator editing a name has no business rewriting.
+ */
+export const updateStudentProfileSchema = z
+  .object({
+    fullName: z.string().min(2).max(120).optional(),
+    classNum: z.number().int().min(1).max(10).optional(),
+    section: z.string().min(1).max(4).optional(),
+    rollNumber: z.string().max(20).nullable().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: 'No fields to update' });
+
+/** Same reasoning as students: identity and assignment only, never credentials. */
+export const updateTeacherProfileSchema = z
+  .object({
+    fullName: z.string().min(2).max(120).optional(),
+    employeeId: z.string().max(40).nullable().optional(),
+    specialization: z.string().max(80).nullable().optional(),
+    classesTaught: z.array(z.number().int().min(1).max(10)).optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: 'No fields to update' });
+
+/** Enable or disable a staff login. Reversible; never deletes the account. */
+export const setStaffActiveSchema = z.object({
+  isActive: z.boolean(),
+});
+
 export const addSingleLabInchargeSchema = z.object({
   fullName: z.string().min(2),
 });

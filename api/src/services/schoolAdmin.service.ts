@@ -13,7 +13,13 @@ import {
   teacherCsvRowSchema,
   type StudentCsvRow,
   type TeacherCsvRow,
+  type updateStudentProfileSchema,
+  type updateTeacherProfileSchema,
 } from '../schemas/schoolAdmin.schema.js';
+import type { z } from 'zod';
+
+type UpdateStudentInput = z.infer<typeof updateStudentProfileSchema>;
+type UpdateTeacherInput = z.infer<typeof updateTeacherProfileSchema>;
 
 const AVATARS = ['🦁', '🐯', '🦊', '🐼', '🐸', '🦋', '🦄', '🐉', '🚀', '⭐', '🎯', '🏆'];
 const randomAvatar = () => AVATARS[Math.floor(Math.random() * AVATARS.length)]!;
@@ -311,6 +317,195 @@ export async function addSingleStudent(schoolId: string, row: StudentCsvRow) {
 export async function addSingleTeacher(schoolId: string, row: TeacherCsvRow) {
   const schoolCode = await getSchoolCode(schoolId);
   return createOneTeacher(schoolId, schoolCode, row);
+}
+
+// ─────────────────────────────────────────────────────────────
+//  EDITING EXISTING ACCOUNTS
+//
+//  Until now the only way to correct a misspelled name or a wrong class was
+//  to delete the account and re-import it, which threw away the child's XP,
+//  streak, exam history and login. These are the in-place edits.
+//
+//  Every function re-reads the row scoped to schoolId BEFORE writing. The id
+//  arrives from the client and is untrusted: without that check a School Admin
+//  could edit any account on the platform by guessing a uuid.
+// ─────────────────────────────────────────────────────────────
+
+/** Load a student and prove they belong to this school. */
+async function assertStudentInSchool(schoolId: string, studentId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('user_profiles')
+    .select('id, full_name, student_profiles(class_num, section, roll_number)')
+    .eq('id', studentId)
+    .eq('school_id', schoolId)
+    .eq('role', 'student')
+    .maybeSingle();
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to read student', error.message);
+  if (!data) throw new ApiError('NOT_FOUND', 'Student not found in this school');
+  return data;
+}
+
+export async function updateStudentProfile(
+  schoolId: string,
+  studentId: string,
+  input: UpdateStudentInput,
+  actorId: string,
+) {
+  const before = await assertStudentInSchool(schoolId, studentId);
+  const sp = Array.isArray(before.student_profiles) ? before.student_profiles[0] : before.student_profiles;
+
+  if (input.fullName !== undefined) {
+    const { error } = await supabaseAdmin
+      .from('user_profiles')
+      .update({ full_name: input.fullName, updated_at: new Date().toISOString() })
+      .eq('id', studentId);
+    if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to update name', error.message);
+  }
+
+  const profilePatch: Record<string, unknown> = {};
+  if (input.classNum !== undefined) profilePatch.class_num = input.classNum;
+  if (input.section !== undefined) profilePatch.section = input.section.trim().toUpperCase();
+  if (input.rollNumber !== undefined) profilePatch.roll_number = input.rollNumber;
+
+  if (Object.keys(profilePatch).length > 0) {
+    // A section must exist before a student can be moved into it, or the
+    // roster shows a child in a class the timetable has never heard of.
+    const targetClass = (profilePatch.class_num as number | undefined) ?? sp?.class_num;
+    const targetSection = (profilePatch.section as string | undefined) ?? sp?.section;
+    if (targetClass && targetSection) await ensureSectionExists(schoolId, targetClass, targetSection);
+
+    const { error } = await supabaseAdmin.from('student_profiles').update(profilePatch).eq('user_id', studentId);
+    if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to update student details', error.message);
+  }
+
+  // Crossing the Class 4/5 boundary swaps PIN login for password login. The
+  // caller is told so it can prompt for a credential reset; batch_id is a
+  // generated column so it follows the class automatically.
+  const crossedBatch =
+    input.classNum !== undefined && sp ? (sp.class_num <= 4) !== (input.classNum <= 4) : false;
+
+  await writeAuditLog({
+    schoolId,
+    actorId,
+    action: 'student.updated',
+    entity: 'student',
+    entityId: studentId,
+    metadata: {
+      before: { fullName: before.full_name, classNum: sp?.class_num, section: sp?.section, rollNumber: sp?.roll_number },
+      after: input,
+      crossedBatch,
+    },
+  });
+
+  return { ...(await assertStudentInSchool(schoolId, studentId)), crossedBatch };
+}
+
+async function assertTeacherInSchool(schoolId: string, teacherId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('user_profiles')
+    .select('id, full_name, is_active, teacher_profiles(employee_id, specialization, classes_taught)')
+    .eq('id', teacherId)
+    .eq('school_id', schoolId)
+    .eq('role', 'teacher')
+    .maybeSingle();
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to read teacher', error.message);
+  if (!data) throw new ApiError('NOT_FOUND', 'Teacher not found in this school');
+  return data;
+}
+
+export async function updateTeacherProfile(
+  schoolId: string,
+  teacherId: string,
+  input: UpdateTeacherInput,
+  actorId: string,
+) {
+  const before = await assertTeacherInSchool(schoolId, teacherId);
+  const tp = Array.isArray(before.teacher_profiles) ? before.teacher_profiles[0] : before.teacher_profiles;
+
+  if (input.fullName !== undefined) {
+    const { error } = await supabaseAdmin
+      .from('user_profiles')
+      .update({ full_name: input.fullName, updated_at: new Date().toISOString() })
+      .eq('id', teacherId);
+    if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to update name', error.message);
+  }
+
+  const profilePatch: Record<string, unknown> = {};
+  if (input.employeeId !== undefined) profilePatch.employee_id = input.employeeId;
+  if (input.specialization !== undefined) profilePatch.specialization = input.specialization;
+  if (input.classesTaught !== undefined) profilePatch.classes_taught = input.classesTaught;
+
+  if (Object.keys(profilePatch).length > 0) {
+    const { error } = await supabaseAdmin.from('teacher_profiles').update(profilePatch).eq('user_id', teacherId);
+    if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to update teacher details', error.message);
+  }
+
+  await writeAuditLog({
+    schoolId,
+    actorId,
+    action: 'teacher.updated',
+    entity: 'teacher',
+    entityId: teacherId,
+    metadata: {
+      before: {
+        fullName: before.full_name,
+        employeeId: tp?.employee_id,
+        specialization: tp?.specialization,
+        classesTaught: tp?.classes_taught,
+      },
+      after: input,
+    },
+  });
+
+  return assertTeacherInSchool(schoolId, teacherId);
+}
+
+/**
+ * Enable or disable a staff login (teacher or lab in-charge).
+ *
+ * Students already had this through the bulk directory actions; staff did not,
+ * so a teacher who left the school could only be dealt with by resetting their
+ * password and hoping. Reversible — this never deletes the account, because the
+ * exams and tasks they authored still reference them.
+ */
+export async function setStaffActive(
+  schoolId: string,
+  userId: string,
+  isActive: boolean,
+  actorId: string,
+) {
+  const { data: staff, error: readError } = await supabaseAdmin
+    .from('user_profiles')
+    .select('id, full_name, role')
+    .eq('id', userId)
+    .eq('school_id', schoolId)
+    .in('role', ['teacher', 'lab_incharge'])
+    .maybeSingle();
+  if (readError) throw new ApiError('INTERNAL_ERROR', 'Failed to read staff account', readError.message);
+  if (!staff) throw new ApiError('NOT_FOUND', 'Staff account not found in this school');
+
+  const { error } = await supabaseAdmin
+    .from('user_profiles')
+    .update({ is_active: isActive, updated_at: new Date().toISOString() })
+    .eq('id', userId);
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to update staff account', error.message);
+
+  await writeAuditLog({
+    schoolId,
+    actorId,
+    action: isActive ? 'staff.reactivated' : 'staff.deactivated',
+    entity: staff.role as string,
+    entityId: userId,
+    metadata: { fullName: staff.full_name },
+  });
+
+  // requireAuth re-reads is_active per request, so the next call is refused
+  // either way. Revoking as well ends the session they are holding right now.
+  if (!isActive) {
+    await revokeUserSessions(userId, 'account_deactivated', { actorId, schoolId });
+  }
+
+  return { id: userId, fullName: staff.full_name, role: staff.role, isActive };
 }
 
 // ─────────────────────────────────────────────────────────────

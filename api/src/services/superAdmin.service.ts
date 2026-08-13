@@ -5,6 +5,7 @@ import { sendSchoolAdminWelcomeEmail } from '../lib/mailer.js';
 import { revokeUserSessions, revokeSessionsForUsers } from '../lib/sessions.js';
 import { writeAuditLog } from './auditLog.service.js';
 import {
+  grantAllEntitlements,
   seedEntitlementsFromPackage,
   invalidateEntitlementsCache,
   FEATURE_KEYS,
@@ -41,12 +42,12 @@ export async function createSchool(input: CreateSchoolInput) {
 
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to create school', error.message);
 
-  // Grant exactly what the chosen package includes. Must happen before the
-  // school is usable — a school with no entitlement rows is treated as fully
-  // entitled (the grandfathering rule), so skipping this would silently hand
-  // a Starter school the whole Enterprise feature set.
+  // One plan, everything included — a newly registered school gets the full
+  // feature set. Rows are still written explicitly rather than leaning on the
+  // grandfathering rule, so a later per-school toggle is distinguishable from
+  // a seed that never ran.
   try {
-    await seedEntitlementsFromPackage(school.id as string, input.plan);
+    await grantAllEntitlements(school.id as string);
   } catch (seedError) {
     await supabaseAdmin.from('schools').delete().eq('id', school.id);
     throw new ApiError(
@@ -101,61 +102,88 @@ export async function createSchool(input: CreateSchoolInput) {
   return { ...school, adminCredential };
 }
 
-export async function listSchools() {
-  const { data, error } = await supabaseAdmin
+export const SCHOOLS_PAGE_SIZE = 25;
+
+/**
+ * Schools, paginated and searchable.
+ *
+ * Returned as an envelope rather than a bare array so the caller can render
+ * "showing 25 of 340" without a second count query. `total` is the count for
+ * the CURRENT filter, which is what a pager needs.
+ */
+export async function listSchools(opts: { page?: number; pageSize?: number; search?: string } = {}) {
+  const page = Math.max(1, opts.page ?? 1);
+  const pageSize = Math.min(100, Math.max(1, opts.pageSize ?? SCHOOLS_PAGE_SIZE));
+  const from = (page - 1) * pageSize;
+
+  let query = supabaseAdmin
     .from('schools')
     .select(
       'id, name, code, address, city, state, pincode, board, plan, logo_path, contact_name, contact_email, contact_phone, is_active, created_at',
+      { count: 'exact' },
     )
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(from, from + pageSize - 1);
 
+  const search = opts.search?.trim();
+  if (search) {
+    // Name or code — the two things an operator actually knows when hunting
+    // for one school among hundreds. Commas would break out of the or()
+    // filter syntax, so they are stripped.
+    const safe = search.replace(/[,()]/g, ' ');
+    query = query.or(`name.ilike.%${safe}%,code.ilike.%${safe}%`);
+  }
+
+  const { data, error, count } = await query;
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to list schools', error.message);
-  return data;
+
+  return { rows: data ?? [], total: count ?? 0, page, pageSize };
 }
 
+interface SchoolStatsRow {
+  school_id: string;
+  students: number;
+  teachers: number;
+  staff: number;
+  active_now: number;
+  open_tickets: number;
+}
+
+/**
+ * Platform overview.
+ *
+ * The per-school counts come from platform_school_stats(), a SQL aggregate.
+ * This used to pull EVERY user_profile and every open ticket into Node and
+ * count them in a loop — fine against four demo schools, but a hundred schools
+ * of five hundred students means fifty thousand rows over the wire on every
+ * dashboard load. The response shape is unchanged.
+ */
 export async function getOverview() {
-  const [{ data: schools, error: schoolsError }, { data: profiles, error: profilesError }, { data: tickets, error: ticketsError }] =
-    await Promise.all([
-      supabaseAdmin.from('schools').select('id, name, code, is_active, created_at'),
-      supabaseAdmin.from('user_profiles').select('school_id, role, last_seen_at'),
-      supabaseAdmin.from('support_tickets').select('school_id, status').in('status', ['open', 'in_progress']),
-    ]);
+  const [{ data: schools, error: schoolsError }, { data: stats, error: statsError }] = await Promise.all([
+    supabaseAdmin.from('schools').select('id, name, code, is_active, created_at').order('created_at', { ascending: false }),
+    supabaseAdmin.rpc('platform_school_stats'),
+  ]);
 
   if (schoolsError) throw new ApiError('INTERNAL_ERROR', 'Failed to load schools', schoolsError.message);
-  if (profilesError) throw new ApiError('INTERNAL_ERROR', 'Failed to load users', profilesError.message);
-  if (ticketsError) throw new ApiError('INTERNAL_ERROR', 'Failed to load tickets', ticketsError.message);
+  if (statsError) throw new ApiError('INTERNAL_ERROR', 'Failed to load platform statistics', statsError.message);
 
-  const activeSince = Date.now() - 15 * 60_000;
-  const countsBySchool = new Map<string, { students: number; teachers: number; staff: number; activeNow: number }>();
-  for (const p of profiles ?? []) {
-    if (!p.school_id) continue;
-    const entry = countsBySchool.get(p.school_id) ?? { students: 0, teachers: 0, staff: 0, activeNow: 0 };
-    if (p.role === 'student') entry.students += 1;
-    else if (p.role === 'teacher') entry.teachers += 1;
-    else entry.staff += 1;
-    if (p.last_seen_at && new Date(p.last_seen_at).getTime() > activeSince) entry.activeNow += 1;
-    countsBySchool.set(p.school_id, entry);
-  }
-
-  const openTicketsBySchool = new Map<string, number>();
-  for (const t of tickets ?? []) {
-    if (!t.school_id) continue;
-    openTicketsBySchool.set(t.school_id, (openTicketsBySchool.get(t.school_id) ?? 0) + 1);
-  }
+  const byId = new Map<string, SchoolStatsRow>(
+    ((stats ?? []) as SchoolStatsRow[]).map((r) => [r.school_id, r]),
+  );
 
   const schoolRows = (schools ?? []).map((s) => {
-    const counts = countsBySchool.get(s.id) ?? { students: 0, teachers: 0, staff: 0, activeNow: 0 };
+    const c = byId.get(s.id);
     return {
       id: s.id,
       name: s.name,
       code: s.code,
       isActive: s.is_active,
       createdAt: s.created_at,
-      studentCount: counts.students,
-      teacherCount: counts.teachers,
-      staffCount: counts.staff,
-      activeNow: counts.activeNow,
-      openTickets: openTicketsBySchool.get(s.id) ?? 0,
+      studentCount: Number(c?.students ?? 0),
+      teacherCount: Number(c?.teachers ?? 0),
+      staffCount: Number(c?.staff ?? 0),
+      activeNow: Number(c?.active_now ?? 0),
+      openTickets: Number(c?.open_tickets ?? 0),
     };
   });
 
@@ -164,7 +192,7 @@ export async function getOverview() {
     activeSchools: schoolRows.filter((s) => s.isActive).length,
     totalStudents: schoolRows.reduce((sum, s) => sum + s.studentCount, 0),
     totalTeachers: schoolRows.reduce((sum, s) => sum + s.teacherCount, 0),
-    totalOpenTickets: (tickets ?? []).length,
+    totalOpenTickets: schoolRows.reduce((sum, s) => sum + s.openTickets, 0),
     schools: schoolRows,
   };
 }
@@ -483,7 +511,38 @@ export async function resetSchoolAdminPassword(schoolId: string, userId: string,
 // ─────────────────────────────────────────────────────────────
 //  AUDIT LOG — platform-wide viewer with optional school filter.
 // ─────────────────────────────────────────────────────────────
-export async function listAuditLogs(filters: { schoolId?: string; days: number; limit: number }) {
+export interface AuditLogFilters {
+  schoolId?: string;
+  days: number;
+  limit: number;
+  /** Exact action key, e.g. `credential.reset`. */
+  action?: string;
+  /** Entity type, e.g. `student` / `school`. */
+  entity?: string;
+  /** Restrict to one actor — "what did this administrator do?". */
+  actorId?: string;
+  /** Substring match across action and entity, for when you don't know the key. */
+  search?: string;
+}
+
+/**
+ * The distinct action keys currently present, so the viewer can offer a real
+ * dropdown instead of asking an operator to memorise the vocabulary.
+ * Derived from the data rather than a hardcoded list, so a new audited action
+ * appears in the filter the first time it is recorded.
+ */
+export async function listAuditActions(days = 90): Promise<string[]> {
+  const since = new Date(Date.now() - days * 24 * 60 * 60_000).toISOString();
+  const { data, error } = await supabaseAdmin
+    .from('audit_logs')
+    .select('action')
+    .gte('created_at', since)
+    .limit(5000);
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to load audit actions', error.message);
+  return [...new Set((data ?? []).map((r) => r.action as string))].sort();
+}
+
+export async function listAuditLogs(filters: AuditLogFilters) {
   const since = new Date(Date.now() - filters.days * 24 * 60 * 60_000).toISOString();
 
   let query = supabaseAdmin
@@ -494,6 +553,13 @@ export async function listAuditLogs(filters: { schoolId?: string; days: number; 
     .limit(filters.limit);
 
   if (filters.schoolId) query = query.eq('school_id', filters.schoolId);
+  if (filters.action) query = query.eq('action', filters.action);
+  if (filters.entity) query = query.eq('entity', filters.entity);
+  if (filters.actorId) query = query.eq('actor_id', filters.actorId);
+  if (filters.search?.trim()) {
+    const safe = filters.search.trim().replace(/[,()]/g, ' ');
+    query = query.or(`action.ilike.%${safe}%,entity.ilike.%${safe}%`);
+  }
 
   const { data, error } = await query;
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to load audit log', error.message);
@@ -521,4 +587,58 @@ export async function listAuditLogs(filters: { schoolId?: string; days: number; 
     actor: actorById.get(r.actor_id) ?? null,
     schools: r.school_id ? (schoolById.get(r.school_id) ?? null) : null,
   }));
+}
+
+/**
+ * The same query, rendered as CSV for an auditor or a regulator.
+ *
+ * Runs through listAuditLogs so an export can never disagree with what the
+ * screen showed — an audit extract that quietly used different filters than
+ * the viewer would be worse than having no export at all.
+ *
+ * `metadata` is serialised as JSON in a single column. It is deliberately NOT
+ * flattened into columns: the shape differs per action, and a spreadsheet that
+ * silently drops fields it didn't expect is not an audit record.
+ */
+export async function exportAuditLogsCsv(filters: AuditLogFilters): Promise<string> {
+  const rows = await listAuditLogs(filters);
+
+  const header = [
+    'timestamp_utc',
+    'action',
+    'entity',
+    'entity_id',
+    'actor_name',
+    'actor_role',
+    'actor_id',
+    'school_name',
+    'school_code',
+    'metadata_json',
+  ];
+
+  /** RFC 4180: quote everything, double any embedded quote. */
+  const cell = (v: unknown): string => {
+    if (v === null || v === undefined) return '""';
+    const s = typeof v === 'string' ? v : JSON.stringify(v);
+    return `"${s.replace(/"/g, '""')}"`;
+  };
+
+  const lines = [header.join(',')];
+  for (const r of rows) {
+    lines.push(
+      [
+        cell(r.created_at),
+        cell(r.action),
+        cell(r.entity),
+        cell(r.entity_id),
+        cell(r.actor?.full_name ?? null),
+        cell(r.actor?.role ?? null),
+        cell(r.actor_id),
+        cell(r.schools?.name ?? null),
+        cell(r.schools?.code ?? null),
+        cell(r.metadata ?? null),
+      ].join(','),
+    );
+  }
+  return lines.join('\r\n');
 }

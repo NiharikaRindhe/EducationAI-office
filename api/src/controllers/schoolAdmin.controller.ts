@@ -6,6 +6,9 @@ import {
   addSingleTeacherSchema,
   addSingleLabInchargeSchema,
   importScopeSchema,
+  updateStudentProfileSchema,
+  updateTeacherProfileSchema,
+  setStaffActiveSchema,
 } from '../schemas/schoolAdmin.schema.js';
 import { requireSchoolId } from '../lib/httpParams.js';
 
@@ -58,6 +61,36 @@ export async function importTeachersController(req: Request, res: Response, next
       errors: [...parseErrors, ...result.errors],
       credentials: result.credentials,
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateStudentProfileController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const schoolId = requireSchoolId(req);
+    const input = updateStudentProfileSchema.parse(req.body);
+    res.json(await schoolAdminService.updateStudentProfile(schoolId, req.params.id!, input, req.user!.id));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateTeacherProfileController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const schoolId = requireSchoolId(req);
+    const input = updateTeacherProfileSchema.parse(req.body);
+    res.json(await schoolAdminService.updateTeacherProfile(schoolId, req.params.id!, input, req.user!.id));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function setStaffActiveController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const schoolId = requireSchoolId(req);
+    const { isActive } = setStaffActiveSchema.parse(req.body);
+    res.json(await schoolAdminService.setStaffActive(schoolId, req.params.id!, isActive, req.user!.id));
   } catch (err) {
     next(err);
   }

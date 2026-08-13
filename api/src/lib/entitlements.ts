@@ -198,8 +198,32 @@ export async function getSchoolFeatures(schoolId: string | null): Promise<Featur
 }
 
 /**
- * Seed a newly created school's entitlements from its package.
- * `custom` grants nothing by default and is driven by later edits.
+ * Grant a school every feature.
+ *
+ * EduAI sells one plan with everything included, so a school gets the full
+ * platform the moment it is registered. Rows are still written per feature
+ * rather than relying on the grandfathered-empty path, so that a Super Admin
+ * can later switch an individual feature off for one school without that
+ * looking identical to a failed seed.
+ */
+export async function grantAllEntitlements(schoolId: string): Promise<void> {
+  const rows = FEATURE_KEYS.map((key) => ({
+    school_id: schoolId,
+    feature_key: key,
+    enabled: true,
+  }));
+
+  const { error } = await supabaseAdmin.from('school_entitlements').upsert(rows);
+  if (error) throw error;
+  invalidateEntitlementsCache();
+}
+
+/**
+ * Seed a school's entitlements from a named package.
+ *
+ * Retained for the Super Admin console, which can still apply a preset or
+ * hand-pick features for an individual school. New schools do NOT go through
+ * here — see grantAllEntitlements.
  */
 export async function seedEntitlementsFromPackage(schoolId: string, packageKey: string): Promise<void> {
   const { data: pkgFeatures, error } = await supabaseAdmin

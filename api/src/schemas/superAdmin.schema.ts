@@ -65,6 +65,19 @@ export const auditLogQuerySchema = z.object({
   schoolId: z.string().uuid().optional(),
   days: z.coerce.number().int().min(1).max(365).default(30),
   limit: z.coerce.number().int().min(1).max(500).default(200),
+  action: z.string().max(60).optional(),
+  entity: z.string().max(40).optional(),
+  actorId: z.string().uuid().optional(),
+  search: z.string().max(80).optional(),
+});
+
+/**
+ * Export shares the viewer's filters but allows a far larger ceiling — an
+ * auditor asking for a year of activity should get the year, not the first
+ * 500 rows silently.
+ */
+export const auditLogExportQuerySchema = auditLogQuerySchema.extend({
+  limit: z.coerce.number().int().min(1).max(20000).default(5000),
 });
 
 // The finalized book-hierarchy subject list — the only subjects the platform

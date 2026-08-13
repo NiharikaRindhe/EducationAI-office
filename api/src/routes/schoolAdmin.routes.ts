@@ -10,6 +10,9 @@ import {
   listStudentsController,
   listTeachersController,
   resetStudentCredentialController,
+  updateStudentProfileController,
+  updateTeacherProfileController,
+  setStaffActiveController,
   resetTeacherPasswordController,
   listLabInchargesController,
   addSingleLabInchargeController,
@@ -91,11 +94,14 @@ schoolAdminRouter.post('/students/bulk/active', bulkSetActiveController);
 schoolAdminRouter.get('/students', listStudentsController);
 schoolAdminRouter.post('/students', addSingleStudentController);
 schoolAdminRouter.post('/students/import', upload.single('file'), importStudentsController);
+schoolAdminRouter.patch('/students/:id', updateStudentProfileController);
 schoolAdminRouter.post('/students/:id/reset-credentials', resetStudentCredentialController);
 
 schoolAdminRouter.get('/teachers', listTeachersController);
 schoolAdminRouter.post('/teachers', addSingleTeacherController);
 schoolAdminRouter.post('/teachers/import', upload.single('file'), importTeachersController);
+schoolAdminRouter.patch('/teachers/:id', updateTeacherProfileController);
+schoolAdminRouter.post('/teachers/:id/active', setStaffActiveController);
 schoolAdminRouter.post('/teachers/:id/reset-password', resetTeacherPasswordController);
 
 schoolAdminRouter.get('/class-sections', listSectionsController);
@@ -116,6 +122,7 @@ schoolAdminRouter.delete('/teaching-assignments/:id', removeTeachingAssignmentCo
 
 schoolAdminRouter.get('/lab-incharges', listLabInchargesController);
 schoolAdminRouter.post('/lab-incharges', addSingleLabInchargeController);
+schoolAdminRouter.post('/lab-incharges/:id/active', setStaffActiveController);
 schoolAdminRouter.post('/lab-incharges/:id/reset-password', resetLabInchargePasswordController);
 
 schoolAdminRouter.get('/promotion/preview', getPromotionPreviewController);

@@ -24,14 +24,59 @@ const ALLOWED_MIME: Record<string, string> = {
 
 export const MAX_LOGO_BYTES = 2 * 1024 * 1024;
 
+/**
+ * What the file's own bytes say it is.
+ *
+ * `file.mimetype` is supplied by the uploading client and is not evidence of
+ * anything — curl will happily send `Content-Type: image/png` with an HTML or
+ * SVG payload. Since these files land in a PUBLIC bucket and are rendered
+ * inside every authenticated page, trusting that header is how a "logo" turns
+ * into stored XSS. The magic bytes are checked instead, and the declared type
+ * must agree with them.
+ *
+ *   PNG   89 50 4E 47 0D 0A 1A 0A
+ *   JPEG  FF D8 FF
+ *   WEBP  "RIFF" .... "WEBP"
+ */
+function sniffImageType(buffer: Buffer): 'png' | 'jpg' | 'webp' | null {
+  if (buffer.length < 12) return null;
+
+  if (
+    buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47 &&
+    buffer[4] === 0x0d && buffer[5] === 0x0a && buffer[6] === 0x1a && buffer[7] === 0x0a
+  ) {
+    return 'png';
+  }
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'jpg';
+  if (buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP') {
+    return 'webp';
+  }
+  return null;
+}
+
 export async function setSchoolLogo(schoolId: string, file: Express.Multer.File) {
-  const ext = ALLOWED_MIME[file.mimetype];
-  if (!ext) {
+  const declared = ALLOWED_MIME[file.mimetype];
+  if (!declared) {
     throw new ApiError('VALIDATION_ERROR', 'Logo must be a PNG, JPG or WEBP image.');
   }
   if (file.size > MAX_LOGO_BYTES) {
     throw new ApiError('VALIDATION_ERROR', 'Logo must be 2MB or smaller.');
   }
+
+  const actual = sniffImageType(file.buffer);
+  if (!actual) {
+    throw new ApiError('VALIDATION_ERROR', 'That file is not a valid PNG, JPG or WEBP image.');
+  }
+  // A mismatch means the client lied about the type. Refuse rather than
+  // quietly trusting the bytes: nothing legitimate sends a JPEG labelled PNG,
+  // so this is either a broken uploader or an attempt at something.
+  if (actual !== declared) {
+    throw new ApiError(
+      'VALIDATION_ERROR',
+      `This file is a ${actual.toUpperCase()} but was uploaded as ${file.mimetype}. Re-save it and try again.`,
+    );
+  }
+  const ext = actual;
 
   const { data: school } = await supabaseAdmin
     .from('schools')

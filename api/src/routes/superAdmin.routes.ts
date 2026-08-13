@@ -11,6 +11,8 @@ import {
   addSchoolAdminController,
   resetSchoolAdminPasswordController,
   listAuditLogsController,
+  listAuditActionsController,
+  exportAuditLogsController,
   getSchoolEntitlementsController,
   setSchoolEntitlementsController,
 } from '../controllers/superAdmin.controller.js';
@@ -88,6 +90,8 @@ superAdminRouter.get('/students/export', superAdminExportController);
 superAdminRouter.post('/students/bulk/active', superAdminBulkSetActiveController);
 
 superAdminRouter.get('/audit-log', listAuditLogsController);
+superAdminRouter.get('/audit-log/actions', listAuditActionsController);
+superAdminRouter.get('/audit-log/export', exportAuditLogsController);
 
 // ── AI Console ──────────────────────────────────────────────
 superAdminRouter.get('/ai/settings', getAiSettingsController);
