@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   UploadCloud, Loader2, Download, Plus, AlertCircle, Printer, KeyRound,
-  Search, X, GraduationCap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown,
+  Search, X, GraduationCap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Pencil,
   UserCheck, UserRoundX, BookOpenCheck,
 } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
@@ -88,6 +88,25 @@ export const SchoolAdminTeachers: React.FC = () => {
 
   const [resetCredential, setResetCredential] = useState<TeacherCredential | null>(null);
   const [resettingId, setResettingId] = useState<string | null>(null);
+
+  /* Editing an existing teacher. `editing` holds the row being edited; the
+     four fields below are the working copy so Cancel really discards. */
+  const [editing, setEditing] = useState<TeacherRow | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmployeeId, setEditEmployeeId] = useState('');
+  const [editSpecialization, setEditSpecialization] = useState('');
+  const [editClasses, setEditClasses] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const openEdit = (t: TeacherRow) => {
+    const p = tp(t);
+    setEditName(t.full_name);
+    setEditEmployeeId(p?.employee_id ?? '');
+    setEditSpecialization(p?.specialization ?? '');
+    setEditClasses((p?.classes_taught ?? []).join(', '));
+    setEditing(t);
+  };
 
   const loadTeachers = useCallback(async () => {
     setIsLoading(true);
@@ -204,6 +223,48 @@ export const SchoolAdminTeachers: React.FC = () => {
       setError(err instanceof ApiClientError ? err.message : 'Failed to reset password');
     } finally {
       setResettingId(null);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editing) return;
+    setError('');
+    setIsSavingEdit(true);
+    try {
+      await api.patch(`/school-admin/teachers/${editing.id}`, {
+        fullName: editName.trim(),
+        // Empty input means "clear this field", which the API models as null.
+        // Sending '' would store an empty string and show as blank-but-set.
+        employeeId: editEmployeeId.trim() || null,
+        specialization: editSpecialization.trim() || null,
+        classesTaught: editClasses
+          .split(',')
+          .map((c) => Number(c.trim()))
+          .filter((c) => Number.isInteger(c) && c >= 1 && c <= 10),
+      });
+      setEditing(null);
+      await loadTeachers();
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Failed to save changes');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleToggleActive = async (teacher: TeacherRow) => {
+    const next = !teacher.is_active;
+    if (!next && !window.confirm(`Deactivate ${teacher.full_name}? They will be signed out and cannot log in until reactivated.`)) {
+      return;
+    }
+    setError('');
+    setTogglingId(teacher.id);
+    try {
+      await api.post(`/school-admin/teachers/${teacher.id}/active`, { isActive: next });
+      await loadTeachers();
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Failed to update account');
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -367,20 +428,49 @@ export const SchoolAdminTeachers: React.FC = () => {
                           )}
                         </td>
                         <td className="px-4 py-2.5 whitespace-nowrap">
-                          <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium ${t.has_logged_in_ever ? 'text-emerald-700' : 'text-amber-600'}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${t.has_logged_in_ever ? 'bg-emerald-500' : 'bg-amber-400'}`} />
-                            {t.has_logged_in_ever ? 'Active' : 'Never logged in'}
-                          </span>
+                          {/* Account state first — a DEACTIVATED teacher used to
+                              show "Active" here purely because they had logged
+                              in at some point in the past. Login history is a
+                              separate, secondary fact. */}
+                          {!t.is_active ? (
+                            <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-rose-700">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                              Deactivated
+                            </span>
+                          ) : (
+                            <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium ${t.has_logged_in_ever ? 'text-emerald-700' : 'text-amber-600'}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${t.has_logged_in_ever ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                              {t.has_logged_in_ever ? 'Active' : 'Never logged in'}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                          <button
-                            onClick={() => void handleResetPassword(t)}
-                            disabled={resettingId === t.id}
-                            className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-400 hover:text-slate-700 hover:bg-slate-100 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-                          >
-                            {resettingId === t.id ? <Loader2 size={12} className="animate-spin" /> : <KeyRound size={12} />}
-                            Reset password
-                          </button>
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              onClick={() => openEdit(t)}
+                              className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-400 hover:text-slate-700 hover:bg-slate-100 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                            >
+                              <Pencil size={12} /> Edit
+                            </button>
+                            <button
+                              onClick={() => void handleResetPassword(t)}
+                              disabled={resettingId === t.id}
+                              className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-400 hover:text-slate-700 hover:bg-slate-100 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                              {resettingId === t.id ? <Loader2 size={12} className="animate-spin" /> : <KeyRound size={12} />}
+                              Reset password
+                            </button>
+                            <button
+                              onClick={() => void handleToggleActive(t)}
+                              disabled={togglingId === t.id}
+                              className={`inline-flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50 ${
+                                t.is_active ? 'text-slate-400 hover:text-rose-700 hover:bg-rose-50' : 'text-emerald-600 hover:bg-emerald-50'
+                              }`}
+                            >
+                              {togglingId === t.id ? <Loader2 size={12} className="animate-spin" /> : t.is_active ? <UserRoundX size={12} /> : <UserCheck size={12} />}
+                              {t.is_active ? 'Deactivate' : 'Reactivate'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -415,6 +505,59 @@ export const SchoolAdminTeachers: React.FC = () => {
           </>
         )}
       </div>
+
+      {/* Edit teacher modal */}
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px] px-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div>
+                <h2 className="text-[15px] font-semibold text-slate-800">Edit teacher</h2>
+                <p className="text-[12px] text-slate-400 mt-0.5">
+                  Changes are recorded in the audit log. Login credentials are not changed here.
+                </p>
+              </div>
+              <button onClick={() => setEditing(null)} className="text-slate-400 hover:text-slate-600 p-1.5 cursor-pointer"><X size={17} /></button>
+            </div>
+            <form
+              onSubmit={(e) => { e.preventDefault(); void handleSaveEdit(); }}
+              className="p-6 flex flex-col gap-4"
+            >
+              <div>
+                <label className={labelCls}>Full name</label>
+                <input className={inputCls} value={editName} onChange={(e) => setEditName(e.target.value)} required minLength={2} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Employee ID</label>
+                  <input className={inputCls} value={editEmployeeId} onChange={(e) => setEditEmployeeId(e.target.value)} placeholder="Optional" />
+                </div>
+                <div>
+                  <label className={labelCls}>Specialization</label>
+                  <input className={inputCls} value={editSpecialization} onChange={(e) => setEditSpecialization(e.target.value)} placeholder="Optional" />
+                </div>
+              </div>
+              <div>
+                <label className={labelCls}>Classes taught</label>
+                <input className={inputCls} value={editClasses} onChange={(e) => setEditClasses(e.target.value)} placeholder="e.g. 6, 7, 8" />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Comma-separated class numbers. Section and subject mapping lives on Classes &amp; Sections.
+                </p>
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button type="button" onClick={() => setEditing(null)} className="text-[13px] font-semibold text-slate-500 hover:text-slate-700 px-4 py-2 rounded-lg cursor-pointer">Cancel</button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50 cursor-pointer"
+                >
+                  {isSavingEdit && <Loader2 size={13} className="animate-spin" />} Save changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Import modal */}
       {showImport && (
