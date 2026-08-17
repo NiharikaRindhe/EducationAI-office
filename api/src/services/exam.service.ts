@@ -30,6 +30,106 @@ async function requireDraftExamOwnedByTeacher(teacherId: string, examId: string)
   return data;
 }
 
+/** Any exam owned by this teacher, whatever its status. */
+async function requireExamOwnedByTeacher(teacherId: string, examId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('exams')
+    .select('*')
+    .eq('id', examId)
+    .eq('created_by', teacherId)
+    .single();
+  if (error || !data) throw new ApiError('NOT_FOUND', 'Exam not found or not yours');
+  return data;
+}
+
+/**
+ * Edit a draft's metadata (title, subject, duration, window).
+ *
+ * Draft only. Once an exam is published students have been assigned to it and
+ * may already be sitting it — changing the duration or the subject underneath
+ * them is not an edit, it is a different exam.
+ */
+export async function updateDraftExam(
+  teacherId: string,
+  examId: string,
+  patch: { title?: string; subject?: string; durationMin?: number | null; startsAt?: string | null; endsAt?: string | null },
+) {
+  await requireDraftExamOwnedByTeacher(teacherId, examId);
+
+  const row: Record<string, unknown> = {};
+  if (patch.title !== undefined) row.title = patch.title;
+  if (patch.subject !== undefined) row.subject = patch.subject;
+  if (patch.durationMin !== undefined) row.duration_min = patch.durationMin;
+  if (patch.startsAt !== undefined) row.starts_at = patch.startsAt;
+  if (patch.endsAt !== undefined) row.ends_at = patch.endsAt;
+  if (Object.keys(row).length === 0) throw new ApiError('VALIDATION_ERROR', 'No fields to update');
+
+  if (row.starts_at && row.ends_at && String(row.ends_at) <= String(row.starts_at)) {
+    throw new ApiError('VALIDATION_ERROR', 'The exam window must end after it starts');
+  }
+
+  const { data, error } = await supabaseAdmin.from('exams').update(row).eq('id', examId).select().single();
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to update exam', error.message);
+  return data;
+}
+
+/**
+ * Delete a draft exam and its questions.
+ *
+ * Draft only, for the same reason: a published exam has assignments,
+ * submissions and answers hanging off it, and a teacher tidying their list
+ * must not be able to erase work students have already done.
+ */
+export async function deleteDraftExam(teacherId: string, examId: string) {
+  const exam = await requireDraftExamOwnedByTeacher(teacherId, examId);
+
+  // Questions first — they reference the exam without ON DELETE CASCADE.
+  const { error: qError } = await supabaseAdmin.from('questions').delete().eq('exam_id', examId);
+  if (qError) throw new ApiError('INTERNAL_ERROR', 'Failed to remove exam questions', qError.message);
+
+  const { error } = await supabaseAdmin.from('exams').delete().eq('id', examId);
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to delete exam', error.message);
+
+  return { id: examId, title: exam.title as string };
+}
+
+/**
+ * Release or withhold marks for an exam.
+ *
+ * Students are shown nothing until this is set. The point is the gap between
+ * "the AI finished grading" and "a teacher has looked at it" — without this a
+ * child reads a machine-generated mark, and repeats it at home, before anyone
+ * has checked the paper.
+ */
+export async function setResultsReleased(
+  teacherId: string,
+  examId: string,
+  released: boolean,
+) {
+  const exam = await requireExamOwnedByTeacher(teacherId, examId);
+  if (exam.status === 'draft') {
+    throw new ApiError('VALIDATION_ERROR', 'This exam has not been published yet, so it has no results to release');
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('exams')
+    .update({
+      results_released_at: released ? new Date().toISOString() : null,
+      results_released_by: released ? teacherId : null,
+    })
+    .eq('id', examId)
+    .select('id, title, results_released_at')
+    .single();
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to update result visibility', error.message);
+
+  return {
+    id: data.id as string,
+    title: data.title as string,
+    resultsReleased: !!data.results_released_at,
+    releasedAt: data.results_released_at as string | null,
+  };
+}
+
 export async function addQuestion(teacherId: string, examId: string, input: AddQuestionInput) {
   const exam = await requireDraftExamOwnedByTeacher(teacherId, examId);
 

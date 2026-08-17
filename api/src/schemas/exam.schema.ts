@@ -85,6 +85,22 @@ export const addQuestionBankSchema = z.object({
   pyqSource: z.string().optional(),
 });
 
+/** Partial edit of a DRAFT exam's metadata. Nulls clear the optional fields. */
+export const updateExamSchema = z
+  .object({
+    title: z.string().min(2).max(160).optional(),
+    subject: z.string().min(1).max(60).optional(),
+    durationMin: z.number().int().min(1).max(360).nullable().optional(),
+    startsAt: z.string().datetime().nullable().optional(),
+    endsAt: z.string().datetime().nullable().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: 'No fields to update' });
+
+export const setResultsReleasedSchema = z.object({
+  released: z.boolean(),
+});
+
+export type UpdateExamInput = z.infer<typeof updateExamSchema>;
 export type CreateExamInput = z.infer<typeof createExamSchema>;
 export type AddQuestionInput = z.infer<typeof addQuestionSchema>;
 export type PublishExamInput = z.infer<typeof publishExamSchema>;

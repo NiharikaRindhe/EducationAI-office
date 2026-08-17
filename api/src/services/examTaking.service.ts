@@ -76,7 +76,9 @@ async function getOrCreateSubmission(studentId: string, examId: string) {
 export async function listExamsForStudent(studentId: string) {
   const { data, error } = await supabaseAdmin
     .from('exam_assignments')
-    .select('starts_at, ends_at, exams!inner(id, title, subject, class_num, duration_min, total_marks, status, starts_at, ends_at)')
+    .select(
+      'starts_at, ends_at, exams!inner(id, title, subject, class_num, duration_min, total_marks, status, starts_at, ends_at, results_released_at)',
+    )
     .eq('student_id', studentId);
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to list exams', error.message);
 
@@ -112,14 +114,22 @@ export async function listExamsForStudent(studentId: string) {
         endsAt,
         state,
         inProgress: !!submission && !submission.submitted_at,
-        result: submission?.submitted_at
-          ? {
-              totalScore: submission.total_score,
-              maxScore: submission.max_score,
-              isReviewed: submission.is_reviewed,
-              autoSubmitted: submission.auto_submitted,
-            }
-          : null,
+        /*
+         * Marks are only sent to the student once the teacher has released
+         * them. Withheld results are omitted ENTIRELY rather than sent with a
+         * flag for the UI to hide — anything in this payload is one dev-tools
+         * tab away from being read, and "hidden in the UI" is not withheld.
+         */
+        resultsReleased: !!exam.results_released_at,
+        result:
+          submission?.submitted_at && exam.results_released_at
+            ? {
+                totalScore: submission.total_score,
+                maxScore: submission.max_score,
+                isReviewed: submission.is_reviewed,
+                autoSubmitted: submission.auto_submitted,
+              }
+            : null,
       };
     })
     .filter((e): e is NonNullable<typeof e> => e !== null)

@@ -31,6 +31,9 @@ import {
   addQuestionsFromBankController,
   removeQuestionController,
   publishExamController,
+  updateDraftExamController,
+  deleteDraftExamController,
+  setResultsReleasedController,
   closeExamController,
 } from '../controllers/exam.controller.js';
 import {
@@ -109,6 +112,9 @@ teacherRouter.get('/pending-reviews', listPendingReviewsController);
 teacherRouter.post('/exams', createExamController);
 teacherRouter.get('/exams', listExamsController);
 teacherRouter.get('/exams/:id', getExamController);
+teacherRouter.patch('/exams/:id', updateDraftExamController);
+teacherRouter.delete('/exams/:id', deleteDraftExamController);
+teacherRouter.post('/exams/:id/results-released', setResultsReleasedController);
 teacherRouter.post('/exams/:id/questions', addQuestionController);
 teacherRouter.post('/exams/:id/questions/from-bank', addQuestionsFromBankController);
 teacherRouter.delete('/exams/:examId/questions/:questionId', removeQuestionController);
