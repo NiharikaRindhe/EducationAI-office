@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Sparkles, Loader2, AlertCircle, X, CheckCircle2, BookOpen, Trash2, Plus,
-  ChevronDown, ChevronUp, TriangleAlert, Save, RotateCcw,
+  ChevronDown, ChevronUp, TriangleAlert, Save, RotateCcw, Printer, Download,
 } from 'lucide-react';
 import {
   QUESTION_TYPES, MAX_QUESTIONS,
@@ -10,6 +10,7 @@ import {
   type GeneratedQuestion, type GeneratableChapter, type MixRow,
   type Citation, type QuestionType, type Difficulty, type GeneratorPortal,
 } from '../../lib/examGenerator';
+import { printQuestionPaper, downloadQuestionsCsv } from '../../lib/questionPaper';
 
 /**
  * AI question generator, grounded in the books the school has uploaded.
@@ -540,6 +541,25 @@ export const AiQuestionGenerator: React.FC<Props> = ({ scope, onSaved, lockedTo,
                 className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
               >
                 {generating ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />} Regenerate
+              </button>
+              {/* Downloads work on the drafts as they stand, before saving —
+                  a teacher who only wants a printed paper should not have to
+                  push questions into the bank to get one. */}
+              <button
+                onClick={() => printQuestionPaper(drafts, { classNum, subject: effectiveSubject, citation })}
+                disabled={drafts.length === 0}
+                title="Opens a print-ready paper with the answer key on a separate sheet"
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                <Printer size={13} /> Paper
+              </button>
+              <button
+                onClick={() => downloadQuestionsCsv(drafts, { classNum, subject: effectiveSubject, citation })}
+                disabled={drafts.length === 0}
+                title="Download these questions as a spreadsheet"
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                <Download size={13} /> CSV
               </button>
               <button
                 onClick={() => void handleSave()}

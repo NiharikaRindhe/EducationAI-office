@@ -69,12 +69,6 @@ interface EntitlementsPayload {
   features: FeatureRow[];
 }
 
-const PACKAGES = [
-  { key: 'starter', label: 'Starter' },
-  { key: 'school', label: 'School' },
-  { key: 'enterprise', label: 'Enterprise' },
-] as const;
-
 const inputCls =
   'w-full px-3 py-2 text-[13px] text-slate-800 bg-white border border-slate-300 rounded-lg outline-none transition-colors focus:border-slate-500 focus:ring-2 focus:ring-slate-100 placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-500';
 const labelCls = 'block text-[12px] font-medium text-slate-600 mb-1';
@@ -185,19 +179,10 @@ export const SuperAdminSchoolDetail: React.FC = () => {
     }
   };
 
-  /** Applies a package's feature set to the draft without saving, so the
-   *  Super Admin can see exactly what changes before committing. */
-  const applyPackage = (packageKey: string) => {
-    const presets: Record<string, string[]> = {
-      starter: ['games', 'leaderboard'],
-      school: ['games', 'leaderboard', 'ai_tutor', 'virtual_labs', 'pyq_hub', 'reports_analytics'],
-      enterprise: [
-        'games', 'leaderboard', 'ai_tutor', 'virtual_labs', 'pyq_hub',
-        'reports_analytics', 'ai_exam_generator', 'school_content_upload',
-      ],
-    };
-    const granted = new Set(presets[packageKey] ?? []);
-    setDraftFeatures((prev) => Object.fromEntries(Object.keys(prev).map((k) => [k, granted.has(k)])));
+  /** Every school buys the whole platform, so "restore" means all-on. Used to
+   *  undo a temporary suspension without hand-toggling eight switches. */
+  const grantEverything = () => {
+    setDraftFeatures((prev) => Object.fromEntries(Object.keys(prev).map((k) => [k, true])));
   };
 
   const featuresDirty =
@@ -208,7 +193,7 @@ export const SuperAdminSchoolDetail: React.FC = () => {
     if (!detail) return;
     const s = detail.school;
     setForm({
-      name: s.name, board: s.board, plan: s.plan,
+      name: s.name, board: s.board,
       address: s.address ?? '', city: s.city ?? '', state: s.state ?? '', pincode: s.pincode ?? '',
       contactName: s.contact_name ?? '', contactEmail: s.contact_email ?? '', contactPhone: s.contact_phone ?? '',
     });
@@ -221,10 +206,14 @@ export const SuperAdminSchoolDetail: React.FC = () => {
     setIsSaving(true);
     setError('');
     try {
+      // Deliberately no `plan` here. The server re-seeds a school's entitlements
+      // from the package whenever it receives one, so sending it from a profile
+      // form meant a corrected phone number silently revoked every feature the
+      // package happens to exclude. Provisioning belongs to the Features tab,
+      // which is explicit, diffed and audit-logged.
       await api.patch(`/super-admin/schools/${schoolId}`, {
         name: form.name,
         board: form.board,
-        plan: form.plan,
         address: form.address || null,
         city: form.city || null,
         state: form.state || null,
@@ -339,7 +328,7 @@ export const SuperAdminSchoolDetail: React.FC = () => {
             </span>
           </div>
           <p className="text-[13px] text-slate-400 mt-0.5">
-            <span className="font-mono">{school.code}</span> · {school.board} · <span className="capitalize">{school.plan} plan</span> · onboarded {new Date(school.created_at).toLocaleDateString()}
+            <span className="font-mono">{school.code}</span> · {school.board} · onboarded {new Date(school.created_at).toLocaleDateString()}
           </p>
         </div>
         <button
@@ -398,7 +387,7 @@ export const SuperAdminSchoolDetail: React.FC = () => {
       <div className="border-b border-slate-200 flex gap-6">
         {([
           { id: 'profile', label: 'Profile' },
-          { id: 'features', label: 'Features & plan' },
+          { id: 'features', label: 'Features' },
           { id: 'admins', label: `Admin accounts (${admins.length})` },
           { id: 'usage', label: 'Enrollment' },
         ] as const).map((t) => (
@@ -414,14 +403,15 @@ export const SuperAdminSchoolDetail: React.FC = () => {
         ))}
       </div>
 
-      {/* Features & plan tab — what this school has actually bought */}
+      {/* Features tab — every school buys the whole platform; this is where an
+          individual feature gets suspended for one school. */}
       {tab === 'features' && (
         <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
             <div>
-              <h3 className="text-[14px] font-bold text-slate-800">Features &amp; plan</h3>
+              <h3 className="text-[14px] font-bold text-slate-800">Features</h3>
               <p className="text-[12px] text-slate-400 mt-0.5">
-                Only EduAI can change this. The school cannot switch on anything it hasn&apos;t bought.
+                Every school gets the full platform. Switch something off here only to suspend it for this school.
               </p>
             </div>
             {featuresSaved && (
@@ -437,21 +427,29 @@ export const SuperAdminSchoolDetail: React.FC = () => {
             </div>
           ) : (
             <>
-              {/* Package presets */}
+              {/* What this school actually has, counted from the entitlements
+                  themselves rather than from a plan label that could disagree. */}
               <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3 flex-wrap">
-                <span className="text-[12px] font-medium text-slate-500">Apply a package:</span>
-                {PACKAGES.map((p) => (
+                {(() => {
+                  const total = entitlements.features.length;
+                  const on = entitlements.features.filter((f) => f.enabled).length;
+                  const full = on === total;
+                  return (
+                    <span className={`text-[12px] font-semibold ${full ? 'text-emerald-700' : 'text-amber-700'}`}>
+                      {full
+                        ? `Full platform — all ${total} features enabled`
+                        : `${on} of ${total} features enabled — ${total - on} suspended`}
+                    </span>
+                  );
+                })()}
+                {entitlements.features.some((f) => !f.enabled) && (
                   <button
-                    key={p.key}
-                    onClick={() => applyPackage(p.key)}
-                    className="text-[12px] font-semibold text-slate-600 border border-slate-200 px-3 py-1.5 rounded-lg hover:border-slate-400 hover:text-slate-900 transition-colors cursor-pointer"
+                    onClick={grantEverything}
+                    className="text-[12px] font-semibold text-slate-600 border border-slate-200 px-3 py-1.5 rounded-lg hover:border-slate-400 hover:text-slate-900 transition-colors cursor-pointer ml-auto"
                   >
-                    {p.label}
+                    Restore all features
                   </button>
-                ))}
-                <span className="text-[12px] text-slate-400 ml-auto">
-                  Current plan: <span className="font-semibold capitalize text-slate-600">{entitlements.school.plan}</span>
-                </span>
+                )}
               </div>
 
               <div className="divide-y divide-slate-100">
@@ -579,14 +577,6 @@ export const SuperAdminSchoolDetail: React.FC = () => {
                     {['CBSE', 'ICSE', 'State', 'IB'].map((b) => <option key={b} value={b}>{b}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className={labelCls}>Plan</label>
-                  <select value={form.plan} onChange={(e) => setForm((f) => ({ ...f, plan: e.target.value }))} className={inputCls}>
-                    <option value="starter">Starter</option>
-                    <option value="school">School</option>
-                    <option value="enterprise">Enterprise</option>
-                  </select>
-                </div>
                 <div className="col-span-2">
                   <label className={labelCls}>Street address</label>
                   <input value={form.address ?? ''} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} className={inputCls} />
@@ -632,7 +622,6 @@ export const SuperAdminSchoolDetail: React.FC = () => {
               {[
                 ['School code', school.code, true],
                 ['Board', school.board],
-                ['Plan', school.plan],
                 ['Address', school.address],
                 ['City', school.city],
                 ['State', school.state],

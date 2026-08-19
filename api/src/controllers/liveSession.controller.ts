@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { startSessionSchema } from '../schemas/liveSession.schema.js';
+import { startSessionSchema, joinByCodeSchema, markAttendanceSchema } from '../schemas/liveSession.schema.js';
 import * as liveSessionService from '../services/liveSession.service.js';
 import { ApiError } from '../lib/errors.js';
 import { supabaseAdmin } from '../lib/supabase.js';
@@ -83,6 +83,40 @@ export async function raiseHandController(req: Request, res: Response, next: Nex
     if (!id) throw new ApiError('VALIDATION_ERROR', 'Missing session id');
     const { raised } = req.body as { raised: boolean };
     res.json(await liveSessionService.setRaisedHand(req.user!.id, id, Boolean(raised)));
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** Student joins a lab session by typing the code shown in the room. */
+export async function joinByCodeController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { code } = joinByCodeSchema.parse(req.body);
+    const schoolId = req.user!.schoolId;
+    if (!schoolId) throw new ApiError('FORBIDDEN', 'No school associated with this account');
+    res.status(201).json(await liveSessionService.joinSessionByCode(req.user!.id, schoolId, code));
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** Teacher's attendance register for one session. */
+export async function attendanceController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    if (!id) throw new ApiError('VALIDATION_ERROR', 'Missing session id');
+    res.json(await liveSessionService.getAttendance(req.user!.id, id));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function markAttendanceController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    if (!id) throw new ApiError('VALIDATION_ERROR', 'Missing session id');
+    const { studentId, present } = markAttendanceSchema.parse(req.body);
+    res.json(await liveSessionService.markAttendance(req.user!.id, id, studentId, present));
   } catch (err) {
     next(err);
   }

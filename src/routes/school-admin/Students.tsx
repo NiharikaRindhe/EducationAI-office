@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   UploadCloud, Loader2, Download, Plus, AlertCircle, Printer, KeyRound,
   X, Users, UserCheck, UserRoundX, Sparkles, ArrowRightLeft, Ban, CheckCircle2,
+  LogOut, Undo2,
 } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 import { printCredentialSlips } from '../../lib/printSlips';
@@ -74,6 +75,8 @@ export const SchoolAdminStudents: React.FC = () => {
 
   const [moveClass, setMoveClass] = useState(1);
   const [moveSection, setMoveSection] = useState('A');
+  const [showExit, setShowExit] = useState(false);
+  const [exitReason, setExitReason] = useState('');
 
   const loadSummary = useCallback(async () => {
     try {
@@ -131,6 +134,35 @@ export const SchoolAdminStudents: React.FC = () => {
     runBulk(isActive ? 'enable' : 'disable', async () => {
       const res = await api.post<{ succeeded: number }>('/school-admin/students/bulk/active', { studentIds: ids, isActive });
       setBanner({ tone: 'ok', text: `${res.succeeded} account${res.succeeded === 1 ? '' : 's'} ${isActive ? 'activated' : 'deactivated'}.` });
+      clearSelection();
+      refreshAll();
+    });
+
+  /**
+   * "Remove from school" — records that the students have left. Not a delete:
+   * their marks, submissions and badges stay attached to them, and the action
+   * is reversible from the Left-the-school view.
+   */
+  const bulkExit = (ids: string[]) =>
+    runBulk('exit', async () => {
+      const res = await api.post<{ succeeded: number }>('/school-admin/students/bulk/exit', {
+        studentIds: ids,
+        reason: exitReason.trim() || undefined,
+      });
+      setShowExit(false);
+      setExitReason('');
+      setBanner({
+        tone: 'ok',
+        text: `${res.succeeded} student${res.succeeded === 1 ? '' : 's'} marked as left. Their records are kept — switch the Enrolment filter to "Left the school" to see or undo this.`,
+      });
+      clearSelection();
+      refreshAll();
+    });
+
+  const bulkReinstate = (ids: string[]) =>
+    runBulk('reinstate', async () => {
+      const res = await api.post<{ succeeded: number }>('/school-admin/students/bulk/reinstate', { studentIds: ids });
+      setBanner({ tone: 'ok', text: `${res.succeeded} student${res.succeeded === 1 ? '' : 's'} reinstated and back on the roster.` });
       clearSelection();
       refreshAll();
     });
@@ -320,6 +352,7 @@ export const SchoolAdminStudents: React.FC = () => {
         hasActiveFilters={dir.hasActiveFilters}
         total={dir.data.total}
         isLoading={dir.isLoading}
+        showEnrolmentFilter
         onExport={() => downloadDirectoryCsv(`${BASE}/export`, dir.effectiveFilters, 'students.csv')}
       />
 
@@ -356,9 +389,71 @@ export const SchoolAdminStudents: React.FC = () => {
             <button onClick={() => void bulkSetActive(ids, true)} disabled={bulkBusy !== null} className={bulkBtnCls}>
               {bulkBusy === 'enable' ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Activate
             </button>
+            {/* Leaving the school is a different act from being deactivated,
+                so it gets its own destructive-looking control — and its own
+                undo, shown only while viewing leavers. */}
+            {dir.filters.enrolment === 'left' ? (
+              <button onClick={() => void bulkReinstate(ids)} disabled={bulkBusy !== null} className={bulkBtnCls}>
+                {bulkBusy === 'reinstate' ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />} Reinstate
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowExit(true)}
+                disabled={bulkBusy !== null}
+                className={`${bulkBtnCls} !text-rose-600 !border-rose-200 hover:!bg-rose-50`}
+              >
+                <LogOut size={12} /> Remove from school
+              </button>
+            )}
           </>
         )}
       />
+
+      {/* Remove-from-school modal. Wording matters here: an admin clicking a
+          rose-coloured button expects deletion, and needs to be told plainly
+          that the records survive and the action can be undone. */}
+      {showExit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <h2 className="text-[15px] font-semibold text-slate-800">
+                Remove {selectedIds.size} student{selectedIds.size === 1 ? '' : 's'} from the school
+              </h2>
+              <button onClick={() => setShowExit(false)} className="p-1.5 text-slate-400 hover:text-slate-600 cursor-pointer"><X size={17} /></button>
+            </div>
+            <div className="flex flex-col gap-4 px-6 py-5">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-[12.5px] leading-relaxed text-slate-600">
+                They come off the active roster and can no longer sign in, which frees their seat.
+                <strong className="font-semibold text-slate-800"> Their marks, submissions and badges are kept</strong> —
+                nothing is deleted, and you can undo this from the &ldquo;Left the school&rdquo; view.
+              </div>
+              <div>
+                <label className="mb-1.5 block text-[12px] font-medium text-slate-600">Reason (optional)</label>
+                <input
+                  value={exitReason}
+                  onChange={(e) => setExitReason(e.target.value)}
+                  placeholder="Moved city / transferred / completed schooling"
+                  maxLength={200}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-[13px] text-slate-800 outline-none transition-colors focus:border-slate-500 focus:ring-2 focus:ring-slate-100 placeholder:text-slate-400"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 px-6 py-4">
+              <button onClick={() => setShowExit(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-[13px] font-semibold text-slate-600 transition-colors hover:bg-slate-50 cursor-pointer">
+                Cancel
+              </button>
+              <button
+                onClick={() => void bulkExit([...selectedIds])}
+                disabled={bulkBusy !== null}
+                className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-rose-700 disabled:opacity-50 cursor-pointer"
+              >
+                {bulkBusy === 'exit' ? <Loader2 size={14} className="animate-spin" /> : <LogOut size={14} />}
+                Mark as left
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Move-section modal */}
       {showMove && (

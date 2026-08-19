@@ -167,7 +167,7 @@ export const FractionPieEngine: React.FC<FractionPieEngineProps> = ({ game, isPr
           className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer"
           style={{ minHeight: 48, minWidth: 120 }}
         >
-          🔄 {isPreReader ? '' : 'Play Again'}
+          🔄 Play Again
         </button>
       </div>
     );

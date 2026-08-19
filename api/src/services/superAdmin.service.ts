@@ -6,12 +6,14 @@ import { revokeUserSessions, revokeSessionsForUsers } from '../lib/sessions.js';
 import { writeAuditLog } from './auditLog.service.js';
 import {
   grantAllEntitlements,
-  seedEntitlementsFromPackage,
   invalidateEntitlementsCache,
   FEATURE_KEYS,
   type FeatureKey,
 } from '../lib/entitlements.js';
 import type { CreateSchoolInput } from '../schemas/superAdmin.schema.js';
+
+/** The package whose contents equal the full feature catalogue. See createSchool. */
+const FULL_ACCESS_PLAN = 'enterprise';
 
 export async function createSchool(input: CreateSchoolInput) {
   const { data: existing } = await supabaseAdmin
@@ -28,7 +30,12 @@ export async function createSchool(input: CreateSchoolInput) {
       name: input.name,
       code: input.code,
       board: input.board,
-      plan: input.plan,
+      // schools.plan is NOT NULL and pre-dates the single-plan model. Nothing
+      // reads it for authorisation any more — school_entitlements is the only
+      // source of truth — but it is stamped with the package whose contents
+      // match what is actually granted, so the column never contradicts the
+      // school's real feature set.
+      plan: FULL_ACCESS_PLAN,
       address: input.address ?? null,
       city: input.city ?? null,
       state: input.state ?? null,
@@ -309,10 +316,10 @@ export async function getSchoolDetail(schoolId: string) {
   };
 }
 
+/** Profile fields only — provisioning lives in setEntitlements. */
 export interface UpdateSchoolInput {
   name?: string;
   board?: string;
-  plan?: string;
   address?: string | null;
   city?: string | null;
   state?: string | null;
@@ -326,7 +333,6 @@ export async function updateSchool(schoolId: string, patch: UpdateSchoolInput) {
   const updates: Record<string, unknown> = {};
   if (patch.name !== undefined) updates.name = patch.name;
   if (patch.board !== undefined) updates.board = patch.board;
-  if (patch.plan !== undefined) updates.plan = patch.plan;
   if (patch.address !== undefined) updates.address = patch.address;
   if (patch.city !== undefined) updates.city = patch.city;
   if (patch.state !== undefined) updates.state = patch.state;
@@ -339,14 +345,6 @@ export async function updateSchool(schoolId: string, patch: UpdateSchoolInput) {
 
   const { data, error } = await supabaseAdmin.from('schools').update(updates).eq('id', schoolId).select().single();
   if (error || !data) throw new ApiError('NOT_FOUND', 'School not found');
-
-  // Moving a school onto a named package re-seeds its entitlements to that
-  // package's contents — otherwise "upgrade this school to Enterprise" would
-  // change a label and grant nothing. 'custom' is the explicit opt-out: it
-  // preserves whatever hand-picked set the Super Admin has already built.
-  if (patch.plan !== undefined && patch.plan !== 'custom') {
-    await seedEntitlementsFromPackage(schoolId, patch.plan);
-  }
 
   return data;
 }

@@ -153,7 +153,11 @@ export const ExamCenter: React.FC<{ accent: Accent }> = ({ accent }) => {
 
 // ─── Taking the paper ────────────────────────────────────────
 
-const ExamTaking: React.FC<{ accent: Accent; examId: string; onExit: () => void }> = ({ accent, examId, onExit }) => {
+// Exported so the Class 1-4 portal can present its own, age-appropriate list of
+// quizzes while still sitting the child down in front of the REAL paper -
+// timer, autosave, resume-after-crash and proctoring all behave identically to
+// every other batch. Only the list around it differs.
+export const ExamTaking: React.FC<{ accent: Accent; examId: string; onExit: () => void }> = ({ accent, examId, onExit }) => {
   const a = ACCENT[accent];
   const [paper, setPaper] = useState<Paper | null>(null);
   const [answers, setAnswers] = useState<Record<string, { studentAnswer?: string; selectedOptionId?: string }>>({});

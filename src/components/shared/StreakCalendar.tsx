@@ -23,6 +23,36 @@ interface StreakData {
   days: StreakDay[];
 }
 
+/**
+ * What /student/streak-calendar actually answers.
+ *
+ * It is camelCase and calls the array `calendar`, while the views here were
+ * written against a snake_case `days` shape that no endpoint ever returned —
+ * so `data.days` was undefined and every batch crashed the moment a streak
+ * widget rendered. Mapping happens once, at the fetch, rather than teaching
+ * each view about both shapes.
+ */
+interface StreakApiResponse {
+  streak: number;
+  longestStreak: number;
+  graceDays?: number;
+  calendar: { date: string; active: boolean; xpEarned?: number }[];
+}
+
+function toStreakData(res: StreakApiResponse | null | undefined): StreakData {
+  return {
+    current_streak: res?.streak ?? 0,
+    longest_streak: res?.longestStreak ?? 0,
+    // Defaulted rather than trusted: a future shape change should degrade to an
+    // empty trail, not take the whole page down with it.
+    days: (res?.calendar ?? []).map((d) => ({
+      date: d.date,
+      active: Boolean(d.active),
+      xp: d.xpEarned ?? 0,
+    })),
+  };
+}
+
 /* ── Calendar variant (Batch 2 & 3) ─────────────────────────── */
 const CalendarView: React.FC<{ data: StreakData; accent: Accent; showPercent?: boolean }> = ({ data, accent, showPercent }) => {
   const a = ACCENT[accent];
@@ -46,7 +76,9 @@ const CalendarView: React.FC<{ data: StreakData; accent: Accent; showPercent?: b
         <div className={`rounded-2xl border p-4 flex flex-col gap-1 ${a.soft}`}>
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Current Streak</span>
           <span className={`font-display font-black text-2xl ${a.text}`}>🔥 {data.current_streak}</span>
-          <span className="text-[10px] text-slate-400">lab days in a row</span>
+          <span className="text-[10px] text-slate-400">
+            lab {data.current_streak === 1 ? 'day' : 'days'} in a row
+          </span>
         </div>
         <div className="rounded-2xl border border-slate-100 bg-white p-4 flex flex-col gap-1">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Best Ever</span>
@@ -71,7 +103,9 @@ const CalendarView: React.FC<{ data: StreakData; accent: Accent; showPercent?: b
             <Calendar size={15} className={a.text} />
             {today.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
           </span>
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${a.soft}`}>{activeDaysThisMonth} active days</span>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${a.soft}`}>
+            {activeDaysThisMonth} active {activeDaysThisMonth === 1 ? 'day' : 'days'}
+          </span>
         </div>
 
         <div className="grid grid-cols-7 gap-1.5 text-center">
@@ -120,14 +154,18 @@ const TrailView: React.FC<{ data: StreakData; accent: Accent }> = ({ data, accen
       {/* Big streak card */}
       <div className={`rounded-3xl border p-7 text-center flex flex-col items-center gap-2 ${a.soft}`}>
         <span className="text-6xl">🔥</span>
-        <h2 className={`font-display font-black text-3xl ${a.text}`}>{data.current_streak} lab days in a row!</h2>
-        <p className="text-sm text-slate-500 font-medium">Best ever: ⚡ {data.longest_streak} days</p>
+        <h2 className={`font-display font-black text-3xl ${a.text}`}>
+          {data.current_streak} lab {data.current_streak === 1 ? 'day' : 'days'} in a row!
+        </h2>
+        <p className="text-sm text-slate-500 font-medium">
+          Best ever: ⚡ {data.longest_streak} {data.longest_streak === 1 ? 'day' : 'days'}
+        </p>
         <p className="text-xs text-slate-400 mt-1">Come to the lab to keep your fire going!</p>
       </div>
 
       {/* Stepping stone trail */}
       <div className="bento-card border border-slate-100 bg-white p-5">
-        <span className="font-display font-bold text-sm text-slate-700 block mb-4">Your Journey 🏃</span>
+        <span className="font-display font-bold text-sm text-slate-700 block mb-4">Your last lab days 🏃</span>
         <div className="flex flex-wrap gap-3 items-end justify-start">
           {recentDays.map((day, i) => {
             const isToday = i === recentDays.length - 1;
@@ -161,8 +199,8 @@ export const StreakCalendar: React.FC<{ accent: Accent; variant?: Variant; showP
   const [data, setData] = useState<StreakData | null>(null);
 
   useEffect(() => {
-    api.get<StreakData>('/student/streak-calendar')
-      .then(setData)
+    api.get<StreakApiResponse>('/student/streak-calendar')
+      .then((res) => setData(toStreakData(res)))
       .catch(() => setData({ current_streak: 0, longest_streak: 0, days: [] }));
   }, []);
 

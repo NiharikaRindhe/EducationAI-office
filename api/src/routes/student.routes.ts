@@ -4,6 +4,7 @@ import { requireFeature } from '../middleware/requireFeature.js';
 import {
   activeSessionForStudentController,
   joinSessionController,
+  joinByCodeController,
   raiseHandController,
 } from '../controllers/liveSession.controller.js';
 import { listAnnouncementsForStudentController } from '../controllers/announcement.controller.js';
@@ -70,6 +71,9 @@ studentRouter.post('/chemistry/free_react', requireFeature('virtual_labs'), chem
 
 studentRouter.get('/sessions/active', activeSessionForStudentController);
 studentRouter.post('/sessions/join', joinSessionController);
+// Lab sessions are joined by code, because students in a lab period may come
+// from more than one section and roster membership is no longer the gate.
+studentRouter.post('/sessions/join-by-code', joinByCodeController);
 studentRouter.patch('/sessions/:id/raise-hand', raiseHandController);
 
 studentRouter.get('/announcements', listAnnouncementsForStudentController);

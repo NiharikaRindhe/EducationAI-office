@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   UploadCloud, Loader2, Download, Plus, AlertCircle, Printer, KeyRound,
   Search, X, GraduationCap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Pencil,
-  UserCheck, UserRoundX, BookOpenCheck,
+  UserCheck, UserRoundX, BookOpenCheck, LogOut, Undo2,
 } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 import { printCredentialSlips } from '../../lib/printSlips';
@@ -12,6 +12,8 @@ interface TeacherRow {
   id: string;
   full_name: string;
   is_active: boolean;
+  exited_at?: string | null;
+  exit_reason?: string | null;
   has_logged_in_ever: boolean;
   teacher_profiles: { employee_id: string | null; specialization: string | null; classes_taught: number[] } | null;
 }
@@ -98,6 +100,9 @@ export const SchoolAdminTeachers: React.FC = () => {
   const [editClasses, setEditClasses] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
+  // Former staff are hidden by default so the list is who actually works here.
+  const [showFormer, setShowFormer] = useState(false);
 
   const openEdit = (t: TeacherRow) => {
     const p = tp(t);
@@ -111,13 +116,13 @@ export const SchoolAdminTeachers: React.FC = () => {
   const loadTeachers = useCallback(async () => {
     setIsLoading(true);
     try {
-      setTeachers(await api.get<TeacherRow[]>('/school-admin/teachers'));
+      setTeachers(await api.get<TeacherRow[]>('/school-admin/teachers', showFormer ? { includeLeft: 'true' } : undefined));
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : 'Failed to load teachers');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [showFormer]);
 
   useEffect(() => { void loadTeachers(); }, [loadTeachers]);
 
@@ -268,6 +273,66 @@ export const SchoolAdminTeachers: React.FC = () => {
     }
   };
 
+  /**
+   * "Remove from school" — records that the teacher has left. Their exams and
+   * tasks stay attached to them; what goes is their login and their classes,
+   * so no section is left with a class teacher who has gone.
+   */
+  const handleExit = async (teacher: TeacherRow) => {
+    const reason = window.prompt(
+      `Remove ${teacher.full_name} from the school?\n\n` +
+        'They will be signed out, taken off the staff list, and unassigned from their classes. ' +
+        'Their exams, tasks and marks are kept, and you can undo this from "Show former staff".\n\n' +
+        'Reason (optional):',
+      '',
+    );
+    if (reason === null) return; // cancelled
+
+    setError('');
+    setTogglingId(teacher.id);
+    try {
+      const res = await api.post<{ releasedAssignments: number; releasedSections: number }>(
+        `/school-admin/teachers/${teacher.id}/exit`,
+        { reason: reason.trim() || undefined },
+      );
+      const bits = [
+        res.releasedAssignments ? `${res.releasedAssignments} subject assignment${res.releasedAssignments === 1 ? '' : 's'}` : '',
+        res.releasedSections ? `${res.releasedSections} class-teacher role${res.releasedSections === 1 ? '' : 's'}` : '',
+      ].filter(Boolean);
+      setNotice(
+        bits.length
+          ? `${teacher.full_name} removed. Released ${bits.join(' and ')} — reassign these to someone else.`
+          : `${teacher.full_name} removed from the school.`,
+      );
+      await loadTeachers();
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Failed to remove teacher');
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  const handleReinstate = async (teacher: TeacherRow) => {
+    setError('');
+    setTogglingId(teacher.id);
+    try {
+      const res = await api.post<{ restoredAssignments: number; restoredSections: number }>(
+        `/school-admin/teachers/${teacher.id}/reinstate`,
+      );
+      const restored = (res.restoredAssignments ?? 0) + (res.restoredSections ?? 0);
+      setNotice(
+        restored
+          ? `${teacher.full_name} is back, with ${res.restoredAssignments} subject assignment(s) and ${res.restoredSections} class-teacher role(s) restored.`
+          : `${teacher.full_name} is back on the staff list.`,
+      );
+      await loadTeachers();
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Failed to reinstate teacher');
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
   const printSlips = (credentials: TeacherCredential[]) => {
     printCredentialSlips(
       credentials.map((c) => ({ fullName: c.fullName, username: c.username, roleLine: 'Teacher', password: c.password })),
@@ -316,6 +381,13 @@ export const SchoolAdminTeachers: React.FC = () => {
         <div className="bg-rose-50 border border-rose-200 text-rose-700 text-[13px] rounded-lg px-4 py-3 flex items-center gap-2">
           <AlertCircle size={15} /> {error}
           <button onClick={() => setError('')} className="ml-auto cursor-pointer"><X size={14} /></button>
+        </div>
+      )}
+
+      {notice && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-[13px] rounded-lg px-4 py-3 flex items-center gap-2">
+          <UserCheck size={15} /> {notice}
+          <button onClick={() => setNotice('')} className="ml-auto cursor-pointer"><X size={14} /></button>
         </div>
       )}
 
@@ -378,6 +450,16 @@ export const SchoolAdminTeachers: React.FC = () => {
           <option value="never">Never logged in</option>
         </select>
 
+        <label className="inline-flex items-center gap-2 text-[12px] font-medium text-slate-600 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showFormer}
+            onChange={(e) => setShowFormer(e.target.checked)}
+            className="h-3.5 w-3.5 cursor-pointer accent-slate-700"
+          />
+          Show former staff
+        </label>
+
         <div className="ml-auto rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
           {filtered.length} result{filtered.length === 1 ? '' : 's'}
         </div>
@@ -432,7 +514,12 @@ export const SchoolAdminTeachers: React.FC = () => {
                               show "Active" here purely because they had logged
                               in at some point in the past. Login history is a
                               separate, secondary fact. */}
-                          {!t.is_active ? (
+                          {t.exited_at ? (
+                            <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-slate-500" title={t.exit_reason ?? undefined}>
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                              Left the school
+                            </span>
+                          ) : !t.is_active ? (
                             <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-rose-700">
                               <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                               Deactivated
@@ -460,16 +547,39 @@ export const SchoolAdminTeachers: React.FC = () => {
                               {resettingId === t.id ? <Loader2 size={12} className="animate-spin" /> : <KeyRound size={12} />}
                               Reset password
                             </button>
-                            <button
-                              onClick={() => void handleToggleActive(t)}
-                              disabled={togglingId === t.id}
-                              className={`inline-flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50 ${
-                                t.is_active ? 'text-slate-400 hover:text-rose-700 hover:bg-rose-50' : 'text-emerald-600 hover:bg-emerald-50'
-                              }`}
-                            >
-                              {togglingId === t.id ? <Loader2 size={12} className="animate-spin" /> : t.is_active ? <UserRoundX size={12} /> : <UserCheck size={12} />}
-                              {t.is_active ? 'Deactivate' : 'Reactivate'}
-                            </button>
+                            {/* A former teacher only gets "Bring back" — the
+                                deactivate/remove pair makes no sense once they
+                                have already gone. */}
+                            {t.exited_at ? (
+                              <button
+                                onClick={() => void handleReinstate(t)}
+                                disabled={togglingId === t.id}
+                                className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-emerald-600 hover:bg-emerald-50 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                              >
+                                {togglingId === t.id ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />}
+                                Bring back
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => void handleToggleActive(t)}
+                                  disabled={togglingId === t.id}
+                                  className={`inline-flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50 ${
+                                    t.is_active ? 'text-slate-400 hover:text-rose-700 hover:bg-rose-50' : 'text-emerald-600 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  {togglingId === t.id ? <Loader2 size={12} className="animate-spin" /> : t.is_active ? <UserRoundX size={12} /> : <UserCheck size={12} />}
+                                  {t.is_active ? 'Deactivate' : 'Reactivate'}
+                                </button>
+                                <button
+                                  onClick={() => void handleExit(t)}
+                                  disabled={togglingId === t.id}
+                                  className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-400 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                                >
+                                  <LogOut size={12} /> Remove
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>

@@ -13,6 +13,8 @@ import {
   endSessionController,
   activeSessionForTeacherController,
   participantsController,
+  attendanceController,
+  markAttendanceController,
 } from '../controllers/liveSession.controller.js';
 import { createAnnouncementController, deleteAnnouncementController } from '../controllers/announcement.controller.js';
 import {
@@ -88,6 +90,9 @@ teacherRouter.post('/sessions/start', startSessionController);
 teacherRouter.post('/sessions/:id/end', endSessionController);
 teacherRouter.get('/sessions/active', activeSessionForTeacherController);
 teacherRouter.get('/sessions/:id/participants', participantsController);
+// Attendance register for a lab period: the whole roster, present or not.
+teacherRouter.get('/sessions/:id/attendance', attendanceController);
+teacherRouter.post('/sessions/:id/attendance', markAttendanceController);
 
 teacherRouter.post('/announcements', createAnnouncementController);
 teacherRouter.delete('/announcements/:id', deleteAnnouncementController);

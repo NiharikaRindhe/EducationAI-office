@@ -9,6 +9,7 @@ import {
   bulkIdsSchema,
   bulkMoveSchema,
   bulkActiveSchema,
+  bulkExitSchema,
 } from '../schemas/studentDirectory.schema.js';
 
 /**
@@ -101,6 +102,27 @@ export async function bulkSetActiveController(req: Request, res: Response, next:
     const schoolId = requireSchoolId(req);
     const { studentIds, isActive } = bulkActiveSchema.parse(req.body);
     res.json(await bulk.bulkSetStudentActive(schoolId, studentIds, isActive, req.user!.id));
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** Archive students who have left. Not a delete — see exitStudents. */
+export async function bulkExitController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const schoolId = requireSchoolId(req);
+    const { studentIds, reason } = bulkExitSchema.parse(req.body);
+    res.json(await bulk.exitStudents(schoolId, studentIds, reason ?? null, req.user!.id));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function bulkReinstateController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const schoolId = requireSchoolId(req);
+    const { studentIds } = bulkIdsSchema.parse(req.body);
+    res.json(await bulk.reinstateStudents(schoolId, studentIds, req.user!.id));
   } catch (err) {
     next(err);
   }

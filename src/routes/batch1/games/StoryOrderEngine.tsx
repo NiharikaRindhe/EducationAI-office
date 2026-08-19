@@ -139,7 +139,7 @@ export const StoryOrderEngine: React.FC<StoryOrderEngineProps> = ({ game, isPreR
         <span className="text-6xl">🏆</span>
         <div className="flex gap-1">{[1, 2, 3].map((n) => (<Star key={n} size={32} className={n <= earned ? 'fill-amber-400 text-amber-400' : 'text-slate-200'} />))}</div>
         <button onClick={handlePlayAgain} className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer" style={{ minHeight: 48, minWidth: 120 }}>
-          🔄 {isPreReader ? '' : 'Play Again'}
+          🔄 Play Again
         </button>
       </div>
     );

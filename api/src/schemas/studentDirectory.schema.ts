@@ -8,6 +8,8 @@ export const directoryQuerySchema = z.object({
   section: z.string().trim().max(4).optional(),
   status: z.enum(['all', 'active', 'never']).optional(),
   enabled: z.enum(['all', 'enabled', 'disabled']).optional(),
+  /** Omitted means 'current' — see applyFilters. */
+  enrolment: z.enum(['current', 'left', 'all']).optional(),
   batchId: z.coerce.number().int().min(1).max(3).optional(),
   schoolId: z.string().uuid().optional(),
   page: z.coerce.number().int().min(1).optional(),
@@ -34,4 +36,9 @@ export const bulkMoveSchema = z.object({
 export const bulkActiveSchema = z.object({
   studentIds,
   isActive: z.boolean(),
+});
+
+export const bulkExitSchema = z.object({
+  studentIds,
+  reason: z.string().trim().max(200).optional(),
 });

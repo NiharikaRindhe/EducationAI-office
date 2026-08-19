@@ -9,7 +9,9 @@ export const createSchoolSchema = z.object({
     .max(40)
     .regex(/^[A-Z0-9-]+$/, 'School code must be uppercase letters, numbers, and hyphens only'),
   board: z.enum(['CBSE', 'ICSE', 'State', 'IB']).default('CBSE'),
-  plan: z.enum(['starter', 'school', 'enterprise']).default('starter'),
+  // No `plan`. EduAI sells one plan with every feature included, so there is
+  // nothing for a caller to choose — createSchool grants the full catalogue and
+  // stamps the column itself.
 
   // Location
   address: z.string().trim().max(300).optional(),
@@ -46,7 +48,10 @@ export type CreateSchoolInput = z.infer<typeof createSchoolSchema>;
 export const updateSchoolSchema = z.object({
   name: z.string().trim().min(2).optional(),
   board: z.enum(['CBSE', 'ICSE', 'State', 'IB']).optional(),
-  plan: z.enum(['starter', 'school', 'enterprise']).optional(),
+  // Deliberately no `plan`. Accepting one here re-provisioned the school from
+  // that package, so a profile edit could silently revoke paid-for features.
+  // Feature changes go through PUT /schools/:id/entitlements, which diffs and
+  // audit-logs them.
   address: z.string().trim().max(300).nullable().optional(),
   city: z.string().trim().max(80).nullable().optional(),
   state: z.string().trim().max(80).nullable().optional(),

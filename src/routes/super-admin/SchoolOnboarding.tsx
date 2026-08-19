@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Loader2, AlertCircle, ArrowLeft, ArrowRight, Building2, MapPin, Phone,
-  UserPlus, Copy, Check, Sparkles, ShieldCheck, Mail, Printer,
+  UserPlus, Copy, Check, ShieldCheck, Mail, Printer,
 } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 
@@ -10,65 +10,33 @@ import { api, ApiClientError } from '../../lib/api';
  * Full-page school onboarding.
  *
  * Replaces the single cramped modal that asked for identity, address,
- * contact, plan and admin account all at once. Onboarding a school is a
- * sales moment, not a CRUD form: the package choice deserves real
- * comparison rather than a <select>, and the generated admin password is
- * shown exactly once, so the final step is a deliberate handoff screen
- * rather than a toast that can be dismissed by accident.
+ * contact and admin account all at once. Onboarding a school is a sales
+ * moment, not a CRUD form: the generated admin password is shown exactly
+ * once, so the final step is a deliberate handoff screen rather than a
+ * toast that can be dismissed by accident.
  */
 
 const inputCls =
   'w-full px-3.5 py-2.5 text-[13px] text-slate-800 bg-white border border-slate-300 rounded-lg outline-none transition-colors focus:border-slate-500 focus:ring-2 focus:ring-slate-100 placeholder:text-slate-400';
 const labelCls = 'block text-[12px] font-medium text-slate-600 mb-1.5';
 
-type StepId = 'school' | 'plan' | 'admin' | 'review';
+type StepId = 'school' | 'admin' | 'review';
 
 const STEPS: { id: StepId; label: string }[] = [
   { id: 'school', label: 'School details' },
-  { id: 'plan', label: 'Plan' },
   { id: 'admin', label: 'Administrator' },
   { id: 'review', label: 'Review' },
 ];
 
-/** Mirrors package_features in the DB. Kept here purely to explain the
- *  choice — the server is the authority on what actually gets granted. */
-const PLANS = [
-  {
-    key: 'starter',
-    label: 'Starter',
-    tagline: 'Gamified practice for primary classes.',
-    includes: ['Learning Games (Classes 1–4)', 'Leaderboard'],
-    excludes: ['AI Doubt Tutor', 'Virtual Science Labs', 'PYQ Hub', 'Reports & Analytics'],
-  },
-  {
-    key: 'school',
-    label: 'School',
-    tagline: 'The full day-to-day platform. Most schools want this.',
-    includes: [
-      'Everything in Starter',
-      'AI Doubt Tutor',
-      'Virtual Science Labs',
-      'Past Year Questions',
-      'Reports & Analytics',
-    ],
-    excludes: ['AI Exam Generator', 'School Book Uploads'],
-    recommended: true,
-  },
-  {
-    key: 'enterprise',
-    label: 'Enterprise',
-    tagline: 'Adds AI generation and the school’s own content library.',
-    includes: [
-      'Everything in School',
-      'AI Exam Generator',
-      'School Book Uploads',
-    ],
-    excludes: [],
-  },
-] as const;
+/*
+ * EduAI sells one plan with every feature included, so there is no package to
+ * choose during onboarding and none to send: the server grants the full feature
+ * catalogue on create. An individual feature can be suspended for one school
+ * afterwards from that school's Features tab.
+ */
 
 const EMPTY_FORM = {
-  name: '', code: '', board: 'CBSE', plan: 'school',
+  name: '', code: '', board: 'CBSE',
   address: '', city: '', state: '', pincode: '',
   contactName: '', contactEmail: '', contactPhone: '',
   createAdmin: true, adminFullName: '', adminEmail: '',
@@ -84,7 +52,6 @@ interface CreatedSchool {
   id: string;
   name: string;
   code: string;
-  plan: string;
   adminCredential: AdminCredential | null;
 }
 
@@ -167,7 +134,6 @@ export const SuperAdminSchoolOnboarding: React.FC = () => {
         name: form.name,
         code: form.code.toUpperCase(),
         board: form.board,
-        plan: form.plan,
         address: form.address || undefined,
         city: form.city || undefined,
         state: form.state || undefined,
@@ -210,8 +176,7 @@ export const SuperAdminSchoolOnboarding: React.FC = () => {
             <div>
               <h2 className="text-[15px] font-bold text-emerald-900">{created.name} is onboarded</h2>
               <p className="text-[12px] text-emerald-700 mt-0.5">
-                Code <span className="font-mono font-semibold">{created.code}</span> ·{' '}
-                <span className="capitalize">{created.plan}</span> plan · features provisioned
+                Code <span className="font-mono font-semibold">{created.code}</span> · full platform provisioned
               </p>
             </div>
           </div>
@@ -419,73 +384,7 @@ export const SuperAdminSchoolOnboarding: React.FC = () => {
           </div>
         )}
 
-        {/* STEP 2 — plan */}
-        {step === 'plan' && (
-          <div className="px-6 py-5 flex flex-col gap-4">
-            <div>
-              <h2 className="text-[14px] font-bold text-slate-800">What has this school bought?</h2>
-              <p className="text-[12px] text-slate-400 mt-0.5">
-                This grants the features immediately. It can be changed later from the school&apos;s Features &amp; plan tab.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              {PLANS.map((p) => {
-                const selected = form.plan === p.key;
-                return (
-                  <button
-                    key={p.key}
-                    onClick={() => setForm((f) => ({ ...f, plan: p.key }))}
-                    className={`text-left border rounded-xl p-4 flex flex-col gap-3 transition-all cursor-pointer relative ${
-                      selected
-                        ? 'border-slate-900 ring-2 ring-slate-900/10 bg-slate-50/60'
-                        : 'border-slate-200 hover:border-slate-400'
-                    }`}
-                  >
-                    {'recommended' in p && p.recommended && (
-                      <span className="absolute -top-2 left-4 text-[10px] font-bold uppercase tracking-wide text-white bg-indigo-600 px-2 py-0.5 rounded">
-                        Most schools
-                      </span>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <span className="text-[14px] font-bold text-slate-800">{p.label}</span>
-                      <span
-                        className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                          selected ? 'border-slate-900 bg-slate-900' : 'border-slate-300'
-                        }`}
-                      >
-                        {selected && <Check size={9} className="text-white" strokeWidth={4} />}
-                      </span>
-                    </div>
-                    <p className="text-[11.5px] text-slate-500 leading-relaxed">{p.tagline}</p>
-                    <ul className="flex flex-col gap-1.5 mt-auto">
-                      {p.includes.map((f) => (
-                        <li key={f} className="flex items-start gap-1.5 text-[11.5px] text-slate-700">
-                          <Check size={12} className="text-emerald-600 shrink-0 mt-0.5" strokeWidth={3} />
-                          {f}
-                        </li>
-                      ))}
-                      {p.excludes.map((f) => (
-                        <li key={f} className="flex items-start gap-1.5 text-[11.5px] text-slate-300">
-                          <span className="w-3 shrink-0 text-center mt-0.5">–</span>
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                  </button>
-                );
-              })}
-            </div>
-
-            <p className="text-[11.5px] text-slate-400 flex items-start gap-1.5">
-              <Sparkles size={12} className="shrink-0 mt-0.5" />
-              Core teaching tools — exams, tasks, timetable, notes, live sessions and support — are included in every
-              plan and are never restricted.
-            </p>
-          </div>
-        )}
-
-        {/* STEP 3 — administrator */}
+        {/* STEP 2 — administrator */}
         {step === 'admin' && (
           <div className="px-6 py-5 flex flex-col gap-5">
             <div>
@@ -553,8 +452,8 @@ export const SuperAdminSchoolOnboarding: React.FC = () => {
                 ['Email', form.contactEmail || '—'],
                 ['Phone', form.contactPhone || '—'],
               ]],
-              ['Plan', [
-                ['Package', PLANS.find((p) => p.key === form.plan)?.label ?? form.plan],
+              ['Features', [
+                ['Included', 'The full platform — every feature'],
               ]],
               ['Administrator', form.createAdmin
                 ? [['Name', form.adminFullName], ['Email', form.adminEmail]]

@@ -131,3 +131,89 @@ export async function bulkSetStudentActive(
 
   return { succeeded: studentIds.length, failed: [] };
 }
+
+/**
+ * Record that students have left the school.
+ *
+ * This is what the roster's "remove" action does, and it is deliberately not a
+ * DELETE. Twelve tables reference student_profiles with NO ACTION, so deleting
+ * a student who has ever sat an exam is rejected by the database — and even
+ * where it would succeed, discarding a leaver's marks is the wrong outcome. An
+ * exited student leaves the active roster and loses their login; their
+ * submissions, badges and results stay attached to them.
+ *
+ * Reversible via reinstateStudents, because "left" is frequently entered by
+ * mistake on the wrong row.
+ */
+export async function exitStudents(
+  schoolId: string,
+  studentIds: string[],
+  reason: string | null,
+  actorId: string,
+): Promise<BulkOutcome> {
+  await assertStudentsInSchool(studentIds, schoolId);
+
+  const now = new Date().toISOString();
+
+  // Exit and login-disable are one write: both live on user_profiles, and a
+  // leaver who stayed signed in because the second update failed would be a
+  // security hole rather than a cosmetic bug.
+  const { error } = await supabaseAdmin
+    .from('user_profiles')
+    .update({ exited_at: now, exit_reason: reason, is_active: false, updated_at: now })
+    .in('id', studentIds);
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to archive students', error.message);
+
+  // Close out this year's enrolment so the promotion run doesn't carry a
+  // student who has left into the next class.
+  await supabaseAdmin
+    .from('student_enrollments')
+    .update({ outcome: 'left' })
+    .in('student_id', studentIds)
+    .eq('outcome', 'enrolled');
+
+  await writeAuditLog({
+    schoolId,
+    actorId,
+    action: 'student.exited',
+    entity: 'student',
+    metadata: { count: studentIds.length, studentIds, reason },
+  });
+
+  await revokeSessionsForUsers(studentIds, 'student_exited', { actorId, schoolId });
+
+  return { succeeded: studentIds.length, failed: [] };
+}
+
+/** Undo an exit — the student never left, or has come back. */
+export async function reinstateStudents(
+  schoolId: string,
+  studentIds: string[],
+  actorId: string,
+): Promise<BulkOutcome> {
+  await assertStudentsInSchool(studentIds, schoolId);
+
+  const now = new Date().toISOString();
+
+  const { error } = await supabaseAdmin
+    .from('user_profiles')
+    .update({ exited_at: null, exit_reason: null, is_active: true, updated_at: now })
+    .in('id', studentIds);
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to reinstate students', error.message);
+
+  await supabaseAdmin
+    .from('student_enrollments')
+    .update({ outcome: 'enrolled' })
+    .in('student_id', studentIds)
+    .eq('outcome', 'left');
+
+  await writeAuditLog({
+    schoolId,
+    actorId,
+    action: 'student.reinstated',
+    entity: 'student',
+    metadata: { count: studentIds.length, studentIds },
+  });
+
+  return { succeeded: studentIds.length, failed: [] };
+}

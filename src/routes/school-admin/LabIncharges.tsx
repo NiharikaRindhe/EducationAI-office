@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Loader2, Plus, AlertCircle, Printer, KeyRound } from 'lucide-react';
+import { Loader2, Plus, AlertCircle, Printer, KeyRound, LogOut, Undo2 } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 import { printCredentialSlips } from '../../lib/printSlips';
 
@@ -8,6 +8,8 @@ interface LabInchargeRow {
   full_name: string;
   is_active: boolean;
   has_logged_in_ever: boolean;
+  exited_at?: string | null;
+  exit_reason?: string | null;
 }
 
 interface Credential {
@@ -24,19 +26,59 @@ export const SchoolAdminLabIncharges: React.FC = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [resettingId, setResettingId] = useState<string | null>(null);
   const [freshCredential, setFreshCredential] = useState<Credential | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  // Former in-charges stay out of the list unless asked for.
+  const [showFormer, setShowFormer] = useState(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      setRows(await api.get<LabInchargeRow[]>('/school-admin/lab-incharges'));
+      setRows(await api.get<LabInchargeRow[]>('/school-admin/lab-incharges', showFormer ? { includeLeft: 'true' } : undefined));
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : 'Failed to load lab in-charges');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [showFormer]);
 
   useEffect(() => { void load(); }, [load]);
+
+  /** Removing an in-charge records that they left; it never deletes the
+   *  account, which still owns audit entries for credentials they reset. */
+  const handleExit = async (row: LabInchargeRow) => {
+    const reason = window.prompt(
+      `Remove ${row.full_name}?
+
+They will be signed out and taken off the list. Nothing they did is deleted, and you can undo this from "Show former in-charges".
+
+Reason (optional):`,
+      '',
+    );
+    if (reason === null) return;
+    setError('');
+    setBusyId(row.id);
+    try {
+      await api.post(`/school-admin/lab-incharges/${row.id}/exit`, { reason: reason.trim() || undefined });
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Failed to remove lab in-charge');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleReinstate = async (row: LabInchargeRow) => {
+    setError('');
+    setBusyId(row.id);
+    try {
+      await api.post(`/school-admin/lab-incharges/${row.id}/reinstate`);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Failed to reinstate lab in-charge');
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,7 +159,13 @@ export const SchoolAdminLabIncharges: React.FC = () => {
       )}
 
       <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
-        <h2 className="font-display font-bold text-lg text-slate-800 mb-4">All Lab In-charges ({rows.length})</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-display font-bold text-lg text-slate-800">All Lab In-charges ({rows.length})</h2>
+          <label className="inline-flex items-center gap-2 text-[11px] font-medium text-slate-600 cursor-pointer select-none">
+            <input type="checkbox" checked={showFormer} onChange={(e) => setShowFormer(e.target.checked)} className="h-3.5 w-3.5 cursor-pointer accent-slate-700" />
+            Show former in-charges
+          </label>
+        </div>
         {isLoading ? (
           <div className="flex justify-center py-8"><Loader2 className="animate-spin text-rose-400" /></div>
         ) : rows.length === 0 ? (
@@ -135,21 +183,44 @@ export const SchoolAdminLabIncharges: React.FC = () => {
                   <tr key={r.id} className="border-b border-slate-50">
                     <td className="py-2.5 font-semibold text-slate-700">{r.full_name}</td>
                     <td className="py-2.5">
-                      {r.has_logged_in_ever ? (
+                      {r.exited_at ? (
+                        <span className="text-slate-400 font-bold" title={r.exit_reason ?? undefined}>Left the school</span>
+                      ) : r.has_logged_in_ever ? (
                         <span className="text-emerald-600 font-bold">Active</span>
                       ) : (
                         <span className="text-amber-600 font-bold">Never logged in</span>
                       )}
                     </td>
                     <td className="py-2.5 text-right">
-                      <button
-                        onClick={() => void handleReset(r)}
-                        disabled={resettingId === r.id}
-                        className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-rose-600 hover:bg-rose-50 px-2 py-1 rounded-lg transition-all cursor-pointer disabled:opacity-40"
-                      >
-                        {resettingId === r.id ? <Loader2 size={11} className="animate-spin" /> : <KeyRound size={11} />}
-                        Reset Password
-                      </button>
+                      {r.exited_at ? (
+                        <button
+                          onClick={() => void handleReinstate(r)}
+                          disabled={busyId === r.id}
+                          className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:bg-emerald-50 px-2 py-1 rounded-lg transition-all cursor-pointer disabled:opacity-40"
+                        >
+                          {busyId === r.id ? <Loader2 size={11} className="animate-spin" /> : <Undo2 size={11} />}
+                          Bring Back
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => void handleReset(r)}
+                            disabled={resettingId === r.id}
+                            className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-rose-600 hover:bg-rose-50 px-2 py-1 rounded-lg transition-all cursor-pointer disabled:opacity-40"
+                          >
+                            {resettingId === r.id ? <Loader2 size={11} className="animate-spin" /> : <KeyRound size={11} />}
+                            Reset Password
+                          </button>
+                          <button
+                            onClick={() => void handleExit(r)}
+                            disabled={busyId === r.id}
+                            className="ml-1 inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-rose-600 hover:bg-rose-50 px-2 py-1 rounded-lg transition-all cursor-pointer disabled:opacity-40"
+                          >
+                            {busyId === r.id ? <Loader2 size={11} className="animate-spin" /> : <LogOut size={11} />}
+                            Remove
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}

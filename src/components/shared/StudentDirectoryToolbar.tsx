@@ -22,6 +22,8 @@ interface Props {
   sectionOptions?: string[];
   /** Renders the school <select> for the Super Admin directory. */
   schoolOptions?: SchoolOption[];
+  /** Enrolment filter — only the school admin can retire or reinstate a student. */
+  showEnrolmentFilter?: boolean;
   onExport?: () => Promise<void> | void;
   /** Extra controls (e.g. Import / Add student) rendered at the right. */
   children?: React.ReactNode;
@@ -34,7 +36,7 @@ export const StudentDirectoryToolbar: React.FC<Props> = ({
   filters, onChange, onReset, hasActiveFilters, total, isLoading,
   classOptions = Array.from({ length: 10 }, (_, i) => i + 1),
   sectionOptions = ['A', 'B', 'C', 'D', 'E'],
-  schoolOptions, onExport, children,
+  schoolOptions, onExport, children, showEnrolmentFilter = false,
 }) => {
   const [isExporting, setIsExporting] = React.useState(false);
 
@@ -113,6 +115,22 @@ export const StudentDirectoryToolbar: React.FC<Props> = ({
         <option value="enabled">Active only</option>
         <option value="disabled">Deactivated only</option>
       </select>
+
+      {/* Enrolment is separate from the account toggle: a leaver is not the
+          same as a suspended account, and the roster hides leavers by default
+          so headcount stays honest. */}
+      {showEnrolmentFilter && (
+        <select
+          value={filters.enrolment ?? 'current'}
+          onChange={(e) => onChange({ enrolment: e.target.value as DirectoryFilters['enrolment'] })}
+          className={selectCls}
+          aria-label="Filter by enrolment"
+        >
+          <option value="current">Currently enrolled</option>
+          <option value="left">Left the school</option>
+          <option value="all">Enrolled + left</option>
+        </select>
+      )}
 
       {hasActiveFilters && (
         <button

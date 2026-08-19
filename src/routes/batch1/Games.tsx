@@ -1,12 +1,14 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
 import { useSearchParams } from 'react-router-dom';
-import { Star, ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Lock, Star } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getClassTheme, getSubjectCardColors } from './theme';
+import { Button, Card, EmptyState, PageHeader, Pic, ProgressBar, Skeleton, StarRow, T } from './ui';
 import { QuestEngine, type QuestParams } from './QuestEngine';
+import { LetterTracingEngine } from './games/LetterTracingEngine';
 import { NumberHopEngine } from './games/NumberHopEngine';
 import { NumberSlideEngine } from './games/NumberSlideEngine';
 import { WordBuildEngine } from './games/WordBuildEngine';
@@ -193,6 +195,8 @@ export const Batch1Games: React.FC = () => {
   const [challengeGames, setChallengeGames] = useState<GameItem[]>([]);
   const [chapterInfo, setChapterInfo] = useState<Map<string, CurriculumChapterLite>>(new Map());
   const [activeGame, setActiveGame] = useState<GameItem | null>(null);
+  /* Empty string = every subject. */
+  const [activeSubject, setActiveSubject] = useState<string>('');
 
   const theme = getClassTheme(currentClass);
 
@@ -314,64 +318,86 @@ export const Batch1Games: React.FC = () => {
       .sort((a, b) => a.subject.localeCompare(b.subject) || a.chapterNum - b.chapterNum);
   };
 
-  /* One juicy island card per game (or challenge) */
+  /* One card per game.
+
+     Rebuilt from the old "juicy island card" for three reasons a child hit
+     immediately: the game's NAME was hidden for Class 1-2, so a chapter holding
+     two games showed two identical unlabelled tiles (the frog pair that used to
+     sit in Class 2 Maths); the "PLAY" strip was as big as the picture and
+     competed with it; and the locked state read "Get 2 stars first!" — a
+     sentence, to a child who cannot yet read one. Now: one big picture, the
+     name always under it, stars, and the whole card is the button. */
   const renderGameCard = (game: GameItem, isChallenge = false) => {
     const c = getSubjectCardColors(game.subject);
+
     if (game.locked) {
       return (
         <div
           key={game.gameId}
-          className="relative rounded-[28px] p-5 flex flex-col items-center gap-2.5 select-none opacity-80"
-          style={{ background: 'linear-gradient(160deg,#DDE9F2,#C3D5E2)', boxShadow: '0 8px 0 #A8BDCC' }}
+          className="relative flex flex-col items-center justify-center gap-2 px-3 py-5 text-center select-none"
+          style={{
+            minHeight: 170,
+            borderRadius: T.radius.md,
+            background: 'linear-gradient(180deg,#E7F0F7,#D2E0EB)',
+            boxShadow: '0 5px 0 #B7C9D6',
+          }}
+          aria-label={`${game.name} — locked. Win 2 stars on the game before it.`}
         >
-          <span className="text-6xl leading-none">🔒</span>
-          <span className="font-display font-black text-sm" style={{ color: '#5E7A8C' }}>
-            {isPreReader ? '⭐⭐' : 'Get 2 stars first!'}
+          <span
+            className="flex items-center justify-center"
+            style={{ width: 62, height: 62, borderRadius: 999, background: 'rgba(255,255,255,.75)' }}
+          >
+            <Lock size={28} style={{ color: '#7E97A9' }} />
           </span>
+          <span className="font-display font-black text-base leading-tight" style={{ color: '#5E7A8C' }}>
+            {game.name}
+          </span>
+          {/* The rule is "win 2 stars on the one before". Drawn, not written. */}
+          <StarRow earned={2} size={16} />
         </div>
       );
     }
+
     return (
       <button
         key={game.gameId}
         onClick={() => setActiveGame(game)}
-        className="relative rounded-[28px] p-5 pt-6 flex flex-col items-center gap-2.5 overflow-hidden cursor-pointer
-                   select-none transition-transform duration-150 hover:-translate-y-1.5 hover:rotate-[-0.5deg] active:translate-y-0.5"
+        className="relative flex flex-col items-center justify-center gap-2.5 px-3 py-5 overflow-hidden text-center
+                   select-none transition-transform duration-100 ease-out active:translate-y-[3px] cursor-pointer"
         style={{
-          background: `linear-gradient(160deg, ${c.from}, ${c.to})`,
-          boxShadow: `0 8px 0 ${c.shadow}, 0 14px 24px ${c.to}55`,
+          minHeight: 170,
+          borderRadius: T.radius.md,
+          background: `linear-gradient(180deg, ${c.from}, ${c.to})`,
+          boxShadow: `0 5px 0 ${c.shadow}, 0 14px 24px ${c.to}45`,
         }}
       >
         <span
-          className="absolute top-0 left-0 right-0 h-[44%] pointer-events-none"
-          style={{ background: 'linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0))' }}
           aria-hidden="true"
+          className="absolute inset-x-0 top-0 pointer-events-none"
+          style={{ height: '42%', background: 'linear-gradient(180deg, rgba(255,255,255,.32), rgba(255,255,255,0))' }}
         />
-        <span
-          className="absolute top-3 left-4 bg-white/90 rounded-full px-2.5 py-0.5 text-[10px] font-black tracking-wider"
-          style={{ color: c.text }}
-        >
-          {isChallenge ? '🚀 CLASS ' + game.classNum : 'GAME'}
-        </span>
-        <span className="text-6xl leading-none anim-bob" style={{ filter: 'drop-shadow(0 4px 5px rgba(0,0,0,.2))' }}>
-          {game.icon}
-        </span>
-        {!isPreReader && (
-          <span className="font-display font-black text-base text-white text-center leading-tight"
-                style={{ textShadow: '0 2px 3px rgba(0,0,0,.2)' }}>
-            {game.name}
+
+        {/* Marked only when it IS special. Every card used to carry a "GAME"
+            badge, which told a child nothing they could not already see. */}
+        {isChallenge && (
+          <span
+            className="absolute top-2.5 left-2.5 bg-white/95 rounded-full px-2.5 py-0.5 text-[10px] font-black tracking-wider"
+            style={{ color: c.text }}
+          >
+            CLASS {game.classNum}
           </span>
         )}
-        <span className="text-lg tracking-[3px]" style={{ textShadow: '0 2px 2px rgba(0,0,0,.15)' }}>
-          {'⭐'.repeat(game.stars)}{'☆'.repeat(Math.max(0, 3 - game.stars))}
-        </span>
+
+        <Pic emoji={game.icon} size={52} className="drop-shadow-[0_3px_4px_rgba(0,0,0,.20)]" />
+
         <span
-          className="w-full bg-white rounded-2xl py-3 font-display font-black text-sm tracking-widest text-center
-                     transition-transform active:translate-y-0.5"
-          style={{ color: c.text, boxShadow: '0 4px 0 rgba(0,0,0,.15)' }}
+          className="font-display font-black text-sm sm:text-base text-white leading-tight px-1"
+          style={{ textShadow: '0 2px 3px rgba(0,0,0,.22)' }}
         >
-          PLAY ▶
+          {game.name}
         </span>
+
+        <StarRow earned={game.stars} size={17} />
       </button>
     );
   };
@@ -379,97 +405,133 @@ export const Batch1Games: React.FC = () => {
   const renderGallery = () => {
     if (loading) {
       return (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="bg-white/60 rounded-[28px] flex flex-col items-center gap-4 p-6" style={{ minHeight: 190 }}>
-              <div className="skeleton-pulse w-16 h-16 rounded-2xl" />
-              <div className="skeleton-pulse w-24 h-3 rounded-full" />
-              <div className="skeleton-pulse w-full h-9 rounded-2xl" />
-            </div>
-          ))}
+        <div className="flex flex-col gap-5">
+          <Skeleton height={56} />
+          <div className="columns-1 md:columns-2 2xl:columns-3 gap-4">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <Skeleton key={i} height={i % 3 === 1 ? 300 : 230} className="break-inside-avoid mb-4" />
+            ))}
+          </div>
         </div>
       );
     }
 
     if (games.length === 0) {
       return (
-        <div className="bg-white/85 rounded-3xl p-12 text-center flex flex-col items-center gap-4"
-             style={{ boxShadow: '0 6px 0 rgba(20,90,140,.12)' }}>
-          <span className="text-6xl anim-bob">{theme.mascot}</span>
-          <h3 className="font-display font-black text-lg" style={{ color: '#17425F' }}>New games coming soon!</h3>
-          <p className="text-xs font-bold" style={{ color: '#7BA2BC' }}>Check back later to play and collect stars.</p>
-        </div>
+        <EmptyState
+          emoji={theme.mascot}
+          title="No games yet!"
+          body="Your teacher will open games for your class soon."
+          action={{ label: 'Back home', to: '/batch1/home' }}
+        />
       );
     }
 
     const chapters = groupGamesByChapter();
 
+    /* Subject tabs. Without them this page is every chapter of every subject
+       stacked in one column — roughly 4,000px for Class 2, which put the last
+       games a dozen scrolls below the fold and effectively out of reach. */
+    const subjects = Array.from(new Set(chapters.map((ch) => ch.subject)));
+    const shown = activeSubject && subjects.includes(activeSubject)
+      ? chapters.filter((ch) => ch.subject === activeSubject)
+      : chapters;
+
     return (
-      <div className="flex flex-col gap-7">
-        {chapters.map((chapter) => {
-          const chapterStars = chapter.games.reduce((s, g) => s + g.stars, 0);
-          const maxStars = chapter.games.length * 3;
-          return (
-            <div key={chapter.chapterRef} className="flex flex-col gap-4">
-              {/* Chapter header card */}
-              <div className="bg-white rounded-3xl px-5 py-4 flex items-center gap-4"
-                   style={{ boxShadow: '0 5px 0 rgba(20,90,140,.14)' }}>
-                <span
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center font-display font-black text-xl text-white shrink-0"
-                  style={{ background: theme.accent, boxShadow: `0 3px 0 ${theme.accentDark}` }}
+      <div className="flex flex-col gap-5">
+        {subjects.length > 1 && (
+          <div className="flex gap-2.5 flex-wrap" role="tablist" aria-label="Choose a subject">
+            {[{ key: '', label: 'All' }, ...subjects.map((sub) => ({ key: sub, label: sub }))].map((tab) => {
+              const on = activeSubject === tab.key;
+              return (
+                <button
+                  key={tab.key || 'all'}
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => setActiveSubject(tab.key)}
+                  className="font-display font-black text-sm sm:text-base px-5 transition-transform duration-100
+                             active:translate-y-[2px] cursor-pointer"
+                  style={{
+                    minHeight: 52,
+                    borderRadius: T.radius.sm,
+                    background: on ? theme.accent : '#FFFFFF',
+                    color: on ? '#FFFFFF' : T.ink.strong,
+                    border: `2px solid ${on ? theme.accent : T.surface.line}`,
+                    boxShadow: `0 3px 0 ${on ? theme.accentDark : '#CBDDE9'}`,
+                  }}
                 >
-                  {chapter.chapterNum > 0 ? chapter.chapterNum : '★'}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="font-display font-black text-base leading-tight truncate" style={{ color: '#17425F' }}>
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Chapters are PANELS that tile, not full-width rows.
+
+           Most chapters in this curriculum hold exactly one game. Giving each
+           its own row across a 1680px screen left a single card at the far left
+           with six empty columns beside it, repeated a dozen times down the
+           page. CSS columns let each panel take only the height it needs and
+           pack side by side, so the grouping survives and the whitespace goes. */}
+        <div className="columns-1 md:columns-2 2xl:columns-3 gap-4">
+          {shown.map((chapter) => {
+            const chapterStars = chapter.games.reduce((sum, g) => sum + g.stars, 0);
+            const maxStars = chapter.games.length * 3;
+            return (
+              <section
+                key={chapter.chapterRef}
+                className="break-inside-avoid mb-4 bg-white/70 p-3.5 flex flex-col gap-3"
+                style={{ borderRadius: T.radius.md, boxShadow: T.shadow.card }}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className="flex items-center justify-center font-display font-black text-base text-white shrink-0"
+                    style={{
+                      width: 38, height: 38, borderRadius: T.radius.sm,
+                      background: theme.accent, boxShadow: `0 3px 0 ${theme.accentDark}`,
+                    }}
+                  >
+                    {chapter.chapterNum > 0 ? chapter.chapterNum : '★'}
+                  </span>
+                  <h2
+                    className="flex-1 min-w-0 font-display font-black text-sm sm:text-base leading-tight"
+                    style={{ color: T.ink.strong }}
+                  >
                     {chapter.chapterTitle}
-                  </div>
-                  {!isPreReader && (
-                    <div className="text-[10px] font-black tracking-widest" style={{ color: '#7BA2BC' }}>
-                      {chapter.subject.toUpperCase()}
-                    </div>
-                  )}
+                  </h2>
+                  <span className="flex items-center gap-2 shrink-0">
+                    <ProgressBar value={chapterStars} max={maxStars} className="w-16 hidden sm:block" />
+                    <b className="font-display text-xs whitespace-nowrap" style={{ color: T.ink.muted }}>
+                      {chapterStars}/{maxStars}
+                    </b>
+                  </span>
                 </div>
-                {/* Star meter */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <div className="w-24 h-3.5 rounded-full overflow-hidden hidden sm:block" style={{ background: '#E4EEF8' }}>
-                    <div className="h-full rounded-full"
-                         style={{ width: `${maxStars > 0 ? (chapterStars / maxStars) * 100 : 0}%`,
-                                  background: 'linear-gradient(90deg,#FFC800,#FFB100)' }} />
-                  </div>
-                  <b className="font-display text-sm" style={{ color: '#17425F' }}>{chapterStars}/{maxStars} ⭐</b>
-                </div>
-              </div>
 
-              {/* This chapter's games */}
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
-                {chapter.games.map((game) => renderGameCard(game))}
-              </div>
-            </div>
-          );
-        })}
-
-        {/* Challenge section — same-skill games one class up */}
-        {challengeGames.length > 0 && (
-          <div className="flex flex-col gap-4">
-            <div className="bg-white rounded-3xl px-5 py-4 flex items-center gap-3"
-                 style={{ boxShadow: '0 5px 0 rgba(20,90,140,.14)' }}>
-              <span className="text-3xl anim-wiggle">🚀</span>
-              <div>
-                <div className="font-display font-black text-base" style={{ color: '#17425F' }}>
-                  {isPreReader ? '🚀⭐' : 'Challenge Zone'}
+                {/* Two per row inside a panel: most chapters hold one or two
+                    games, and a half-panel card is a far bigger tap target for a
+                    six-year-old than a third-panel one. */}
+                <div className="grid grid-cols-2 gap-3">
+                  {chapter.games.map((game) => renderGameCard(game))}
                 </div>
-                {!isPreReader && (
-                  <div className="text-[10px] font-black tracking-widest" style={{ color: '#7BA2BC' }}>
-                    YOU MASTERED THIS — TRY THE NEXT CLASS!
-                  </div>
-                )}
-              </div>
+              </section>
+            );
+          })}
+        </div>
+
+        {/* Same skill, one class up — offered once a child has mastered theirs. */}
+        {challengeGames.length > 0 && !activeSubject && (
+          <section className="flex flex-col gap-3">
+            <div className="flex items-center gap-3 px-1">
+              <Pic emoji="\U0001F680" size={40} />
+              <h2 className="font-display font-black text-base sm:text-lg" style={{ color: T.ink.strong }}>
+                Try something harder
+              </h2>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-7 gap-3">
               {challengeGames.map((game) => renderGameCard(game, true))}
             </div>
-          </div>
+          </section>
         )}
       </div>
     );
@@ -484,7 +546,15 @@ export const Batch1Games: React.FC = () => {
       case 'count-add':
         return <CountAddEngine game={activeGame} numChoices={numChoices} isPreReader={isPreReader} onFinish={submitAttempt} />;
       case 'letter-trace':
-        return <LetterTraceEngine game={activeGame} isPreReader={isPreReader} onFinish={submitAttempt} />;
+        // The real EducationAI tracing engine (stroke order, direction and
+        // accuracy scoring) replaces the earlier proximity-only lookalike.
+        return (
+          <LetterTracingEngine
+            game={{ gameId: activeGame.gameId, name: activeGame.name, icon: activeGame.icon, params: { letters: activeGame.params.letters } }}
+            isPreReader={isPreReader}
+            onFinish={submitAttempt}
+          />
+        );
       case 'phonics-pop':
         return <PhonicsPopEngine game={activeGame} numChoices={numChoices} isPreReader={isPreReader} onFinish={submitAttempt} />;
       case 'number-hop':
@@ -636,39 +706,49 @@ export const Batch1Games: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col gap-6 font-sans select-none anim-fade-up relative">
-      {/* XP float animation */}
+    <div className="flex flex-col gap-5 select-none anim-fade-up relative">
+      {/* Star reward, floating up from where the child just earned it. */}
       {xpFloat && (
         <div
           key={xpFloat.key}
-          className="animate-xp-float fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-amber-400 text-white font-display font-black text-lg px-5 py-2 rounded-full shadow-lg"
+          className="animate-xp-float fixed top-24 left-1/2 -translate-x-1/2 z-50 font-display font-black text-lg px-5 py-2.5 rounded-full"
+          style={{ background: '#FFC400', color: '#7A5200', boxShadow: '0 4px 0 #D79E00' }}
         >
-          +{xpFloat.amount} XP
+          +{xpFloat.amount} ⭐
         </div>
       )}
 
       {activeGame ? (
-        /* ── Active game wrapper ── */
-        <div className="bg-white rounded-[28px] p-6 md:p-8 anim-fade-up" style={{ boxShadow: '0 8px 0 rgba(20,90,140,.14)' }}>
-          {/* Header bar */}
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
-            <button
-              onClick={() => setActiveGame(null)}
-              className="flex items-center justify-center gap-2 text-white font-display font-black text-sm rounded-2xl px-5 py-2.5
-                         transition-transform cursor-pointer hover:-translate-y-0.5 active:translate-y-0.5"
-              style={{ minHeight: 44, minWidth: 64, background: theme.accent, boxShadow: `0 4px 0 ${theme.accentDark}` }}
-            >
-              <ArrowLeft size={18} strokeWidth={3} />
-              {!isPreReader && <span>Back</span>}
-            </button>
-            <span className="text-2xl anim-bob">{theme.mascot}</span>
+        /* ── Playing ── */
+        <div className="flex flex-col gap-4">
+          {/* The way out of a game. It used to be an arrow with no word next to
+              it for Class 1–2, which is the one control a stuck child needs to
+              find; it now always says what it does. */}
+          <div className="flex items-center gap-3">
+            <Button tone="quiet" onClick={() => setActiveGame(null)} icon={<ArrowLeft size={20} strokeWidth={3} />}>
+              Back
+            </Button>
+            <div className="flex items-center gap-2.5 min-w-0">
+              <Pic emoji={activeGame.icon} size={34} />
+              <span className="font-display font-black text-lg truncate" style={{ color: T.ink.strong }}>
+                {activeGame.name}
+              </span>
+            </div>
           </div>
 
-          {renderActiveGame()}
+          <Card className="anim-fade-up">{renderActiveGame()}</Card>
         </div>
       ) : (
-        /* ── Gallery ── */
-        renderGallery()
+        /* ── Choosing ── */
+        <>
+          <PageHeader
+            emoji="🎮"
+            artKey="nav-games"
+            title="Games"
+            hint="Play, and collect stars for every chapter"
+          />
+          {renderGallery()}
+        </>
       )}
     </div>
   );
@@ -813,7 +893,7 @@ const CountAddEngine: React.FC<EngineProps> = ({ game, numChoices, isPreReader, 
           className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer"
           style={{ minHeight: 48, minWidth: 120 }}
         >
-          🔄 {isPreReader ? '' : 'Play Again'}
+          🔄 Play Again
         </button>
       </div>
     );
@@ -901,236 +981,13 @@ const CountAddEngine: React.FC<EngineProps> = ({ game, numChoices, isPreReader, 
 
 /* ═══════════════════════════════════════════════════════════
    ENGINE: LETTER TRACE
+   Lives in ./games/LetterTracingEngine.tsx, which runs the real
+   EducationAI tracing engine (src/lib/tracing). The 222-line
+   proximity-only lookalike that used to sit here was removed when
+   that port landed — it scored nothing about stroke order or
+   direction, so a scribble passed.
    ═══════════════════════════════════════════════════════════ */
 
-interface TraceProps {
-  game: GameItem;
-  isPreReader: boolean;
-  onFinish: (gameId: string, stars: number, score: number) => void;
-}
-
-const LetterTraceEngine: React.FC<TraceProps> = ({ game, isPreReader, onFinish }) => {
-  const lettersRaw = game.params.letters ?? ['A'];
-  const letterCase = game.params.case ?? 'upper';
-  const letters = lettersRaw.map((l) => (letterCase === 'lower' ? l.toLowerCase() : l.toUpperCase()));
-
-  const [letterIndex, setLetterIndex] = useState(0);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [traceDone, setTraceDone] = useState(false);
-  const [allDone, setAllDone] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  const currentLetter = letters[letterIndex] ?? letters[0];
-
-  const initCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    setTraceDone(false);
-
-    /* Dotted guide letter */
-    ctx.font = 'bold 200px Outfit, sans-serif';
-    ctx.strokeStyle = '#e2e8f0';
-    ctx.lineWidth = 4;
-    ctx.setLineDash([8, 8]);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.strokeText(currentLetter, canvas.width / 2, canvas.height / 2);
-
-    ctx.setLineDash([]);
-    ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 14;
-    ctx.lineCap = 'round';
-  }, [currentLetter]);
-
-  useEffect(() => {
-    const timer = setTimeout(initCanvas, 60);
-    return () => clearTimeout(timer);
-  }, [initCanvas, letterIndex]);
-
-  /* ── Drawing helpers (shared by mouse + touch) ── */
-  const getCanvasCoords = (clientX: number, clientY: number) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
-  };
-
-  const beginStroke = (x: number, y: number) => {
-    const ctx = canvasRef.current?.getContext('2d');
-    if (!ctx) return;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    setIsDrawing(true);
-  };
-
-  const continueStroke = (x: number, y: number) => {
-    if (!isDrawing) return;
-    const ctx = canvasRef.current?.getContext('2d');
-    if (!ctx) return;
-    ctx.lineTo(x, y);
-    ctx.stroke();
-  };
-
-  const endStroke = () => setIsDrawing(false);
-
-  /* ── Mouse events ── */
-  const onMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const coords = getCanvasCoords(e.clientX, e.clientY);
-    if (coords) beginStroke(coords.x, coords.y);
-  };
-  const onMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const coords = getCanvasCoords(e.clientX, e.clientY);
-    if (coords) continueStroke(coords.x, coords.y);
-  };
-
-  /* ── Touch events ── */
-  const onTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    const touch = e.touches[0];
-    if (!touch) return;
-    const coords = getCanvasCoords(touch.clientX, touch.clientY);
-    if (coords) beginStroke(coords.x, coords.y);
-  };
-  const onTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    const touch = e.touches[0];
-    if (!touch) return;
-    const coords = getCanvasCoords(touch.clientX, touch.clientY);
-    if (coords) continueStroke(coords.x, coords.y);
-  };
-  const onTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    endStroke();
-  };
-
-  /* ── Verify / Next ── */
-  const handleVerify = () => {
-    setTraceDone(true);
-    confetti({ particleCount: 40, spread: 40 });
-
-    if (letterIndex + 1 >= letters.length) {
-      /* All letters traced – 3 stars always */
-      setAllDone(true);
-      onFinish(game.gameId, 3, letters.length);
-      confetti({ particleCount: 100, spread: 70, colors: ['#f59e0b', '#22c55e', '#3b82f6'] });
-    }
-  };
-
-  const handleNext = () => {
-    setLetterIndex((i) => i + 1);
-  };
-
-  const handlePlayAgain = () => {
-    setLetterIndex(0);
-    setAllDone(false);
-    setTraceDone(false);
-  };
-
-  if (allDone) {
-    return (
-      <div className="flex flex-col items-center gap-5 py-10 anim-fade-up">
-        <span className="text-6xl">✨</span>
-        <div className="flex gap-1">
-          {[1, 2, 3].map((n) => (
-            <Star key={n} size={32} className="fill-amber-400 text-amber-400" />
-          ))}
-        </div>
-        {!isPreReader && (
-          <p className="font-display font-bold text-slate-600 text-sm">
-            All {letters.length} letters traced!
-          </p>
-        )}
-        <button
-          onClick={handlePlayAgain}
-          className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer"
-          style={{ minHeight: 48 }}
-        >
-          🔄 {isPreReader ? '' : 'Play Again'}
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col items-center gap-5 max-w-md mx-auto anim-fade-up">
-      {/* Letter progress */}
-      <div className="flex gap-2">
-        {letters.map((l, i) => (
-          <div
-            key={i}
-            className={`w-9 h-9 rounded-xl flex items-center justify-center font-display font-bold text-sm transition-all ${
-              i < letterIndex
-                ? 'bg-emerald-400 text-white'
-                : i === letterIndex
-                ? 'bg-amber-400 text-white scale-110'
-                : 'bg-slate-100 text-slate-400'
-            }`}
-          >
-            {l}
-          </div>
-        ))}
-      </div>
-
-      {/* Canvas */}
-      <div
-        className="border-2 border-amber-200 rounded-3xl overflow-hidden bg-amber-50/30 shadow-inner relative"
-        style={{ touchAction: 'none' }}
-      >
-        <canvas
-          ref={canvasRef}
-          width={340}
-          height={340}
-          onMouseDown={onMouseDown}
-          onMouseMove={onMouseMove}
-          onMouseUp={endStroke}
-          onMouseLeave={endStroke}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-          className="cursor-crosshair block w-full h-auto"
-          style={{ maxWidth: 340 }}
-        />
-      </div>
-
-      {/* Buttons */}
-      <div className="flex gap-3 w-full max-w-xs">
-        <button
-          onClick={initCanvas}
-          className="flex-1 py-3 border-2 border-slate-200 hover:bg-slate-50 text-slate-500 font-display font-bold text-sm rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-all"
-          style={{ minHeight: 48 }}
-        >
-          🔄
-        </button>
-
-        {traceDone && letterIndex + 1 < letters.length ? (
-          <button
-            onClick={handleNext}
-            className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-display font-bold text-sm rounded-2xl flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all animate-glow-green"
-            style={{ minHeight: 48 }}
-          >
-            ✅ {isPreReader ? '→' : 'Next'}
-          </button>
-        ) : (
-          <button
-            onClick={handleVerify}
-            disabled={traceDone}
-            className="flex-1 py-3 bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-2xl flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all disabled:opacity-40"
-            style={{ minHeight: 48 }}
-          >
-            {traceDone ? '✅' : '✓'}
-            {!isPreReader && (traceDone ? ' Done!' : ' Check')}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-};
 
 /* ═══════════════════════════════════════════════════════════
    ENGINE: PHONICS POP (silent-lab — emoji + letter match)
@@ -1274,7 +1131,7 @@ const PhonicsPopEngine: React.FC<EngineProps> = ({ game, numChoices, isPreReader
           className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer"
           style={{ minHeight: 48 }}
         >
-          🔄 {isPreReader ? '' : 'Play Again'}
+          🔄 Play Again
         </button>
       </div>
     );

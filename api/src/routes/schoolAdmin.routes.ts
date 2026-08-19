@@ -13,6 +13,8 @@ import {
   updateStudentProfileController,
   updateTeacherProfileController,
   setStaffActiveController,
+  exitStaffController,
+  reinstateStaffController,
   resetTeacherPasswordController,
   listLabInchargesController,
   addSingleLabInchargeController,
@@ -43,6 +45,7 @@ import {
   deleteSlotController,
   createExceptionController,
   getSchoolOccurrencesController,
+  importTimetableController,
 } from '../controllers/timetable.controller.js';
 import { listLabsController, createLabController, updateLabController } from '../controllers/lab.controller.js';
 import {
@@ -52,6 +55,8 @@ import {
   bulkResetCredentialsController,
   bulkMoveController,
   bulkSetActiveController,
+  bulkExitController,
+  bulkReinstateController,
 } from '../controllers/studentDirectory.controller.js';
 import {
   listSchoolIngestionJobsController,
@@ -90,6 +95,11 @@ schoolAdminRouter.get('/students/directory/export', schoolAdminExportController)
 schoolAdminRouter.post('/students/bulk/reset-credentials', bulkResetCredentialsController);
 schoolAdminRouter.post('/students/bulk/move', bulkMoveController);
 schoolAdminRouter.post('/students/bulk/active', bulkSetActiveController);
+// Archiving a leaver, and undoing it. Deliberately not a DELETE —
+// student_profiles is referenced NO ACTION by twelve tables, and a leaver's
+// marks remain part of their record.
+schoolAdminRouter.post('/students/bulk/exit', bulkExitController);
+schoolAdminRouter.post('/students/bulk/reinstate', bulkReinstateController);
 
 schoolAdminRouter.get('/students', listStudentsController);
 schoolAdminRouter.post('/students', addSingleStudentController);
@@ -102,6 +112,10 @@ schoolAdminRouter.post('/teachers', addSingleTeacherController);
 schoolAdminRouter.post('/teachers/import', upload.single('file'), importTeachersController);
 schoolAdminRouter.patch('/teachers/:id', updateTeacherProfileController);
 schoolAdminRouter.post('/teachers/:id/active', setStaffActiveController);
+// Removing a teacher archives them and releases their classes. Not a DELETE:
+// tasks, exams and live_sessions reference teacher_profiles with NO ACTION.
+schoolAdminRouter.post('/teachers/:id/exit', exitStaffController);
+schoolAdminRouter.post('/teachers/:id/reinstate', reinstateStaffController);
 schoolAdminRouter.post('/teachers/:id/reset-password', resetTeacherPasswordController);
 
 schoolAdminRouter.get('/class-sections', listSectionsController);
@@ -123,6 +137,8 @@ schoolAdminRouter.delete('/teaching-assignments/:id', removeTeachingAssignmentCo
 schoolAdminRouter.get('/lab-incharges', listLabInchargesController);
 schoolAdminRouter.post('/lab-incharges', addSingleLabInchargeController);
 schoolAdminRouter.post('/lab-incharges/:id/active', setStaffActiveController);
+schoolAdminRouter.post('/lab-incharges/:id/exit', exitStaffController);
+schoolAdminRouter.post('/lab-incharges/:id/reinstate', reinstateStaffController);
 schoolAdminRouter.post('/lab-incharges/:id/reset-password', resetLabInchargePasswordController);
 
 schoolAdminRouter.get('/promotion/preview', getPromotionPreviewController);
@@ -139,6 +155,9 @@ schoolAdminRouter.patch('/labs/:id', updateLabController);
 
 schoolAdminRouter.get('/timetable', listTimetableController);
 schoolAdminRouter.post('/timetable', createSlotController);
+// Schools arrive with a timetable already built in a spreadsheet; re-keying it
+// by hand is why the builder went unused.
+schoolAdminRouter.post('/timetable/import', upload.single('file'), importTimetableController);
 schoolAdminRouter.patch('/timetable/:id', updateSlotController);
 schoolAdminRouter.delete('/timetable/:id', deleteSlotController);
 schoolAdminRouter.post('/timetable/:slotId/exceptions', createExceptionController);

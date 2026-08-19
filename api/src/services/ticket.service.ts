@@ -1,5 +1,7 @@
 import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
+import { sendTicketRaisedEmail } from '../lib/mailer.js';
+import { logger } from '../lib/logger.js';
 import type { AuthUser } from '../types/index.js';
 import type { CreateTicketInput, ListTicketsQuery } from '../schemas/ticket.schema.js';
 
@@ -27,7 +29,77 @@ export async function createTicket(user: AuthUser, input: CreateTicketInput) {
     .single();
 
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to create ticket', error.message);
+
+  // Notify the Super Admins out of band. Deliberately not awaited and never
+  // allowed to throw: the ticket is already saved and visible in the inbox, so
+  // a dead SMTP server must not turn a successful report into a 500 for the
+  // school that just told us something is broken.
+  void notifySuperAdminsOfTicket(data, user).catch((err) =>
+    logger.warn({ err, ticketId: data.id }, 'Failed to notify super admins of new ticket'),
+  );
+
   return data;
+}
+
+/**
+ * Row shape returned by TICKET_SELECT, narrowed to what the mail needs.
+ *
+ * The embeds are typed as arrays by the generated client even though a to-one
+ * relationship comes back as a single object, so both shapes are accepted and
+ * normalised by `one()` below.
+ */
+interface TicketRow {
+  id: string;
+  category: string;
+  subject: string;
+  body: string;
+  priority: string;
+  raised_role: string;
+  schools?: unknown;
+  raiser?: unknown;
+}
+
+function one<T>(embed: unknown): T | null {
+  if (!embed) return null;
+  return (Array.isArray(embed) ? (embed[0] as T | undefined) : (embed as T)) ?? null;
+}
+
+async function notifySuperAdminsOfTicket(ticket: TicketRow, raiser: AuthUser): Promise<void> {
+  // A super admin raising a ticket themselves does not need to be told.
+  if (raiser.role === 'super_admin') return;
+
+  const { data: admins, error } = await supabaseAdmin
+    .from('user_profiles')
+    .select('id')
+    .eq('role', 'super_admin')
+    .eq('is_active', true);
+
+  if (error || !admins?.length) return;
+
+  // Addresses live in auth.users, not user_profiles. There are only ever a
+  // handful of super admins, so fetching them one by one is cheaper than
+  // paging the whole auth user list.
+  const school = one<{ name: string; code: string }>(ticket.schools);
+  const raisedBy = one<{ full_name: string }>(ticket.raiser);
+
+  for (const admin of admins) {
+    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(admin.id as string);
+    const to = authUser?.user?.email;
+    if (!to) continue;
+
+    sendTicketRaisedEmail({
+      to,
+      ticketId: ticket.id,
+      subject: ticket.subject,
+      body: ticket.body,
+      category: ticket.category,
+      priority: ticket.priority,
+      raisedByName: raisedBy?.full_name ?? 'Unknown user',
+      raisedByRole: ticket.raised_role,
+      schoolName: school?.name ?? null,
+      schoolCode: school?.code ?? null,
+    });
+  }
 }
 
 export async function listTickets(user: AuthUser, filters: ListTicketsQuery) {

@@ -32,6 +32,27 @@ export async function startSession(teacherId: string, schoolId: string, input: S
     .eq('teacher_id', teacherId)
     .eq('is_active', true);
 
+  // A lab session gets a join code and a scheduled end; an ordinary classroom
+  // session gets neither, because section membership already decides who may
+  // join and the teacher ends it when the lesson ends.
+  let labId: string | null = null;
+  let joinCode: string | null = null;
+  let endsAtExpected: string | null = null;
+
+  if (input.labId) {
+    const { data: lab } = await supabaseAdmin
+      .from('labs')
+      .select('id')
+      .eq('id', input.labId)
+      .eq('school_id', schoolId)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (!lab) throw new ApiError('NOT_FOUND', 'That lab does not exist in this school');
+    labId = lab.id as string;
+    joinCode = await allocateJoinCode();
+    endsAtExpected = input.endsAtExpected ?? (await scheduledEndForNow(schoolId, input.classNum, input.section));
+  }
+
   const { data, error } = await supabaseAdmin
     .from('live_sessions')
     .insert({
@@ -40,12 +61,86 @@ export async function startSession(teacherId: string, schoolId: string, input: S
       class_num: input.classNum,
       section: input.section,
       subject: input.subject ?? null,
+      lab_id: labId,
+      join_code: joinCode,
+      ends_at_expected: endsAtExpected,
     })
     .select()
     .single();
 
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to start session', error.message);
   return data;
+}
+
+/**
+ * A short code a student can read off a board and type without ambiguity.
+ *
+ * I, O, 0 and 1 are excluded — in a lab, across a room, on a projector, those
+ * are the characters that get mistyped. Six characters from a 32-symbol
+ * alphabet is ~10^9 combinations, and only codes for *currently running*
+ * sessions have to be distinct, so collisions are vanishingly rare; the retry
+ * loop exists for correctness rather than because it is expected to run.
+ */
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+async function allocateJoinCode(): Promise<string> {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    let code = '';
+    for (let i = 0; i < 6; i += 1) {
+      code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+    }
+    const { data: clash } = await supabaseAdmin
+      .from('live_sessions')
+      .select('id')
+      .eq('join_code', code)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (!clash) return code;
+  }
+  throw new ApiError('INTERNAL_ERROR', 'Could not allocate a join code — try again');
+}
+
+/**
+ * The end time of the timetable period this section is in right now.
+ *
+ * Best-effort: a lab session started off-timetable (a catch-up, a club) simply
+ * has no scheduled end and shows a stopwatch instead of a countdown.
+ */
+async function scheduledEndForNow(
+  schoolId: string,
+  classNum: number,
+  section: string,
+): Promise<string | null> {
+  const now = new Date();
+  // Postgres day_of_week here is 1=Mon..6=Sat; JS getDay() is 0=Sun..6=Sat.
+  const jsDay = now.getDay();
+  if (jsDay === 0) return null; // Sunday — no periods
+  const dayOfWeek = jsDay;
+
+  const { data: section_ } = await supabaseAdmin
+    .from('class_sections')
+    .select('id')
+    .eq('school_id', schoolId)
+    .eq('class_num', classNum)
+    .ilike('section_label', section)
+    .maybeSingle();
+  if (!section_) return null;
+
+  const hhmm = now.toTimeString().slice(0, 8);
+  const { data: slot } = await supabaseAdmin
+    .from('timetable_slots')
+    .select('ends_at')
+    .eq('class_section_id', section_.id)
+    .eq('day_of_week', dayOfWeek)
+    .lte('starts_at', hhmm)
+    .gte('ends_at', hhmm)
+    .maybeSingle();
+  if (!slot) return null;
+
+  const [h, m] = String(slot.ends_at).split(':');
+  const end = new Date(now);
+  end.setHours(Number(h), Number(m), 0, 0);
+  return end.toISOString();
 }
 
 export async function endSession(teacherId: string, sessionId: string) {
@@ -159,6 +254,111 @@ export async function joinSession(studentId: string, sessionId: string) {
   await logStreakActivity(studentId, 0);
 
   return data;
+}
+
+/**
+ * Join a lab session by typing its code.
+ *
+ * The code is the authorisation, but not on its own — the session still has to
+ * belong to the student's own school. Without that check a code guessed or
+ * passed between schools would let an outsider into a live register.
+ */
+export async function joinSessionByCode(studentId: string, schoolId: string, rawCode: string) {
+  const code = rawCode.trim().toUpperCase();
+  if (!/^[A-Z0-9]{4,8}$/.test(code)) {
+    throw new ApiError('VALIDATION_ERROR', 'That does not look like a session code');
+  }
+
+  const { data: session } = await supabaseAdmin
+    .from('live_sessions')
+    .select('id, school_id, class_num, section, subject, lab_id, ends_at_expected, labs(name)')
+    .eq('join_code', code)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  // Deliberately the same message for "no such code" and "another school's
+  // code": a student probing codes should not learn which ones exist.
+  if (!session || session.school_id !== schoolId) {
+    throw new ApiError('NOT_FOUND', 'No live session is using that code');
+  }
+
+  const { error } = await supabaseAdmin
+    .from('session_participants')
+    .upsert(
+      { session_id: session.id, student_id: studentId, left_at: null },
+      { onConflict: 'session_id,student_id' },
+    );
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to join session', error.message);
+
+  await logStreakActivity(studentId, 0);
+  return session;
+}
+
+/**
+ * The attendance register for a session: everyone on the roster, present or
+ * not. Absentees are rows with attended=false rather than missing entries, so
+ * the teacher marks a register rather than reconciling two lists.
+ */
+export async function getAttendance(teacherId: string, sessionId: string) {
+  const { data: session } = await supabaseAdmin
+    .from('live_sessions')
+    .select('id, teacher_id, class_num, section, subject, started_at, ends_at_expected, labs(name)')
+    .eq('id', sessionId)
+    .maybeSingle();
+  if (!session || session.teacher_id !== teacherId) {
+    throw new ApiError('NOT_FOUND', 'Session not found or not yours');
+  }
+
+  const { data, error } = await supabaseAdmin.rpc('lab_session_attendance', { p_session_id: sessionId });
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to load attendance', error.message);
+
+  const rows = data ?? [];
+  return {
+    session,
+    present: rows.filter((r: { attended: boolean }) => r.attended).length,
+    total: rows.length,
+    rows,
+  };
+}
+
+/**
+ * Mark a student present who could not join themselves — a broken machine, a
+ * forgotten password. Flagged as teacher-marked so the register still
+ * distinguishes "was here" from "connected".
+ */
+export async function markAttendance(
+  teacherId: string,
+  sessionId: string,
+  studentId: string,
+  present: boolean,
+) {
+  const { data: session } = await supabaseAdmin
+    .from('live_sessions')
+    .select('id, teacher_id')
+    .eq('id', sessionId)
+    .maybeSingle();
+  if (!session || session.teacher_id !== teacherId) {
+    throw new ApiError('NOT_FOUND', 'Session not found or not yours');
+  }
+
+  if (!present) {
+    const { error } = await supabaseAdmin
+      .from('session_participants')
+      .delete()
+      .eq('session_id', sessionId)
+      .eq('student_id', studentId);
+    if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to update attendance', error.message);
+    return { studentId, present: false };
+  }
+
+  const { error } = await supabaseAdmin
+    .from('session_participants')
+    .upsert(
+      { session_id: sessionId, student_id: studentId, marked_by_teacher: true, left_at: null },
+      { onConflict: 'session_id,student_id' },
+    );
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to update attendance', error.message);
+  return { studentId, present: true };
 }
 
 export async function setRaisedHand(studentId: string, sessionId: string, raised: boolean) {

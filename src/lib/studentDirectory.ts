@@ -48,11 +48,13 @@ export interface DirectoryFilters {
   section: string;
   status: 'all' | 'active' | 'never';
   enabled: 'all' | 'enabled' | 'disabled';
+  /** Hides students who have left unless widened. Absent = 'current'. */
+  enrolment?: 'current' | 'left' | 'all';
   schoolId: string;
 }
 
 export const EMPTY_FILTERS: DirectoryFilters = {
-  search: '', classNum: '', section: '', status: 'all', enabled: 'all', schoolId: '',
+  search: '', classNum: '', section: '', status: 'all', enabled: 'all', enrolment: 'current', schoolId: '',
 };
 
 /** Only send params the server should act on — empty strings would otherwise
@@ -67,6 +69,8 @@ export function toQuery(
     section: filters.section || undefined,
     status: filters.status === 'all' ? undefined : filters.status,
     enabled: filters.enabled === 'all' ? undefined : filters.enabled,
+    // Sent only when widened; the server already defaults to current-only.
+    enrolment: !filters.enrolment || filters.enrolment === 'current' ? undefined : filters.enrolment,
     schoolId: filters.schoolId || undefined,
     ...extra,
   };
@@ -158,7 +162,8 @@ export function useStudentDirectory({
 
   const hasActiveFilters =
     Boolean(effectiveFilters.search) || Boolean(filters.classNum) || Boolean(filters.section) ||
-    filters.status !== 'all' || filters.enabled !== 'all' || Boolean(filters.schoolId);
+    filters.status !== 'all' || filters.enabled !== 'all' ||
+    (Boolean(filters.enrolment) && filters.enrolment !== 'current') || Boolean(filters.schoolId);
 
   return {
     filters, setFilters, resetFilters, hasActiveFilters,

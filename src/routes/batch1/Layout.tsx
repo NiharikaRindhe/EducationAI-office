@@ -1,23 +1,38 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { SessionEndWatcher } from '../../components/shared/SessionEndWatcher';
-import { LogOut } from 'lucide-react';
+import { LogOut, Home as HomeIcon, User, ChevronDown, Trophy } from 'lucide-react';
 import { getClassTheme } from './theme';
+import { Pic, IconButton, T } from './ui';
+import { Scene } from './Scene';
 
 /**
- * Batch 1 Layout — "Adventure Island" shell for ages 6–9.
+ * Batch 1 shell — the frame around every Class 1–4 screen.
  *
- * The whole batch lives inside one scene: sky gradient, a slowly spinning
- * sun, drifting clouds. Pages render on top of it. No sidebar, no topbar —
- * inner pages get one giant 🏠 button; Home IS the navigation.
+ *  1. ONE HEADER, EVERY PAGE. Home used to draw its own header (avatar, stars,
+ *     streak, exit) while inner pages drew a different one — so the child's
+ *     stars vanished the moment they opened a game and the exit button moved.
+ *     The header lives here now; only its leftmost slot changes, holding a
+ *     greeting on Home and a Home button elsewhere.
+ *
+ *  2. THE PAGE SITS IN A FRAME, ON A SCENE. Content used to float directly on
+ *     a flat gradient, which is why a short page read as an unfinished screen
+ *     with a lot of leftover sky. The scene (hills, school, trees, clouds) is
+ *     the world; the frame is the paper laid on top of it, so a page holding
+ *     only two cards still looks like a finished place.
+ *
+ *  3. LOG OUT LIVES BEHIND A MENU. It sat as a bare icon beside the stars, one
+ *     mis-tap from ending a six-year-old's session in the middle of a lesson.
  */
 export const Batch1Layout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { batchId, currentClass, studentName, studentAvatar } = useApp();
+  const { batchId, currentClass, studentName, studentAvatar, studentXP, studentStreak } = useApp();
   const { logout } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (currentClass < 1 || currentClass > 4) {
@@ -25,10 +40,25 @@ export const Batch1Layout: React.FC = () => {
     }
   }, [batchId, currentClass, navigate]);
 
+  // Close on an outside tap — children tap away rather than press Escape.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (e: PointerEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown);
+    return () => document.removeEventListener('pointerdown', onDown);
+  }, [menuOpen]);
+
+  useEffect(() => { setMenuOpen(false); }, [location.pathname]);
+
   if (currentClass < 1 || currentClass > 4) return null;
 
   const theme = getClassTheme(currentClass);
-  const isHome = location.pathname.endsWith('/home') || location.pathname === '/batch1' || location.pathname === '/batch1/';
+  const isHome =
+    location.pathname.endsWith('/home') ||
+    location.pathname === '/batch1' ||
+    location.pathname === '/batch1/';
 
   const handleLogout = () => {
     logout();
@@ -36,80 +66,146 @@ export const Batch1Layout: React.FC = () => {
   };
 
   return (
-    <div
-      className="min-h-screen relative overflow-hidden flex flex-col"
-      style={{ background: 'linear-gradient(180deg,#5BC9FF 0%,#8ADAFF 34%,#C8F0FF 68%,#E9FAFF 100%)' }}
-    >
+    <div className="min-h-screen relative flex flex-col">
       <SessionEndWatcher />
+      <Scene />
 
-      {/* ── Scene: sun + clouds (behind everything) ── */}
-      <div className="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
-        {/* Sun */}
+      <div className="relative z-10 flex-1 flex flex-col w-full max-w-[1560px] mx-auto px-3 sm:px-6 py-3 sm:py-5">
+        {/* The frame: everything the child interacts with sits on this sheet. */}
         <div
-          className="absolute top-6 right-10 w-20 h-20 rounded-full animate-spin-slow"
+          className="flex-1 flex flex-col bg-white/78 px-3 sm:px-6 lg:px-8 py-4 sm:py-5"
           style={{
-            background: 'radial-gradient(circle at 35% 35%, #FFF6C9, #FFD93B 70%)',
-            boxShadow: '0 0 60px 22px rgba(255,217,59,.45)',
+            borderRadius: 34,
+            border: '1px solid rgba(255,255,255,.85)',
+            boxShadow: '0 18px 44px rgba(24,86,132,.16), inset 0 2px 0 rgba(255,255,255,.9)',
           }}
-        />
-        {/* Clouds */}
-        <div className="absolute top-16 left-0 cloud-drift">
-          <div className="relative w-28 h-8 bg-white/90 rounded-full">
-            <div className="absolute w-12 h-12 bg-white/90 rounded-full -top-6 left-4" />
-            <div className="absolute w-9 h-9 bg-white/90 rounded-full -top-4 left-14" />
-          </div>
-        </div>
-        <div className="absolute top-36 left-0 cloud-drift-rtl opacity-70">
-          <div className="relative w-20 h-6 bg-white rounded-full">
-            <div className="absolute w-9 h-9 bg-white rounded-full -top-4 left-3" />
-            <div className="absolute w-7 h-7 bg-white rounded-full -top-3 left-10" />
-          </div>
-        </div>
-        {/* Sparkles */}
-        <span className="absolute anim-twinkle text-lg" style={{ top: 90, left: '22%' }}>✦</span>
-        <span className="absolute anim-twinkle text-lg" style={{ top: 55, left: '55%', animationDelay: '1.2s' }}>✦</span>
-        <span className="absolute anim-twinkle text-lg" style={{ top: 140, left: '78%', animationDelay: '.6s' }}>✦</span>
-      </div>
+        >
+          {/* ── Header ── */}
+          <header className="flex items-center gap-3 mb-4">
+            {isHome ? (
+              <div className="flex items-center gap-3 min-w-0">
+                {/* The child's own face, ringed in their class colour. */}
+                <span
+                  className="relative flex items-center justify-center shrink-0 rounded-full"
+                  style={{
+                    width: 62, height: 62,
+                    background: '#FFFFFF',
+                    border: `4px solid ${theme.accent}`,
+                    boxShadow: `0 3px 0 ${theme.accentDark}`,
+                  }}
+                >
+                  <Pic emoji={studentAvatar || theme.mascot} size={36} />
+                </span>
+                <span className="min-w-0">
+                  <span
+                    className="block font-display font-black text-xl sm:text-2xl leading-tight truncate"
+                    style={{ color: T.ink.strong }}
+                  >
+                    Hi {studentName}!
+                  </span>
+                  <span className="flex items-center gap-1.5 text-xs sm:text-sm font-bold" style={{ color: T.ink.muted }}>
+                    Class {currentClass} · {theme.teamName}
+                    <Pic emoji={theme.mascot} size={16} />
+                  </span>
+                </span>
+              </div>
+            ) : (
+              <IconButton to="/batch1/home" label="Go to Home">
+                <HomeIcon size={22} />
+              </IconButton>
+            )}
 
-      {/* ── Minimal header on inner pages: 🏠 + name + logout ── */}
-      {!isHome && (
-        <header className="relative z-10 flex items-center justify-between px-4 py-3 sm:px-6">
-          <Link
-            to="/batch1/home"
-            className="w-14 h-14 sm:w-16 sm:h-16 rounded-3xl bg-white flex items-center justify-center
-                       text-3xl sm:text-4xl transition-transform duration-150 hover:-translate-y-1 active:translate-y-1 select-none"
-            style={{ boxShadow: '0 5px 0 rgba(20,90,140,.18)' }}
-            aria-label="Go Home"
-          >
-            🏠
-          </Link>
+            <div className="flex-1" />
 
-          <div className="flex items-center gap-3">
-            <div
-              className="flex items-center gap-2 bg-white rounded-2xl px-4 py-2"
-              style={{ boxShadow: '0 4px 0 rgba(20,90,140,.14)' }}
-            >
-              <span className="text-2xl select-none">{studentAvatar || theme.mascot}</span>
-              <span className="font-display font-black text-sm hidden sm:inline" style={{ color: '#17425F' }}>
-                {studentName}
-              </span>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <HeaderStat emoji="⭐" label="Stars" value={studentXP.toLocaleString()} />
+              <div className="hidden sm:block">
+                <HeaderStat
+                  emoji="🔥"
+                  label="Streak"
+                  value={`${studentStreak} ${studentStreak === 1 ? 'day' : 'days'}`}
+                />
+              </div>
+
+              <div className="relative" ref={menuRef}>
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen((o) => !o)}
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                  aria-label="Your account"
+                  className="flex items-center gap-1 bg-white px-3 transition-transform duration-100 active:translate-y-[2px] cursor-pointer"
+                  style={{
+                    height: 56, borderRadius: 999,
+                    border: `2px solid ${T.surface.line}`,
+                    boxShadow: '0 3px 0 rgba(20,90,140,.10)',
+                    color: T.ink.muted,
+                  }}
+                >
+                  <User size={22} />
+                  <ChevronDown size={16} className={`transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {menuOpen && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 top-[64px] w-56 bg-white p-2 z-50 anim-fade-up"
+                    style={{
+                      borderRadius: T.radius.md,
+                      boxShadow: '0 14px 34px rgba(24,86,132,.22)',
+                      border: `1px solid ${T.surface.line}`,
+                    }}
+                  >
+                    <Link
+                      to="/batch1/my-stuff"
+                      role="menuitem"
+                      className="flex items-center gap-3 px-3 py-3 font-display font-black text-sm hover:bg-slate-50"
+                      style={{ borderRadius: T.radius.sm, color: T.ink.strong }}
+                    >
+                      <Trophy size={19} className="text-amber-500" />
+                      My Trophies
+                    </Link>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-3 px-3 py-3 font-display font-black text-sm hover:bg-rose-50 cursor-pointer"
+                      style={{ borderRadius: T.radius.sm, color: '#D2453F' }}
+                    >
+                      <LogOut size={19} />
+                      Log out
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-            <button
-              onClick={handleLogout}
-              className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/70 hover:bg-white border-2 border-white/80
-                         flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
-              aria-label="Log out"
-            >
-              <LogOut size={18} />
-            </button>
-          </div>
-        </header>
-      )}
+          </header>
 
-      {/* ── Page content — fill the screen on lab monitors ── */}
-      <main className={`relative z-10 flex-1 w-full max-w-[1700px] mx-auto px-4 sm:px-8 lg:px-14 ${isHome ? 'py-4' : 'py-2 pb-10'}`}>
-        <Outlet />
-      </main>
+          {/* ── Page content ── */}
+          <main className="flex-1 flex flex-col">
+            <Outlet />
+          </main>
+        </div>
+      </div>
     </div>
   );
 };
+
+/** Stars / streak. Wider than a plain chip so the label reads as a word rather
+ *  than an all-caps abbreviation a six-year-old has to decode. */
+const HeaderStat: React.FC<{ emoji: string; label: string; value: React.ReactNode }> = ({ emoji, label, value }) => (
+  <div
+    className="flex items-center gap-2.5 bg-white px-3.5 sm:px-4"
+    style={{
+      height: 56, borderRadius: T.radius.md,
+      border: `2px solid ${T.surface.line}`,
+      boxShadow: '0 3px 0 rgba(20,90,140,.10)',
+    }}
+  >
+    <Pic emoji={emoji} size={26} />
+    <span className="leading-none">
+      <span className="block text-[11px] font-bold mb-1" style={{ color: T.ink.muted }}>{label}</span>
+      <span className="block font-display font-black text-base" style={{ color: T.ink.strong }}>{value}</span>
+    </span>
+  </div>
+);

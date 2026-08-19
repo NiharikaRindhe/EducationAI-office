@@ -18,7 +18,7 @@ import { NotFound } from './routes/public/NotFound';
 import { Batch1Layout } from './routes/batch1/Layout';
 import { Batch1Home } from './routes/batch1/Home';
 import { Batch1Stories } from './routes/batch1/Stories';
-import { Batch1Exams } from './routes/batch1/Exams';
+import { Batch1Quizzes } from './routes/batch1/Quizzes';
 import { Batch1Tasks } from './routes/batch1/Tasks';
 import { Batch1Games } from './routes/batch1/Games';
 import { Batch1MyStuff } from './routes/batch1/MyStuff';
@@ -154,7 +154,7 @@ function App() {
               <Route index element={<Navigate to="/batch1/home" replace />} />
               <Route path="home" element={<Batch1Home />} />
               <Route path="stories" element={<Batch1Stories />} />
-              <Route path="exams" element={<Batch1Exams />} />
+              <Route path="exams" element={<Batch1Quizzes />} />
               <Route path="tasks" element={<Batch1Tasks />} />
               <Route path="games" element={<Batch1Games />} />
               <Route path="my-stuff" element={<Batch1MyStuff />} />

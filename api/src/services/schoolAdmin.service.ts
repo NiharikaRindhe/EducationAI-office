@@ -508,6 +508,216 @@ export async function setStaffActive(
   return { id: userId, fullName: staff.full_name, role: staff.role, isActive };
 }
 
+/**
+ * Remove a teacher or lab in-charge from the school.
+ *
+ * This is the "delete" action on the staff lists, and like the student one it
+ * records a departure rather than destroying the row. tasks, exams,
+ * live_sessions and announcements all reference teacher_profiles with NO
+ * ACTION, so the database refuses to delete a teacher who ever set an exam —
+ * and an exam's author is part of its record regardless.
+ *
+ * What the school actually wants happens either way: the person disappears
+ * from the staff list, loses their login, and releases anything they were
+ * holding. A departing teacher is unassigned from their classes so nobody is
+ * left with a ghost class teacher or a timetable slot nobody will turn up to.
+ */
+export async function exitStaff(
+  schoolId: string,
+  userId: string,
+  reason: string | null,
+  actorId: string,
+) {
+  const { data: staff, error: readError } = await supabaseAdmin
+    .from('user_profiles')
+    .select('id, full_name, role')
+    .eq('id', userId)
+    .eq('school_id', schoolId)
+    .in('role', ['teacher', 'lab_incharge'])
+    .maybeSingle();
+  if (readError) throw new ApiError('INTERNAL_ERROR', 'Failed to read staff account', readError.message);
+  if (!staff) throw new ApiError('NOT_FOUND', 'Staff account not found in this school');
+
+  const now = new Date().toISOString();
+  const { error } = await supabaseAdmin
+    .from('user_profiles')
+    .update({ exited_at: now, exit_reason: reason, is_active: false, updated_at: now })
+    .eq('id', userId);
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to remove staff member', error.message);
+
+  // Release their teaching commitments. class_sections.class_teacher_id and
+  // timetable_slots.teacher_id are both ON DELETE SET NULL, but nothing is
+  // being deleted here, so they have to be cleared explicitly.
+  //
+  // Exactly what was released is recorded below rather than just how many.
+  // A count tells an admin who mis-clicked that something is gone without
+  // telling them what to put back, and it makes reinstate unable to undo.
+  let released: { classSectionId: string; subject: string }[] = [];
+  let releasedSectionIds: string[] = [];
+  if (staff.role === 'teacher') {
+    const { data: assignments } = await supabaseAdmin
+      .from('teaching_assignments')
+      .select('class_section_id, subject')
+      .eq('teacher_id', userId)
+      .eq('school_id', schoolId);
+    released = (assignments ?? []).map((a) => ({
+      classSectionId: a.class_section_id as string,
+      subject: a.subject as string,
+    }));
+
+    const { data: sections } = await supabaseAdmin
+      .from('class_sections')
+      .select('id')
+      .eq('class_teacher_id', userId)
+      .eq('school_id', schoolId);
+    releasedSectionIds = (sections ?? []).map((s) => s.id as string);
+
+    if (released.length) {
+      await supabaseAdmin
+        .from('teaching_assignments')
+        .delete()
+        .eq('teacher_id', userId)
+        .eq('school_id', schoolId);
+    }
+    if (releasedSectionIds.length) {
+      await supabaseAdmin
+        .from('class_sections')
+        .update({ class_teacher_id: null })
+        .eq('class_teacher_id', userId)
+        .eq('school_id', schoolId);
+    }
+  }
+
+  const releasedAssignments = released.length;
+  const releasedSections = releasedSectionIds.length;
+
+  await writeAuditLog({
+    schoolId,
+    actorId,
+    action: 'staff.exited',
+    entity: staff.role as string,
+    entityId: userId,
+    metadata: {
+      fullName: staff.full_name,
+      reason,
+      releasedAssignments,
+      releasedSections,
+      // The detail reinstate reads back to restore the teacher's timetable.
+      assignments: released,
+      sectionIds: releasedSectionIds,
+    },
+  });
+
+  await revokeUserSessions(userId, 'staff_exited', { actorId, schoolId });
+
+  return {
+    id: userId,
+    fullName: staff.full_name,
+    role: staff.role,
+    releasedAssignments,
+    releasedSections,
+  };
+}
+
+/**
+ * Undo a staff exit, putting back the classes the exit released.
+ *
+ * Most reinstates are undoing a mis-click on the wrong row, so leaving the
+ * teacher present but stripped of every class would be a half-undo that the
+ * admin then has to repair by hand. The exit audit entry records exactly what
+ * it took away, so this can put it back.
+ *
+ * Restoration is best-effort: a section deleted since the exit, or a subject
+ * already reassigned to someone else, is skipped rather than failing the
+ * reinstate. The count of what actually came back is returned so the UI can
+ * tell the admin when something needs re-doing manually.
+ */
+export async function reinstateStaff(schoolId: string, userId: string, actorId: string) {
+  const { data: staff, error: readError } = await supabaseAdmin
+    .from('user_profiles')
+    .select('id, full_name, role')
+    .eq('id', userId)
+    .eq('school_id', schoolId)
+    .in('role', ['teacher', 'lab_incharge'])
+    .maybeSingle();
+  if (readError) throw new ApiError('INTERNAL_ERROR', 'Failed to read staff account', readError.message);
+  if (!staff) throw new ApiError('NOT_FOUND', 'Staff account not found in this school');
+
+  const now = new Date().toISOString();
+  const { error } = await supabaseAdmin
+    .from('user_profiles')
+    .update({ exited_at: null, exit_reason: null, is_active: true, updated_at: now })
+    .eq('id', userId);
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to reinstate staff member', error.message);
+
+  let restoredAssignments = 0;
+  let restoredSections = 0;
+
+  if (staff.role === 'teacher') {
+    const { data: lastExit } = await supabaseAdmin
+      .from('audit_logs')
+      .select('metadata')
+      .eq('entity_id', userId)
+      .eq('action', 'staff.exited')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const meta = (lastExit?.metadata ?? {}) as {
+      assignments?: { classSectionId: string; subject: string }[];
+      sectionIds?: string[];
+    };
+
+    const assignments = meta.assignments ?? [];
+    if (assignments.length) {
+      // onConflict ignore: the unique key is (teacher, section, subject), so a
+      // row that somehow survived is left alone rather than erroring.
+      const { count } = await supabaseAdmin
+        .from('teaching_assignments')
+        .upsert(
+          assignments.map((a) => ({
+            school_id: schoolId,
+            teacher_id: userId,
+            class_section_id: a.classSectionId,
+            subject: a.subject,
+          })),
+          { onConflict: 'teacher_id,class_section_id,subject', ignoreDuplicates: true, count: 'exact' },
+        );
+      restoredAssignments = count ?? 0;
+    }
+
+    const sectionIds = meta.sectionIds ?? [];
+    if (sectionIds.length) {
+      // Only reclaim sections that are still vacant — if someone else has
+      // since been made class teacher, that decision wins.
+      const { count } = await supabaseAdmin
+        .from('class_sections')
+        .update({ class_teacher_id: userId }, { count: 'exact' })
+        .in('id', sectionIds)
+        .is('class_teacher_id', null)
+        .eq('school_id', schoolId);
+      restoredSections = count ?? 0;
+    }
+  }
+
+  await writeAuditLog({
+    schoolId,
+    actorId,
+    action: 'staff.reinstated',
+    entity: staff.role as string,
+    entityId: userId,
+    metadata: { fullName: staff.full_name, restoredAssignments, restoredSections },
+  });
+
+  return {
+    id: userId,
+    fullName: staff.full_name,
+    role: staff.role,
+    restoredAssignments,
+    restoredSections,
+  };
+}
+
 // ─────────────────────────────────────────────────────────────
 //  LISTING
 // ─────────────────────────────────────────────────────────────
@@ -572,13 +782,18 @@ export async function addSingleLabIncharge(schoolId: string, fullName: string): 
   return { fullName, username, password };
 }
 
-export async function listLabIncharges(schoolId: string) {
-  const { data, error } = await supabaseAdmin
+export async function listLabIncharges(schoolId: string, includeLeft = false) {
+  let query = supabaseAdmin
     .from('user_profiles')
-    .select('id, full_name, is_active, has_logged_in_ever')
+    .select('id, full_name, is_active, has_logged_in_ever, exited_at, exit_reason')
     .eq('school_id', schoolId)
     .eq('role', 'lab_incharge');
 
+  // People who have left are out of the list unless asked for, so the staff
+  // count on screen is the staff the school actually has.
+  if (!includeLeft) query = query.is('exited_at', null);
+
+  const { data, error } = await query;
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to list lab in-charges', error.message);
   return data;
 }
@@ -620,13 +835,18 @@ export async function resetLabInchargePassword(
   return { fullName: profile.full_name, username, password };
 }
 
-export async function listTeachers(schoolId: string) {
-  const { data, error } = await supabaseAdmin
+export async function listTeachers(schoolId: string, includeLeft = false) {
+  let query = supabaseAdmin
     .from('user_profiles')
-    .select('id, full_name, is_active, has_logged_in_ever, teacher_profiles(employee_id, specialization, classes_taught)')
+    .select('id, full_name, is_active, has_logged_in_ever, exited_at, exit_reason, teacher_profiles(employee_id, specialization, classes_taught)')
     .eq('school_id', schoolId)
     .eq('role', 'teacher');
 
+  // Departed teachers are hidden by default so the staff list, and the
+  // teacher pickers built from it, only offer people who are still here.
+  if (!includeLeft) query = query.is('exited_at', null);
+
+  const { data, error } = await query;
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to list teachers', error.message);
   return data;
 }

@@ -1,7 +1,13 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { Loader2, AlertCircle, X, Trash2, Plus, FlaskConical, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertCircle, X, Trash2, Plus, FlaskConical, AlertTriangle, UploadCloud } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 import { buildTeacherLabels } from '../../lib/teacherLabel';
+
+interface TimetableImportResult {
+  created: number;
+  replaced: number;
+  errors: { row: number; reason: string; detail?: string }[];
+}
 
 interface SectionRow {
   id: string;
@@ -69,6 +75,13 @@ export const SchoolAdminTimetable: React.FC = () => {
   const [formWarning, setFormWarning] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Bulk import of a timetable the school already has on paper.
+  const [showImport, setShowImport] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [replaceExisting, setReplaceExisting] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [importResult, setImportResult] = useState<TimetableImportResult | null>(null);
 
   const loadStatic = useCallback(async () => {
     try {
@@ -166,6 +179,29 @@ export const SchoolAdminTimetable: React.FC = () => {
     }
   };
 
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportError('');
+    setIsImporting(true);
+    try {
+      const result = await api.upload<TimetableImportResult>(
+        '/school-admin/timetable/import',
+        file,
+        { replaceExisting: String(replaceExisting) },
+      );
+      setImportResult(result);
+      // The grid behind the modal is now stale whichever section is showing.
+      await loadSlots(selectedSectionId);
+    } catch (err) {
+      setImportError(err instanceof ApiClientError ? err.message : 'Could not read that file');
+    } finally {
+      setIsImporting(false);
+      // Clear the input so re-picking the same file fires change again.
+      e.target.value = '';
+    }
+  };
+
   const handleDelete = async () => {
     if (!modalCell?.slot) return;
     setIsDeleting(true);
@@ -195,17 +231,133 @@ export const SchoolAdminTimetable: React.FC = () => {
             Build the weekly period grid per section — assign subject, teacher and lab per period. Conflicts are checked automatically.
           </p>
         </div>
-        <select
-          value={selectedSectionId}
-          onChange={(e) => setSelectedSectionId(e.target.value)}
-          className="px-3 py-2 text-[13px] text-slate-700 bg-white border border-slate-300 rounded-lg outline-none cursor-pointer focus:border-slate-500 min-w-48"
-        >
-          {sections.length === 0 && <option value="">No sections yet</option>}
-          {sections.map((s) => (
-            <option key={s.id} value={s.id}>Class {s.class_num} · {s.section_label}</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          {/* Most schools arrive with the timetable already made in a
+              spreadsheet — building it cell by cell here is the slow path. */}
+          <button
+            onClick={() => { setShowImport(true); setImportResult(null); setImportError(''); }}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50 cursor-pointer"
+          >
+            <UploadCloud size={14} /> Import timetable
+          </button>
+          <select
+            value={selectedSectionId}
+            onChange={(e) => setSelectedSectionId(e.target.value)}
+            className="px-3 py-2 text-[13px] text-slate-700 bg-white border border-slate-300 rounded-lg outline-none cursor-pointer focus:border-slate-500 min-w-48"
+          >
+            {sections.length === 0 && <option value="">No sections yet</option>}
+            {sections.map((s) => (
+              <option key={s.id} value={s.id}>Class {s.class_num} · {s.section_label}</option>
+            ))}
+          </select>
+        </div>
       </div>
+
+      {showImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-xl rounded-xl bg-white shadow-2xl max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <h2 className="text-[15px] font-semibold text-slate-800">Import a timetable</h2>
+              <button onClick={() => setShowImport(false)} className="p-1.5 text-slate-400 hover:text-slate-600 cursor-pointer"><X size={17} /></button>
+            </div>
+
+            <div className="flex flex-col gap-4 px-6 py-5">
+              {!importResult && (
+                <>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-[12.5px] leading-relaxed text-slate-600">
+                    Upload the school&apos;s own <strong className="font-semibold text-slate-800">.csv or .xlsx</strong> with one row per period.
+                    Columns: <span className="font-mono text-[11.5px]">Class, Section, Day, Period, Start, End, Subject, Teacher, Lab</span>.
+                    <span className="mt-1.5 block text-slate-500">
+                      Day accepts Mon–Sat or 1–6, times accept 09:00 or 9:00 AM, and Teacher accepts the full name or employee id.
+                      Teacher and Lab may be left blank.
+                    </span>
+                  </div>
+
+                  <label className="inline-flex items-start gap-2 text-[12.5px] text-slate-700 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={replaceExisting}
+                      onChange={(e) => setReplaceExisting(e.target.checked)}
+                      className="mt-0.5 h-3.5 w-3.5 cursor-pointer accent-slate-700"
+                    />
+                    <span>
+                      Replace the existing timetable for the classes in this file
+                      <span className="block text-slate-400">
+                        Clears current periods for only those classes first. Leave unticked to add alongside what is already there.
+                      </span>
+                    </span>
+                  </label>
+
+                  {importError && (
+                    <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700">
+                      <AlertCircle size={15} /> {importError}
+                    </div>
+                  )}
+
+                  <label className={`flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed px-6 py-8 text-center transition ${isImporting ? 'border-slate-200 opacity-60' : 'border-slate-300 hover:border-slate-400'}`}>
+                    {isImporting ? <Loader2 size={22} className="animate-spin text-slate-400" /> : <UploadCloud size={22} className="text-slate-400" />}
+                    <span className="text-[13px] font-semibold text-slate-700">
+                      {isImporting ? 'Reading the file…' : 'Choose a .csv or .xlsx file'}
+                    </span>
+                    <input type="file" accept=".csv,.xlsx" disabled={isImporting} onChange={handleImport} className="hidden" />
+                  </label>
+                </>
+              )}
+
+              {importResult && (
+                <>
+                  <div className={`rounded-lg border px-4 py-3 text-[13px] ${importResult.errors.length ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
+                    <strong className="font-semibold">{importResult.created}</strong> period{importResult.created === 1 ? '' : 's'} imported
+                    {importResult.replaced > 0 && <> · {importResult.replaced} replaced</>}
+                    {importResult.errors.length > 0 && <> · <strong className="font-semibold">{importResult.errors.length}</strong> row{importResult.errors.length === 1 ? '' : 's'} skipped</>}
+                  </div>
+
+                  {importResult.errors.length > 0 && (
+                    <div className="max-h-64 overflow-y-auto rounded-lg border border-slate-200">
+                      <table className="w-full text-[12px]">
+                        <thead className="bg-slate-50">
+                          <tr className="text-left text-slate-500">
+                            <th className="px-3 py-2 font-semibold">Row</th>
+                            <th className="px-3 py-2 font-semibold">Why it was skipped</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[...importResult.errors].sort((a, b) => a.row - b.row).map((e, i) => (
+                            <tr key={i} className="border-t border-slate-100 align-top">
+                              <td className="px-3 py-2 font-mono text-slate-500">{e.row}</td>
+                              <td className="px-3 py-2 text-slate-700">
+                                {e.reason}
+                                {e.detail && <span className="block text-slate-400">{e.detail}</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-slate-100 px-6 py-4">
+              {importResult ? (
+                <>
+                  <button onClick={() => { setImportResult(null); setImportError(''); }} className="rounded-lg border border-slate-300 px-4 py-2 text-[13px] font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer">
+                    Import another
+                  </button>
+                  <button onClick={() => setShowImport(false)} className="rounded-lg bg-slate-900 px-5 py-2 text-[13px] font-semibold text-white hover:bg-slate-800 cursor-pointer">
+                    Done
+                  </button>
+                </>
+              ) : (
+                <button onClick={() => setShowImport(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-[13px] font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer">
+                  Cancel
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {labs.length === 0 && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 text-[13px] rounded-lg px-4 py-3 flex items-center gap-2">

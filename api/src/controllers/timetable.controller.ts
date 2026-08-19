@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import * as timetableService from '../services/timetable.service.js';
+import { importTimetable } from '../services/timetableImport.service.js';
 import { createSlotSchema, updateSlotSchema, createExceptionSchema } from '../schemas/timetable.schema.js';
 import { ApiError } from '../lib/errors.js';
 import { requireSchoolId } from '../lib/httpParams.js';
@@ -130,6 +131,32 @@ export async function getMyStudentOccurrencesController(req: Request, res: Respo
     const { fromDate, toDate } = requireDateRange(req);
     const occurrences = await timetableService.getOccurrencesForStudent(schoolId, req.user.id, fromDate, toDate);
     res.json(occurrences);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Bulk timetable import from the school's own spreadsheet.
+ *
+ * Answers 200 with a per-row report rather than throwing on bad rows: a
+ * ninety-row file with two clashes should import the other eighty-eight and
+ * show the admin exactly which two need fixing.
+ */
+export async function importTimetableController(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.file) throw new ApiError('VALIDATION_ERROR', 'A .csv or .xlsx file is required (field name: file)');
+    const schoolId = requireSchoolId(req);
+    const replaceExisting = req.body?.replaceExisting === 'true' || req.body?.replaceExisting === true;
+
+    const result = await importTimetable(
+      schoolId,
+      req.file.buffer,
+      req.file.originalname ?? 'timetable.csv',
+      { replaceExisting },
+      req.user!.id,
+    );
+    res.json(result);
   } catch (err) {
     next(err);
   }

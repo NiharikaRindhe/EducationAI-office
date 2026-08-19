@@ -98,7 +98,10 @@ export const SuperAdminOverview: React.FC = () => {
                     <td className="py-2.5">{s.activeNow > 0 ? <span className="text-emerald-600 font-bold">{s.activeNow}</span> : '0'}</td>
                     <td className="py-2.5">
                       {s.openTickets > 0 ? (
-                        <Link to="/super-admin/tickets" className="text-rose-600 font-bold hover:underline">{s.openTickets}</Link>
+                        // Carry the school through: the inbox defaults to
+                        // "escalated + mine", so an unscoped link lands on an
+                        // empty page and this count looks like a lie.
+                        <Link to={`/super-admin/tickets?schoolId=${s.id}`} className="text-rose-600 font-bold hover:underline">{s.openTickets}</Link>
                       ) : '0'}
                     </td>
                   </tr>

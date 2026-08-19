@@ -66,6 +66,7 @@ interface QuestProps {
 const TOTAL_ROUNDS = 5;
 const ri = (n: number) => Math.floor(Math.random() * n);
 const pick = <T,>(arr: T[]): T => arr[ri(arr.length)];
+const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
 
 function shuffleWithAnswer(options: (string | number)[], answerValue: string | number): { options: string[]; answer: number } {
   const strs = options.map(String);
@@ -93,25 +94,42 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 const METRIC_QS = [
   { q: '1 metre = ? centimetres', o: ['100', '10', '1000'], a: 0 },
   { q: '1 kilogram = ? grams', o: ['1000', '100', '10'], a: 0 },
-  { q: 'Which is used to measure milk?', o: ['🥛 litres', '📏 metres', '⚖️ kilograms'], a: 0 },
-  { q: 'Which is heavier?', o: ['🐘 elephant', '🐱 cat', '🐜 ant'], a: 0 },
-  { q: 'Which unit measures your height?', o: ['📏 cm', '🥛 litres', '🕐 hours'], a: 0 },
+  { q: 'Which is used to measure milk?', o: ['\u{1F95B} litres', '\u{1F4CF} metres', '\u{2696}\u{FE0F} kilograms'], a: 0 },
+  { q: 'Which is heavier?', o: ['\u{1F418} elephant', '\u{1F431} cat', '\u{1F41C} ant'], a: 0 },
+  { q: 'Which unit measures your height?', o: ['\u{1F4CF} cm', '\u{1F95B} litres', '\u{1F550} hours'], a: 0 },
+  { q: 'Which is used to measure rice?', o: ['\u{2696}\u{FE0F} kilograms', '\u{1F4CF} metres', '\u{1F550} hours'], a: 0 },
+  { q: '100 centimetres = ? metre', o: ['1', '10', '100'], a: 0 },
+  { q: 'Which is lighter?', o: ['\u{1FAB6} feather', '\u{1F9F1} brick', '\u{1FAB5} log'], a: 0 },
+  { q: 'Half a kilogram = ? grams', o: ['500', '50', '5'], a: 0 },
+  { q: 'We weigh vegetables using a\u2026', o: ['\u{2696}\u{FE0F} balance', '\u{1F4CF} ruler', '\u{1F550} clock'], a: 0 },
 ];
 const METRIC_BIG_QS = [
   { q: '1 kilometre = ? metres', o: ['1000', '100', '10'], a: 0 },
   { q: '1 litre = ? millilitres', o: ['1000', '100', '10'], a: 0 },
-  { q: 'The distance between cities is measured in…', o: ['🛣️ kilometres', '📏 centimetres', '🥄 millilitres'], a: 0 },
-  { q: 'A fence around a field measures its…', o: ['🔲 perimeter', '🎨 colour', '⚖️ weight'], a: 0 },
+  { q: 'The distance between cities is measured in\u2026', o: ['\u{1F6E3}\u{FE0F} kilometres', '\u{1F4CF} centimetres', '\u{1F944} millilitres'], a: 0 },
+  { q: 'A fence around a field measures its\u2026', o: ['\u{1F532} perimeter', '\u{1F3A8} colour', '\u{2696}\u{FE0F} weight'], a: 0 },
   { q: 'Half of 1 litre is ? mL', o: ['500', '50', '5'], a: 0 },
+  { q: '2 kilometres = ? metres', o: ['2000', '200', '20'], a: 0 },
+  { q: 'A medicine spoon holds about\u2026', o: ['\u{1F944} 5 mL', '\u{1F95B} 5 litres', '\u{1FAA3} 5 buckets'], a: 0 },
+  { q: 'Which would you measure in kilometres?', o: ['\u{1F68C} a bus journey', '\u{270F}\u{FE0F} a pencil', '\u{1F4D6} a book'], a: 0 },
+  { q: 'The space inside a shape is its\u2026', o: ['\u{25FC}\u{FE0F} area', '\u{1F4CF} perimeter', '\u{2696}\u{FE0F} weight'], a: 0 },
+  { q: '1500 metres is the same as\u2026', o: ['1 km 500 m', '15 km 0 m', '150 km 0 m'], a: 0 },
 ];
 const LENGTH_PAIRS = [
-  { long: '🚌 bus', short: '✏️ pencil' }, { long: '🚂 train', short: '🚲 cycle' },
-  { long: '🐍 snake', short: '🐛 caterpillar' }, { long: '🌉 bridge', short: '🪜 ladder' },
-  { long: '🦒 giraffe', short: '🐰 rabbit' },
+  { long: '\u{1F68C} bus', short: '\u{270F}\u{FE0F} pencil' }, { long: '\u{1F682} train', short: '\u{1F6B2} cycle' },
+  { long: '\u{1F40D} snake', short: '\u{1F41B} caterpillar' }, { long: '\u{1F309} bridge', short: '\u{1FA9C} ladder' },
+  { long: '\u{1F992} giraffe', short: '\u{1F430} rabbit' }, { long: '\u{1F334} palm tree', short: '\u{1F33F} small plant' },
+  { long: '\u{1F6E3}\u{FE0F} road', short: '\u{1F9F5} thread' }, { long: '\u{1F3E2} tall building', short: '\u{1F3E0} hut' },
+  { long: '\u{1F40B} whale', short: '\u{1F41F} fish' },
 ];
 const CAPACITY_SETS = [
-  { most: '🪣 bucket', rest: ['🥛 glass', '🥄 spoon'] }, { most: '🛁 bathtub', rest: ['🪣 bucket', '🥛 glass'] },
-  { most: '🫙 jug', rest: ['🥤 cup', '🥄 spoon'] },
+  { most: '\u{1FAA3} bucket', rest: ['\u{1F95B} glass', '\u{1F944} spoon'] },
+  { most: '\u{1F6C1} bathtub', rest: ['\u{1FAA3} bucket', '\u{1F95B} glass'] },
+  { most: '\u{1FAD9} jug', rest: ['\u{1F964} cup', '\u{1F944} spoon'] },
+  { most: '\u{1F6A2} water tanker', rest: ['\u{1FAD9} jug', '\u{1F37C} bottle'] },
+  { most: '\u{1F37C} bottle', rest: ['\u{1F944} spoon', '\u{1F48A} cap'] },
+  { most: '\u{1F958} big pot', rest: ['\u{1F963} bowl', '\u{1F944} spoon'] },
+  { most: '\u{1F30A} lake', rest: ['\u{1FAA3} bucket', '\u{1F95B} glass'] },
 ];
 
 function makeRound(gen: string, params: QuestParams, numChoices: number): Round {
@@ -243,8 +261,25 @@ function makeRound(gen: string, params: QuestParams, numChoices: number): Round 
     case 'fractions': {
       const den = pick<number>(params.parts ?? [2, 4]);
       const num = 1 + ri(den - 1);
-      const label = `${num}/${den}`;
-      const all = ['1/2', '1/4', '3/4', '1/3', '2/3', '2/4'].filter((f) => f !== label);
+      const value = num / den;
+      // The pie still shows the slices it was built from (2 of 4 quarters), but
+      // the answer is always in lowest terms. Accepting "2/4" as the answer for
+      // a half-shaded pie is unteachable when "1/2" is sitting in the options.
+      const g = gcd(num, den);
+      const label = `${num / g}/${den / g}`;
+      // Options are chosen by VALUE, not by label. Half a pie shaded is exactly
+      // what 2/4 looks like, so 1/2 and 2/4 must never appear together: as
+      // answer + distractor that asks a child to choose between two correct
+      // answers, and as two distractors it shows the same amount twice.
+      const taken = new Set<number>([value]);
+      const all = ['1/2', '1/4', '3/4', '1/3', '2/3', '2/4', '1/6', '5/6', '2/6', '3/6', '3/8', '5/8']
+        .sort(() => Math.random() - 0.5)
+        .filter((f) => {
+          const [n, d] = f.split('/').map(Number);
+          if (taken.has(n / d)) return false;
+          taken.add(n / d);
+          return true;
+        });
       const opts = [label, ...all.slice(0, numChoices - 1)];
       const { options, answer } = shuffleWithAnswer(opts, label);
       return { visual: { kind: 'fraction', num, den }, prompt: 'How much is colored? 🎨', options, answer };
@@ -278,6 +313,60 @@ function makeRound(gen: string, params: QuestParams, numChoices: number): Round 
       return { visual: { kind: 'emojis', text: '⭐'.repeat(n) }, prompt: 'How many ⭐?', options, answer };
     }
   }
+}
+
+/* -- Session deck: five DIFFERENT questions ---------------------------- */
+
+/* Every generator used to be called fresh each round with no memory of what
+   it had already asked, and `pick()` samples with replacement — so a game
+   drawing 5 rounds from a 4-question pool repeated itself every single time,
+   and even the 5-question pools repeated in 96% of sessions.
+
+   A round is "the same question" when the child sees the same picture, is
+   asked the same thing, and the same option is correct. buildDeck generates
+   with rejection on that signature, so a session never asks twice. */
+
+function visualKey(v: Visual): string {
+  switch (v.kind) {
+    case 'emojis': return 'e:' + v.text;
+    case 'grid': return `g:${v.rows}x${v.cols}:${v.emoji}`;
+    case 'clock': return `c:${v.h}:${v.m}`;
+    case 'coins': return 'o:' + v.values.join(',');
+    // By value, not by label: 1/2 and 2/4 draw the same pie, so a deck that
+    // told them apart would show a child the same picture twice.
+    case 'fraction': return `f:${v.num / v.den}`;
+    case 'big': return 'b:' + v.e;
+    case 'text': return 't:' + v.text;
+    default: return 'n';
+  }
+}
+
+const roundKey = (r: Round) => `${r.prompt}|${r.options[r.answer]}|${visualKey(r.visual)}`;
+
+/** Never fewer than this many rounds — a one-question game reads as broken
+ *  even when the pool honestly holds only one question. */
+const MIN_ROUNDS = 3;
+
+export function buildDeck(gen: string, params: QuestParams, numChoices: number, wanted: number): Round[] {
+  const deck: Round[] = [];
+  const seen = new Set<string>();
+
+  // Rejection sampling. The budget is generous because a rejected round costs
+  // only a few object allocations, and small pools need many tries to finish.
+  for (let attempt = 0; deck.length < wanted && attempt < wanted * 60; attempt++) {
+    const r = makeRound(gen, params, numChoices);
+    const key = roundKey(r);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deck.push(r);
+  }
+
+  // The pool is genuinely smaller than a full game. Play a SHORTER game rather
+  // than asking the same question twice — stars scale to the deck, so a
+  // 4-round game is still winnable at 3 stars.
+  if (deck.length >= MIN_ROUNDS || deck.length === 0) return deck;
+  while (deck.length < MIN_ROUNDS) deck.push(makeRound(gen, params, numChoices));
+  return deck;
 }
 
 /* ── Visual renderer ──────────────────────────────────────── */
@@ -354,18 +443,32 @@ export const QuestEngine: React.FC<QuestProps> = ({ game, numChoices, isPreReade
 
   const [round, setRound] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
-  const [current, setCurrent] = useState<Round>(() => makeRound(gen, game.params, numChoices));
+  // One deck per session, dealt up front. Holding the whole deck (rather than
+  // generating each round on demand) is what lets a question be excluded
+  // because an EARLIER round already asked it.
+  const [deck, setDeck] = useState<Round[]>(() => buildDeck(gen, game.params, numChoices, TOTAL_ROUNDS));
   const [selected, setSelected] = useState<number | null>(null);
   const [finished, setFinished] = useState(false);
 
-  const nextRound = useCallback(() => {
+  const totalRounds = Math.max(deck.length, 1);
+  const current: Round = deck[round] ?? deck[0];
+
+  const deal = useCallback(() => {
     setSelected(null);
-    setCurrent(makeRound(gen, game.params, numChoices));
+    setRound(0);
+    setCorrectCount(0);
+    setDeck(buildDeck(gen, game.params, numChoices, TOTAL_ROUNDS));
   }, [gen, game.params, numChoices]);
 
-  useEffect(() => { nextRound(); /* new game -> fresh round */ }, [game.gameId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { deal(); /* new game -> fresh deck */ }, [game.gameId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const starsFor = (correct: number) => (correct >= 5 ? 3 : correct >= 4 ? 2 : correct >= 3 ? 1 : 0);
+  /* Stars scale to the deck, because a small pool deals a shorter game:
+     every question right = 3, four fifths = 2, three fifths = 1. On a full
+     5-round deck this is the original 5/4/3 thresholds exactly. */
+  const starsFor = (correct: number) => {
+    const pct = correct / totalRounds;
+    return pct >= 1 ? 3 : pct >= 0.8 ? 2 : pct >= 0.6 ? 1 : 0;
+  };
 
   const handleSelect = (idx: number) => {
     if (selected !== null) return;
@@ -377,23 +480,21 @@ export const QuestEngine: React.FC<QuestProps> = ({ game, numChoices, isPreReade
       confetti({ particleCount: 25, spread: 30, origin: { y: 0.7 } });
     }
     setTimeout(() => {
-      if (round + 1 >= TOTAL_ROUNDS) {
+      if (round + 1 >= totalRounds) {
         const earned = starsFor(newCorrect);
         setFinished(true);
         onFinish(game.gameId, earned, newCorrect);
         if (earned >= 2) confetti({ particleCount: 80, spread: 60, colors: ['#FFC800', '#55C400', '#1CA5F1'] });
       } else {
+        setSelected(null);
         setRound((r) => r + 1);
-        nextRound();
       }
     }, isRight ? 1200 : 1800);
   };
 
   const handlePlayAgain = () => {
-    setRound(0);
-    setCorrectCount(0);
     setFinished(false);
-    nextRound();
+    deal();
   };
 
   if (finished) {
@@ -407,7 +508,7 @@ export const QuestEngine: React.FC<QuestProps> = ({ game, numChoices, isPreReade
           ))}
         </div>
         {!isPreReader && (
-          <p className="font-display font-bold text-slate-600 text-sm">{correctCount} / {TOTAL_ROUNDS} correct</p>
+          <p className="font-display font-bold text-slate-600 text-sm">{correctCount} / {totalRounds} correct</p>
         )}
         <button
           onClick={handlePlayAgain}
@@ -415,7 +516,7 @@ export const QuestEngine: React.FC<QuestProps> = ({ game, numChoices, isPreReade
                      hover:-translate-y-0.5 active:translate-y-0.5"
           style={{ background: 'linear-gradient(180deg,#74DE22,#55C400)', boxShadow: '0 5px 0 #3F9C00' }}
         >
-          🔄 {isPreReader ? '' : 'Play Again'}
+          🔄 Play Again
         </button>
       </div>
     );
@@ -425,7 +526,7 @@ export const QuestEngine: React.FC<QuestProps> = ({ game, numChoices, isPreReade
     <div className="flex flex-col items-center gap-6 max-w-lg mx-auto anim-fade-up">
       {/* Progress dots */}
       <div className="flex gap-2">
-        {Array.from({ length: TOTAL_ROUNDS }).map((_, i) => (
+        {Array.from({ length: totalRounds }).map((_, i) => (
           <div key={i}
                className={`w-3.5 h-3.5 rounded-full transition-all ${
                  i < round ? 'bg-emerald-400' : i === round ? 'bg-amber-400 scale-125' : 'bg-slate-200'}`} />

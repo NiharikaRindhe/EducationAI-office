@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Loader2, AlertCircle, Plus, ArrowLeft, ArrowUpCircle, Send, X } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 
@@ -91,7 +92,13 @@ export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTria
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
   const [statusFilter, setStatusFilter] = useState<Status | ''>('');
-  const [schoolFilter, setSchoolFilter] = useState('');
+  // ?schoolId= lets a caller land straight on one school's queue — the Super
+  // Admin overview links its per-school open-ticket count here, and the default
+  // inbox ("escalated + mine") would otherwise hide exactly those tickets.
+  const [searchParams] = useSearchParams();
+  const [schoolFilter, setSchoolFilter] = useState(
+    showSchoolFilter ? (searchParams.get('schoolId') ?? '') : '',
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -129,9 +136,25 @@ export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTria
 
   useEffect(() => {
     if (showSchoolFilter) {
-      void api.get<School[]>('/super-admin/schools').then(setSchools).catch(() => {});
+      // This endpoint is paginated — it answers { rows, total }, not an array.
+      // Reading it as an array left `schools` an object and crashed the whole
+      // inbox on schools.map().
+      void api
+        .get<{ rows: School[] }>('/super-admin/schools', { pageSize: 200 })
+        .then((page) => setSchools(page.rows ?? []))
+        .catch(() => {});
     }
   }, [showSchoolFilter]);
+
+  // Follow ?schoolId= when it changes on an already-mounted inbox — arriving
+  // from a second scoped link, or via back/forward, is a hash-only navigation
+  // that never remounts this component, so the initial state alone is not
+  // enough to keep the view and the URL agreeing.
+  useEffect(() => {
+    if (!showSchoolFilter) return;
+    const fromUrl = searchParams.get('schoolId') ?? '';
+    if (fromUrl) setSchoolFilter(fromUrl);
+  }, [searchParams, showSchoolFilter]);
 
   const openTicket = async (id: string) => {
     setIsDetailLoading(true);

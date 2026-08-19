@@ -12,6 +12,29 @@ const ACCENT = {
 
 const AVATARS = ['🦊', '🦁', '🐯', '🦋', '🐼', '🦖', '🦄', '🐸', '🐧', '🦅', '🐺', '🦝'];
 
+/* GET /student/profile returns camelCase; this component was written against a
+   snake_case shape that no endpoint has ever produced. Everything that did not
+   happen to match by accident came through as `undefined`, which is why the
+   student card read "Class  – B · Level " with the numbers simply missing, and
+   why the Badges / Tasks Done / Exams tiles rendered blank. Only `section`,
+   `avatar`, `xp` and `streak` line up between the two spellings — the rest did
+   not, and undefined renders as nothing rather than as an error, so it stayed
+   broken quietly on every batch.
+
+   Same defect, same fix as StreakCalendar: name the wire shape, and adapt. */
+interface ProfileApiResponse {
+  userId: string;
+  fullName: string;
+  classNum: number;
+  section: string;
+  avatar: string;
+  xp: number;
+  streak: number;
+  longestStreak: number;
+  completedTasksCount: number;
+  examsTakenCount: number;
+}
+
 interface ProfileData {
   id: string;
   full_name: string;
@@ -26,6 +49,27 @@ interface ProfileData {
   tasks_completed: number;
   exams_taken: number;
   exam_history?: ExamHistoryEntry[];
+}
+
+/** The XP meter below fills over 1000 XP per level, so the level it belongs to
+ *  is derived the same way rather than read from a field the API never sent. */
+const levelFromXp = (xp: number): number => Math.floor((xp ?? 0) / 1000) + 1;
+
+function toProfileData(res: ProfileApiResponse, badgesEarned: number): ProfileData {
+  return {
+    id: res.userId,
+    full_name: res.fullName ?? '',
+    class_num: res.classNum,
+    section: res.section,
+    avatar: res.avatar,
+    xp: res.xp ?? 0,
+    level: levelFromXp(res.xp),
+    streak: res.streak ?? 0,
+    longest_streak: res.longestStreak ?? 0,
+    badges_earned: badgesEarned,
+    tasks_completed: res.completedTasksCount ?? 0,
+    exams_taken: res.examsTakenCount ?? 0,
+  };
 }
 
 interface ExamHistoryEntry {
@@ -49,7 +93,17 @@ export const ProfileCard: React.FC<{
   const [savedMsg, setSavedMsg] = useState(false);
 
   useEffect(() => {
-    api.get<ProfileData>('/student/profile').then(setProfile).catch(() => null);
+    // The badge count is not part of the profile payload, so it comes from the
+    // badges endpoint the badge grid already uses. Settled independently: a
+    // failure there must leave the card showing 0 badges, not no card at all.
+    void Promise.allSettled([
+      api.get<ProfileApiResponse>('/student/profile'),
+      api.get<{ earned: boolean }[]>('/student/badges'),
+    ]).then(([prof, badges]) => {
+      if (prof.status !== 'fulfilled') return;
+      const earned = badges.status === 'fulfilled' ? badges.value.filter((b) => b.earned).length : 0;
+      setProfile(toProfileData(prof.value, earned));
+    });
   }, []);
 
   const handleAvatarSelect = async (emoji: string) => {

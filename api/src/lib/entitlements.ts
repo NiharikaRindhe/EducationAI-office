@@ -218,29 +218,12 @@ export async function grantAllEntitlements(schoolId: string): Promise<void> {
   invalidateEntitlementsCache();
 }
 
-/**
- * Seed a school's entitlements from a named package.
- *
- * Retained for the Super Admin console, which can still apply a preset or
- * hand-pick features for an individual school. New schools do NOT go through
- * here — see grantAllEntitlements.
+/*
+ * seedEntitlementsFromPackage() used to live here: it replaced a school's
+ * entitlements with a package's contents. Removed along with the tiered plans.
+ * It was the only code path that could take a feature away implicitly — a
+ * profile edit that happened to carry a `plan` re-provisioned the school and
+ * silently revoked whatever that package excluded. Features are now granted in
+ * full at registration (grantAllEntitlements) and changed only through the
+ * Super Admin's explicit, diffed, audit-logged entitlements editor.
  */
-export async function seedEntitlementsFromPackage(schoolId: string, packageKey: string): Promise<void> {
-  const { data: pkgFeatures, error } = await supabaseAdmin
-    .from('package_features')
-    .select('feature_key')
-    .eq('package_key', packageKey);
-
-  if (error) throw error;
-
-  const granted = new Set((pkgFeatures ?? []).map((r) => r.feature_key as string));
-  const rows = FEATURE_KEYS.map((key) => ({
-    school_id: schoolId,
-    feature_key: key,
-    enabled: granted.has(key),
-  }));
-
-  const { error: insertError } = await supabaseAdmin.from('school_entitlements').upsert(rows);
-  if (insertError) throw insertError;
-  invalidateEntitlementsCache();
-}

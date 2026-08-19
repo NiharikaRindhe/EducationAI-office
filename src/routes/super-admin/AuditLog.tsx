@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, AlertCircle, ScrollText } from 'lucide-react';
+import { Loader2, AlertCircle, ScrollText, Download } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
+
+/** Matches auditLogQuerySchema's server-side default. Rendered explicitly so a
+ *  truncated page reads as "there is more" rather than as the whole story. */
+const ROW_LIMIT = 200;
 
 interface AuditRow {
   id: string;
@@ -24,26 +28,60 @@ interface School {
 export const SuperAdminAuditLog: React.FC = () => {
   const [rows, setRows] = useState<AuditRow[] | null>(null);
   const [schools, setSchools] = useState<School[]>([]);
+  const [actions, setActions] = useState<string[]>([]);
   const [schoolFilter, setSchoolFilter] = useState('');
+  const [actionFilter, setActionFilter] = useState('');
   const [days, setDays] = useState(30);
   const [error, setError] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
-    void api.get<School[]>('/super-admin/schools').then(setSchools).catch(() => {});
+    // /super-admin/schools is paginated — it answers { rows, total }, not a bare
+    // array. Reading it as an array made schools.map() throw and took the whole
+    // page down to the error boundary.
+    void api
+      .get<{ rows: School[] }>('/super-admin/schools', { pageSize: 200 })
+      .then((page) => setSchools(page.rows ?? []))
+      .catch(() => {});
+    void api.get<string[]>('/super-admin/audit-log/actions').then(setActions).catch(() => {});
   }, []);
+
+  const filters = () => {
+    const query: Record<string, string | number> = { days };
+    if (schoolFilter) query.schoolId = schoolFilter;
+    if (actionFilter) query.action = actionFilter;
+    return query;
+  };
 
   useEffect(() => {
     setRows(null);
-    const query: Record<string, string | number> = { days };
-    if (schoolFilter) query.schoolId = schoolFilter;
     api
-      .get<AuditRow[]>('/super-admin/audit-log', query)
+      .get<AuditRow[]>('/super-admin/audit-log', filters())
       .then(setRows)
       .catch((err) => {
         setError(err instanceof ApiClientError ? err.message : 'Failed to load audit log');
         setRows([]);
       });
-  }, [schoolFilter, days]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schoolFilter, actionFilter, days]);
+
+  const exportCsv = async () => {
+    setIsExporting(true);
+    setError('');
+    try {
+      const blob = await api.download('/super-admin/audit-log/export', filters());
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Failed to export audit log');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-5">
@@ -63,6 +101,14 @@ export const SuperAdminAuditLog: React.FC = () => {
           {schools.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
         </select>
         <select
+          value={actionFilter}
+          onChange={(e) => setActionFilter(e.target.value)}
+          className="px-3 py-2 text-[13px] text-slate-700 bg-white border border-slate-300 rounded-lg outline-none cursor-pointer focus:border-slate-500 font-mono"
+        >
+          <option value="">All actions</option>
+          {actions.map((a) => <option key={a} value={a}>{a}</option>)}
+        </select>
+        <select
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
           className="px-3 py-2 text-[13px] text-slate-700 bg-white border border-slate-300 rounded-lg outline-none cursor-pointer focus:border-slate-500"
@@ -70,8 +116,23 @@ export const SuperAdminAuditLog: React.FC = () => {
           <option value={7}>Last 7 days</option>
           <option value={30}>Last 30 days</option>
           <option value={90}>Last 90 days</option>
+          <option value={365}>Last 12 months</option>
         </select>
-        {rows && <span className="text-[12px] text-slate-400 ml-auto">{rows.length} event{rows.length === 1 ? '' : 's'}</span>}
+        {rows && (
+          <span className="text-[12px] text-slate-400 ml-auto">
+            {rows.length >= ROW_LIMIT
+              ? `First ${ROW_LIMIT} events — export for the full set`
+              : `${rows.length} event${rows.length === 1 ? '' : 's'}`}
+          </span>
+        )}
+        <button
+          onClick={() => void exportCsv()}
+          disabled={isExporting}
+          className={`inline-flex items-center gap-1.5 px-3 py-2 text-[13px] font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg transition-colors hover:border-slate-500 disabled:opacity-50 disabled:cursor-not-allowed ${rows ? '' : 'ml-auto'}`}
+        >
+          {isExporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+          Export CSV
+        </button>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">

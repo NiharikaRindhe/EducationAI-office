@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Loader2, Plus, Search, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Sparkles, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { api, ApiClientError } from '../../lib/api';
-import { AiQuestionGenerator } from '../../components/shared/AiQuestionGenerator';
 
 interface QuestionBankItem {
   id: string;
@@ -38,16 +38,8 @@ const TYPE_OPTIONS = [
   { value: 'fill_blank', label: 'Fill in Blanks' }
 ];
 
-interface TeachingSection {
-  classNum: number;
-  section: string;
-  subjects: string[];
-}
-
 export const TeacherQuestionBank: React.FC = () => {
   const [questions, setQuestions] = useState<QuestionBankItem[] | null>(null);
-  const [showGenerator, setShowGenerator] = useState(false);
-  const [sections, setSections] = useState<TeachingSection[] | null>(null);
 
   // Filters
   const [classNum, setClassNum] = useState<string>('');
@@ -94,28 +86,6 @@ export const TeacherQuestionBank: React.FC = () => {
   useEffect(() => {
     fetchQuestions();
   }, [classNum, subject, type, source, isPyq]);
-
-  // The generator's class/subject options come from the teacher's actual
-  // section assignments, not the class subject whitelist — the API authorizes
-  // generation against the same list, so anything else would offer a choice
-  // the server then rejects.
-  useEffect(() => {
-    api.get<{ sections: TeachingSection[] }>('/teacher/my-sections')
-      .then((res) => setSections(res.sections ?? []))
-      .catch(() => setSections([]));
-  }, []);
-
-  const generatorScope = useMemo(() => {
-    const byClass = new Map<number, Set<string>>();
-    for (const s of sections ?? []) {
-      const existing = byClass.get(s.classNum) ?? new Set<string>();
-      s.subjects.forEach((sub) => existing.add(sub));
-      byClass.set(s.classNum, existing);
-    }
-    return [...byClass.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([cn, subs]) => ({ classNum: cn, subjects: [...subs].sort((a, b) => a.localeCompare(b)) }));
-  }, [sections]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -178,16 +148,15 @@ export const TeacherQuestionBank: React.FC = () => {
           <p className="text-xs text-slate-400 font-medium mt-0.5">Browse CBSE mock questions &amp; add school-scoped challenges.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowGenerator((v) => !v)}
-            className={`px-4 py-2.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold ${
-              showGenerator
-                ? 'bg-slate-900 text-white shadow-md'
-                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
-            }`}
+          {/* Generation lives in Exams, where the questions have somewhere to
+              go. Generating into the bank produced orphan questions a teacher
+              then had to hunt for while building a paper. */}
+          <Link
+            to="/teacher/create-exam"
+            className="px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold"
           >
-            <Sparkles size={14} /> {showGenerator ? 'Hide AI generator' : 'Generate with AI'}
-          </button>
+            <Sparkles size={14} /> Generate in Exams
+          </Link>
           <button
             onClick={() => setShowModal(true)}
             className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-md shadow-indigo-600/10"
@@ -206,17 +175,6 @@ export const TeacherQuestionBank: React.FC = () => {
           <span className="flex-1">{errorMsg}</span>
           <button onClick={() => setErrorMsg('')} className="text-rose-500 hover:text-rose-700 cursor-pointer font-bold">✕</button>
         </div>
-      )}
-
-      {showGenerator && (
-        sections === null ? (
-          <div className="flex justify-center py-10"><Loader2 className="animate-spin text-indigo-400" /></div>
-        ) : (
-          <AiQuestionGenerator
-            scope={generatorScope}
-            onSaved={() => { setShowGenerator(false); void fetchQuestions(); }}
-          />
-        )
       )}
 
       {/* Main Two-Pane layout */}

@@ -44,6 +44,12 @@ export interface DirectoryFilters {
   status?: 'all' | 'active' | 'never';
   /** Account enabled/disabled, independent of whether they ever logged in. */
   enabled?: 'all' | 'enabled' | 'disabled';
+  /**
+   * Whether students who have left the school are included. Defaults to
+   * 'current' everywhere — a roster that quietly counts leavers is wrong for
+   * headcount, section capacity and every report built on top of it.
+   */
+  enrolment?: 'current' | 'left' | 'all';
   schoolId?: string;
   batchId?: number;
 }
@@ -104,6 +110,12 @@ function applyFilters<Q extends FilterableQuery<Q>>(query: Q, filters: Directory
 
   if (filters.enabled === 'enabled') q = q.eq('is_active', true);
   else if (filters.enabled === 'disabled') q = q.eq('is_active', false);
+
+  // Leavers are hidden unless explicitly asked for. 'current' is also the
+  // behaviour when the caller sends nothing, so existing clients keep the
+  // roster they expect without being updated.
+  if (filters.enrolment === 'left') q = q.eq('has_left', true);
+  else if (filters.enrolment !== 'all') q = q.eq('has_left', false);
 
   if (filters.search) {
     // Escape PostgREST's or() delimiters so a name with a comma or paren

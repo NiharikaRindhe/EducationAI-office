@@ -104,3 +104,8 @@ export const importScopeSchema = z.object({
 
 export type StudentCsvRow = z.infer<typeof studentCsvRowSchema>;
 export type TeacherCsvRow = z.infer<typeof teacherCsvRowSchema>;
+
+/** Optional free-text note recorded when a staff member leaves. */
+export const exitStaffSchema = z.object({
+  reason: z.string().trim().max(200).optional(),
+});

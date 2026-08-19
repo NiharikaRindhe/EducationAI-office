@@ -9,6 +9,7 @@ import {
   updateStudentProfileSchema,
   updateTeacherProfileSchema,
   setStaffActiveSchema,
+  exitStaffSchema,
 } from '../schemas/schoolAdmin.schema.js';
 import { requireSchoolId } from '../lib/httpParams.js';
 
@@ -96,6 +97,26 @@ export async function setStaffActiveController(req: Request, res: Response, next
   }
 }
 
+/** Remove a teacher or lab in-charge from the school (archive, not delete). */
+export async function exitStaffController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const schoolId = requireSchoolId(req);
+    const { reason } = exitStaffSchema.parse(req.body ?? {});
+    res.json(await schoolAdminService.exitStaff(schoolId, req.params.id!, reason ?? null, req.user!.id));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function reinstateStaffController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const schoolId = requireSchoolId(req);
+    res.json(await schoolAdminService.reinstateStaff(schoolId, req.params.id!, req.user!.id));
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function resetStudentCredentialController(req: Request, res: Response, next: NextFunction) {
   try {
     const schoolId = requireSchoolId(req);
@@ -118,7 +139,7 @@ export async function resetTeacherPasswordController(req: Request, res: Response
 
 export async function listLabInchargesController(req: Request, res: Response, next: NextFunction) {
   try {
-    res.json(await schoolAdminService.listLabIncharges(requireSchoolId(req)));
+    res.json(await schoolAdminService.listLabIncharges(requireSchoolId(req), req.query.includeLeft === 'true'));
   } catch (err) {
     next(err);
   }
@@ -192,7 +213,7 @@ export async function listStudentsController(req: Request, res: Response, next: 
 export async function listTeachersController(req: Request, res: Response, next: NextFunction) {
   try {
     const schoolId = requireSchoolId(req);
-    const teachers = await schoolAdminService.listTeachers(schoolId);
+    const teachers = await schoolAdminService.listTeachers(schoolId, req.query.includeLeft === 'true');
     res.json(teachers);
   } catch (err) {
     next(err);

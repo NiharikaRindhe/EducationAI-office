@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { useApp } from '../../context/AppContext';
 import { Loader2 } from 'lucide-react';
 import { getClassTheme } from './theme';
+import { EmptyState, PageHeader, Pic, StarRow } from './ui';
 
 /**
  * "My Journey" — the syllabus as a winding island trail (Candy-Crush map).
@@ -33,7 +34,7 @@ interface CurriculumChapter {
 /* Track geometry — wide enough to feel like a real map on lab monitors */
 const TRACK_W = 900;
 const STEP_Y = 155;
-const TOP_PAD = 80;
+const TOP_PAD = 175;   // clears the "YOU ARE HERE" pin above node 1
 const X_LEFT = 220;
 const X_RIGHT = 680;
 
@@ -121,24 +122,15 @@ export const Batch1Syllabus: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-4 select-none anim-fade-up">
-      {/* Title card */}
-      <div
-        className="bg-white rounded-3xl px-6 py-4 flex items-center gap-4"
-        style={{ boxShadow: '0 6px 0 rgba(20,90,140,.14)' }}
-      >
-        <span className="text-4xl">{SUBJECT_EMOJI(activeSubject)}</span>
-        <div className="flex-1">
-          <h1 className="font-display font-black text-xl sm:text-2xl leading-tight" style={{ color: '#17425F' }}>
-            {isPreReader ? 'My Journey' : `${activeSubject} Island`}
-          </h1>
-          {!isPreReader && (
-            <p className="text-[11px] font-black tracking-widest" style={{ color: '#6FA3C0' }}>
-              CLASS {currentClass} · {doneCount} OF {trail.length} CHAPTERS DONE
-            </p>
-          )}
-        </div>
-        <span className="text-3xl anim-bob">{theme.mascot}</span>
-      </div>
+      {/* The progress line was hidden from Class 1-2, leaving them a bare title
+          bar. It is the one sentence on this page that says why the map exists,
+          and a child who cannot read it is sitting next to a teacher who can. */}
+      <PageHeader
+        emoji={SUBJECT_EMOJI(activeSubject)}
+        title="My Journey"
+        hint={`${activeSubject} · ${doneCount} of ${trail.length} chapters done`}
+        right={<Pic emoji={theme.mascot} size={40} className="anim-bob hidden sm:block" />}
+      />
 
       {/* Subject tabs */}
       {subjects.length > 1 && (
@@ -155,8 +147,8 @@ export const Batch1Syllabus: React.FC = () => {
                   ? { background: theme.accent, color: '#fff', boxShadow: `0 5px 0 ${theme.accentDark}` }
                   : { background: '#fff', color: '#17425F', boxShadow: '0 5px 0 rgba(20,90,140,.14)' }}
               >
-                <span className="text-lg">{SUBJECT_EMOJI(s)}</span>
-                {!isPreReader && <span>{s}</span>}
+                <Pic emoji={SUBJECT_EMOJI(s)} size={22} />
+                <span>{s}</span>
               </button>
             );
           })}
@@ -165,11 +157,12 @@ export const Batch1Syllabus: React.FC = () => {
 
       {/* The trail */}
       {trail.length === 0 ? (
-        <div className="bg-white/80 rounded-3xl p-12 text-center flex flex-col items-center gap-3"
-             style={{ boxShadow: '0 6px 0 rgba(20,90,140,.12)' }}>
-          <span className="text-5xl">{theme.mascot}</span>
-          <span className="font-display font-black text-base" style={{ color: '#17425F' }}>New adventures coming soon!</span>
-        </div>
+        <EmptyState
+          emoji={theme.mascot}
+          title="Nothing on the map yet!"
+          body="Your chapters will show up here once your teacher opens them."
+          action={{ label: 'Go and play', to: '/batch1/games' }}
+        />
       ) : (
         <div className="overflow-x-auto">
           <div className="relative mx-auto" style={{ width: TRACK_W, height: trackH }}>
@@ -225,15 +218,20 @@ export const Batch1Syllabus: React.FC = () => {
                       {playable ? ch.chapterNum : '🔒'}
                     </span>
                     {playable && (
-                      <span className="absolute -bottom-1.5 text-[13px] tracking-wider pointer-events-none"
-                            style={{ textShadow: '0 1px 2px rgba(0,0,0,.2)' }}>
-                        {'⭐'.repeat(ch.stars)}{'☆'.repeat(Math.max(0, 3 - ch.stars))}
+                      <span className="absolute -bottom-2 pointer-events-none">
+                        <StarRow earned={ch.stars} size={14} />
                       </span>
                     )}
                   </button>
 
-                  {/* Chapter label card beside the node */}
-                  {!isPreReader && (
+                  {/* Chapter label card beside the node.
+
+                      This used to render only for Class 3-4. For Class 1-2 the
+                      map was seven numbered circles joined by a dotted line and
+                      nothing else — no chapter names anywhere on the screen, so
+                      there was no way to tell node 3 from node 5 or to know
+                      what tapping one would open. */}
+                  {(
                     <div
                       className="absolute -translate-y-1/2 bg-white rounded-2xl px-4 py-2 max-w-[210px] pointer-events-none"
                       style={{

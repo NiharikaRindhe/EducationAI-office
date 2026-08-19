@@ -245,7 +245,7 @@ export const NumberSlideEngine: React.FC<NumberSlideEngineProps> = ({ game, isPr
         style={{ boxShadow: '0 3px 0 rgba(20,90,140,.10)' }}
       >
         <RotateCcw size={16} />
-        {isPreReader ? '' : 'Reset'}
+        Start again
       </button>
 
       {!isPreReader && <p className="text-[11px] text-slate-400 font-medium">Tap a tile next to the empty space — or use arrow keys</p>}

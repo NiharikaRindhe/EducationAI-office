@@ -227,7 +227,7 @@ export const AreaBuilderEngine: React.FC<AreaBuilderEngineProps> = ({ game, isPr
         </div>
         {!isPreReader && <p className="font-display font-bold text-slate-600 text-sm">{correctCount} / {TOTAL_ROUNDS} correct</p>}
         <button onClick={handlePlayAgain} className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer" style={{ minHeight: 48, minWidth: 120 }}>
-          🔄 {isPreReader ? '' : 'Play Again'}
+          🔄 Play Again
         </button>
       </div>
     );

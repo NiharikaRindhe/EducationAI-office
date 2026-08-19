@@ -105,7 +105,7 @@ export const ContextFillEngine: React.FC<ContextFillEngineProps> = ({ game, isPr
         <div className="flex gap-1">{[1, 2, 3].map((n) => (<Star key={n} size={32} className={n <= earned ? 'fill-amber-400 text-amber-400' : 'text-slate-200'} />))}</div>
         {!isPreReader && <p className="font-display font-bold text-slate-600 text-sm">{correctCount} / {puzzles.length} correct</p>}
         <button onClick={handlePlayAgain} className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer" style={{ minHeight: 48, minWidth: 120 }}>
-          🔄 {isPreReader ? '' : 'Play Again'}
+          🔄 Play Again
         </button>
       </div>
     );
