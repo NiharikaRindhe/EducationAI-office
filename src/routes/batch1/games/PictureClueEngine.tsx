@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Star, CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle, XCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { GameFinishScreen, GameOption, GameOptionState, GameProgressDots, Pic, T } from '../ui';
 
 /* Ported from EducationAI-Games-master's Grade4 "PictureMatch" (reading
    comprehension — sentence to matching picture) and restyled to this app's
@@ -81,28 +82,21 @@ export const PictureClueEngine: React.FC<PictureClueEngineProps> = ({ game, isPr
   if (finished) {
     const earned = starsForPictureClue(correctCount, questions.length);
     return (
-      <div className="flex flex-col items-center gap-5 py-10 anim-fade-up">
-        <span className="text-6xl">🏆</span>
-        <div className="flex gap-1">{[1, 2, 3].map((n) => (<Star key={n} size={32} className={n <= earned ? 'fill-amber-400 text-amber-400' : 'text-slate-200'} />))}</div>
-        {!isPreReader && <p className="font-display font-bold text-slate-600 text-sm">{correctCount} / {questions.length} correct</p>}
-        <button onClick={handlePlayAgain} className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer" style={{ minHeight: 48, minWidth: 120 }}>
-          🔄 Play Again
-        </button>
-      </div>
+      <GameFinishScreen
+        earned={earned}
+        scoreLabel={isPreReader ? undefined : `${correctCount} of ${questions.length} correct`}
+        onPlayAgain={handlePlayAgain}
+      />
     );
   }
 
   return (
     <div className="flex flex-col items-center gap-5 max-w-xl mx-auto anim-fade-up">
-      <div className="flex gap-2">
-        {questions.map((_, i) => (
-          <div key={i} className={`w-3.5 h-3.5 rounded-full transition-all ${i < idx ? 'bg-emerald-400' : i === idx ? 'bg-amber-400 scale-125' : 'bg-slate-200'}`} />
-        ))}
-      </div>
+      <GameProgressDots total={questions.length} current={idx} />
 
       {!isPreReader && (
-        <div className="w-full bg-white rounded-3xl border-2 border-amber-100 shadow-sm px-8 py-5">
-          <p className="text-lg font-display font-semibold text-slate-800 text-center leading-relaxed">{question.text}</p>
+        <div className="w-full bg-white px-8 py-5" style={{ borderRadius: T.radius.md, boxShadow: T.shadow.card }}>
+          <p className="text-lg font-display font-semibold text-center leading-relaxed" style={{ color: T.ink.strong }}>{question.text}</p>
         </div>
       )}
 
@@ -110,29 +104,40 @@ export const PictureClueEngine: React.FC<PictureClueEngineProps> = ({ game, isPr
         {question.options.map((opt, i) => {
           const isCorrect = i === question.correctIdx;
           const isSelected = i === selected;
-          let border = 'border-slate-200 bg-white hover:border-amber-300';
-          if (result !== null && isSelected && isCorrect) border = 'border-emerald-400 bg-emerald-50';
-          else if (result !== null && isSelected && !isCorrect) border = 'border-red-400 bg-red-50';
-          else if (result === 'wrong' && isCorrect) border = 'border-emerald-300 bg-emerald-50';
+          let state: GameOptionState = 'idle';
+          if (result !== null) {
+            if (isSelected) state = isCorrect ? 'correct' : 'wrong';
+            else if (isCorrect) state = 'correct';
+            else state = 'dimmed';
+          }
           return (
-            <button key={i} onClick={() => handleSelect(i)} disabled={result !== null} className={`relative rounded-2xl border-2 p-4 transition-all flex flex-col items-center gap-2 ${border}`}>
-              <span className="text-6xl anim-bob">{opt.emoji}</span>
-              {!isPreReader && <span className="text-xs font-semibold text-slate-500 text-center">{opt.label}</span>}
+            <GameOption
+              key={i}
+              state={state}
+              disabled={result !== null}
+              onClick={() => handleSelect(i)}
+              className="relative p-4 flex flex-col items-center gap-2"
+            >
+              <Pic emoji={opt.emoji} size={60} className="anim-bob" />
+              {!isPreReader && <span className="text-xs font-semibold text-center opacity-90">{opt.label}</span>}
               {result !== null && isSelected && (
-                <div className={`absolute top-2 right-2 ${isCorrect ? 'text-emerald-500' : 'text-red-500'}`}>
+                <div className="absolute top-2 right-2 text-white">
                   {isCorrect ? <CheckCircle size={20} /> : <XCircle size={20} />}
                 </div>
               )}
               {result === 'wrong' && !isSelected && isCorrect && (
-                <div className="absolute top-2 right-2 text-emerald-500"><CheckCircle size={20} /></div>
+                <div className="absolute top-2 right-2 text-white"><CheckCircle size={20} /></div>
               )}
-            </button>
+            </GameOption>
           );
         })}
       </div>
 
       {result === 'wrong' && !isPreReader && (
-        <div className="w-full bg-red-50 border-2 border-red-300 rounded-2xl px-5 py-3 text-sm font-semibold text-red-600 anim-fade-up">
+        <div
+          className="w-full px-5 py-3 text-sm font-semibold anim-fade-up"
+          style={{ borderRadius: T.radius.sm, border: '2px solid #F5B3AD', background: '#FDEDEC', color: '#B23930' }}
+        >
           💡 {(selected !== null && question.options[selected].distractor) ?? 'Read the sentence again carefully.'}
         </div>
       )}

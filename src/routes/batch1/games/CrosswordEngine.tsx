@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Star, Lightbulb } from 'lucide-react';
+import { Lightbulb } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { Button, GameFinishScreen, GameOption, GameProgressDots, Pic, T } from '../ui';
 
 /* Ported from EducationAI-Games-master's Grade2 "Crossword" (two
    intersecting words filled from a shared letter-tile pool) and restyled to
@@ -173,26 +174,14 @@ export const CrosswordEngine: React.FC<CrosswordEngineProps> = ({ game, isPreRea
 
   if (finished) {
     const earned = starsForCrossword(totalHinted);
-    return (
-      <div className="flex flex-col items-center gap-5 py-10 anim-fade-up">
-        <span className="text-6xl">🏆</span>
-        <div className="flex gap-1">{[1, 2, 3].map((n) => (<Star key={n} size={32} className={n <= earned ? 'fill-amber-400 text-amber-400' : 'text-slate-200'} />))}</div>
-        <button onClick={handlePlayAgain} className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer" style={{ minHeight: 48, minWidth: 120 }}>
-          🔄 Play Again
-        </button>
-      </div>
-    );
+    return <GameFinishScreen earned={earned} onPlayAgain={handlePlayAgain} />;
   }
 
   const SIZE = 52;
 
   return (
     <div className="flex flex-col items-center gap-4 max-w-xl mx-auto anim-fade-up">
-      <div className="flex gap-2">
-        {puzzles.map((_, i) => (
-          <div key={i} className={`w-3.5 h-3.5 rounded-full transition-all ${i < puzzleIdx ? 'bg-emerald-400' : i === puzzleIdx ? 'bg-amber-400 scale-125' : 'bg-slate-200'}`} />
-        ))}
-      </div>
+      <GameProgressDots total={puzzles.length} current={puzzleIdx} />
 
       <div className="w-full grid grid-cols-2 gap-3">
         {words.map((word) => {
@@ -200,20 +189,26 @@ export const CrosswordEngine: React.FC<CrosswordEngineProps> = ({ game, isPreRea
           return (
             <button
               key={word.id}
+              type="button"
               onClick={() => setActiveId(word.id)}
-              className={`relative text-left rounded-2xl p-3 border-2 bg-white shadow-sm flex items-center gap-3 transition-all ${isActive ? 'border-amber-400 shadow-md' : 'border-slate-200 hover:border-slate-300'}`}
+              className="relative text-left flex items-center gap-3 bg-white p-3 transition-all"
+              style={{
+                borderRadius: T.radius.sm,
+                border: `2px solid ${isActive ? '#FFB100' : T.surface.line}`,
+                boxShadow: isActive ? T.shadow.raised : T.shadow.card,
+              }}
             >
-              <span className="text-3xl">{word.emoji}</span>
+              <Pic emoji={word.emoji} size={30} />
               <div>
-                {!isPreReader && <p className="text-slate-600 text-xs">{word.clue}</p>}
-                {isActive && <p className="text-xs font-display font-black mt-0.5 tracking-widest text-amber-500">{word.answer.split('').join(' · ')}</p>}
+                {!isPreReader && <p className="text-xs" style={{ color: T.ink.muted }}>{word.clue}</p>}
+                {isActive && <p className="text-xs font-display font-black mt-0.5 tracking-widest" style={{ color: '#DB9A00' }}>{word.answer.split('').join(' · ')}</p>}
               </div>
             </button>
           );
         })}
       </div>
 
-      <div className="bg-white/70 rounded-3xl p-5 border border-slate-100" style={{ boxShadow: '0 4px 0 rgba(20,90,140,.08)' }}>
+      <div className="bg-white/70 p-5" style={{ borderRadius: T.radius.md, border: `1px solid ${T.surface.line}`, boxShadow: T.shadow.card }}>
         <div style={{ display: 'grid', gridTemplateRows: `repeat(${allRows.length}, ${SIZE}px)`, gridTemplateColumns: `repeat(${allCols.length}, ${SIZE}px)`, gap: 6 }}>
           {allRows.map((r) => allCols.map((c) => {
             const cell = cells.find((cl) => cl.row === r && cl.col === c);
@@ -223,53 +218,48 @@ export const CrosswordEngine: React.FC<CrosswordEngineProps> = ({ game, isPreRea
             const isActive = cell.wordIds.includes(activeId);
             const isWrong = wrong[k];
             const isRight = val && !isWrong;
-            const style = isRight ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
-              : isWrong ? 'border-red-400 bg-red-50 text-red-600'
-                : isActive ? 'border-amber-300 bg-amber-50'
-                  : 'border-slate-200 bg-white';
+            const bg = isRight ? '#EAFBF0' : isWrong ? '#FDEDEC' : isActive ? '#FFF7E0' : '#FFFFFF';
+            const border = isRight ? '#3FCB6E' : isWrong ? '#F0554C' : isActive ? '#FFD53E' : T.surface.line;
+            const color = isRight ? '#1B7F41' : isWrong ? '#B23930' : T.ink.strong;
             return (
-              <div
+              <button
                 key={k}
+                type="button"
                 onClick={() => setActiveId(cell.wordIds[0])}
-                style={{ width: SIZE, height: SIZE }}
-                className={`relative rounded-xl border-2 flex items-center justify-center cursor-pointer transition-all ${style}`}
+                style={{ width: SIZE, height: SIZE, borderRadius: 12, border: `2px solid ${border}`, background: bg, color }}
+                className="relative flex items-center justify-center transition-all"
               >
                 {val && <span className="text-xl font-display font-black">{val}</span>}
-              </div>
+              </button>
             );
           }))}
         </div>
       </div>
 
       {won && (
-        <div className="w-full bg-emerald-50 border-2 border-emerald-300 rounded-3xl p-6 flex flex-col items-center gap-3 anim-fade-up">
-          <span className="text-4xl">🎉</span>
-          <p className="font-display font-black text-emerald-700">Great Job!</p>
-          <button onClick={nextPuzzle} className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold px-8 py-3 rounded-full shadow-md">
+        <div className="w-full flex flex-col items-center gap-3 p-6 anim-fade-up" style={{ borderRadius: T.radius.md, background: '#EAFBF0', border: '2px solid #A8E8BC' }}>
+          <Pic emoji="🎉" size={44} />
+          <p className="font-display font-black" style={{ color: '#1B7F41' }}>Great Job!</p>
+          <Button tone="amber" onClick={nextPuzzle}>
             {puzzleIdx + 1 >= puzzles.length ? 'Finish' : 'Next Puzzle →'}
-          </button>
+          </Button>
         </div>
       )}
 
       {!won && (
         <>
           {!isPreReader && (
-            <button onClick={giveHint} className="flex items-center gap-2 bg-amber-100 hover:bg-amber-200 text-amber-700 font-display font-bold text-xs px-5 py-2 rounded-full">
-              <Lightbulb size={14} /> HINT
-            </button>
+            <Button tone="quiet" onClick={giveHint} className="text-xs px-5" icon={<Lightbulb size={14} style={{ color: '#DB9A00' }} />}>
+              Hint
+            </Button>
           )}
           <div className="flex flex-wrap justify-center gap-2.5">
             {pool.map((letter, i) => {
               const isUsed = used.includes(i);
               return (
-                <button
-                  key={i}
-                  onClick={() => placeLetter(letter, i)}
-                  disabled={isUsed}
-                  className={`w-12 h-12 rounded-xl text-xl font-display font-black shadow-sm transition-all ${isUsed ? 'bg-slate-100 text-slate-300' : 'bg-amber-400 text-white hover:bg-amber-500 active:scale-95'}`}
-                >
+                <GameOption key={i} state={isUsed ? 'dimmed' : 'idle'} disabled={isUsed} onClick={() => placeLetter(letter, i)} className="text-xl" style={{ width: 48, height: 48, minHeight: 48 }}>
                   {letter}
-                </button>
+                </GameOption>
               );
             })}
           </div>

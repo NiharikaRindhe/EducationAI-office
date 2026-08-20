@@ -50,8 +50,12 @@ export const T = {
   },
 } as const;
 
-/** Shared press physics — every tappable thing in Batch 1 moves the same way. */
-const PRESS = 'transition-transform duration-100 ease-out active:translate-y-[3px] cursor-pointer';
+/** Shared press physics — every tappable thing in Batch 1 moves the same way:
+ *  a chunky press-down plus a small squish, so a tap reads as squeezing a
+ *  soft clay surface rather than sliding a flat panel. Exported so a page
+ *  that builds its own bespoke tappable element (not one of the primitives
+ *  below) can still match, instead of inventing its own transition. */
+export const PRESS = 'transition-transform duration-100 ease-out active:translate-y-[3px] anim-squish-tap cursor-pointer';
 
 /* ── Pic ───────────────────────────────────────────────────────────────── */
 
@@ -154,11 +158,15 @@ export const SectionTitle: React.FC<{
 
 /* ── Button ────────────────────────────────────────────────────────────── */
 
-type ButtonTone = 'primary' | 'secondary' | 'quiet';
+type ButtonTone = 'primary' | 'secondary' | 'amber' | 'quiet';
 
 const TONE: Record<ButtonTone, { bg: string; shadow: string; color: string; border: string }> = {
   primary: { bg: 'linear-gradient(180deg,#7BE034,#55C400)', shadow: '#3F9C00', color: '#FFFFFF', border: 'transparent' },
   secondary: { bg: 'linear-gradient(180deg,#4FC3FF,#1CA5F1)', shadow: '#0E86CC', color: '#FFFFFF', border: 'transparent' },
+  /** Hint / confirm-adjacent actions inside game engines — every engine
+   *  hand-rolled its own amber "Hint"/"Check"/"Confirm" pill before this;
+   *  one tone now covers all of them. */
+  amber: { bg: 'linear-gradient(180deg,#FFD53E,#FFB100)', shadow: '#DB9A00', color: '#7A5200', border: 'transparent' },
   quiet: { bg: '#FFFFFF', shadow: '#CBDDE9', color: T.ink.strong, border: '#E1EDF5' },
 };
 
@@ -241,15 +249,15 @@ export const IconButton: React.FC<{
 /* ── ActionTile ────────────────────────────────────────────────────────── */
 
 /**
- * A big coloured door on the Home screen.
+ * A big door on the Home screen — one soft, tinted card per subject.
  *
- * `label` is never optional and never hidden. `hint` is the small line under
- * it — shown from Class 3 up, where a child can read a short phrase, and
- * dropped for Class 1–2 so the tile stays a picture and one word.
+ * Was a bold saturated gradient with white text; now a pale tint of a single
+ * `accent` colour with the title set IN that colour, matching the reference
+ * mockup (light mint/blue/amber/pink/lilac cards, not solid ones). `label` is
+ * never optional and never hidden; `subtitle` is always shown too — see the
+ * note in Home about why that changed.
  */
 export interface TileMeter {
-  /** Small picture inside the meter pill, left of the bar. */
-  emoji: string;
   value: number;
   max: number;
   /** Overrides the "value / max" readout, e.g. "60%" or "+6". */
@@ -263,41 +271,36 @@ export const ActionTile: React.FC<{
   label: string;
   /** One short phrase under the title. Always shown — see the note in Home. */
   subtitle?: string;
-  from: string;
-  to_: string;
-  shadow: string;
+  /** The one colour this tile is built from — everything else derives from it. */
+  accent: string;
   badge?: number;
   /** Progress along the bottom. Omitted when nothing real can be measured. */
   meter?: TileMeter;
   /** Shown in the meter's place when there is no progress to report. */
   caption?: string;
-}> = ({ to, emoji, artKey, label, subtitle, from, to_, shadow, badge, meter, caption }) => (
+}> = ({ to, emoji, artKey, label, subtitle, accent, badge, meter, caption }) => (
   <Link
     to={to}
-    className={`group relative flex flex-col items-center overflow-hidden text-center px-4 pt-6 pb-4 ${PRESS}`}
+    className={`group relative flex flex-col items-center overflow-hidden text-center px-4 pt-6 pb-5 ${PRESS}`}
     style={{
-      minHeight: 268,
+      minHeight: 248,
       borderRadius: T.radius.lg,
-      background: `linear-gradient(160deg, ${from}, ${to_})`,
-      boxShadow: `0 6px 0 ${shadow}, 0 18px 30px ${to_}40`,
+      background: `color-mix(in srgb, ${accent} 13%, white)`,
+      border: `2px solid color-mix(in srgb, ${accent} 20%, white)`,
+      boxShadow: `0 4px 0 color-mix(in srgb, ${accent} 26%, white), 0 12px 22px rgba(20,90,140,.06)`,
     }}
   >
-    {/* Glossy highlight across the top third. Purely decorative. */}
-    <span
-      aria-hidden="true"
-      className="absolute inset-x-0 top-0 pointer-events-none"
-      style={{ height: '46%', background: 'linear-gradient(180deg, rgba(255,255,255,.26), rgba(255,255,255,0))' }}
-    />
-    {/* A couple of sparkles, so a flat panel reads as somewhere to go. */}
-    <span aria-hidden="true" className="absolute top-4 left-4 text-white/45 text-sm select-none">✦</span>
-    <span aria-hidden="true" className="absolute top-12 right-6 text-white/30 text-xs select-none">✦</span>
+    {/* A couple of sparkles in the tile's own colour, so a soft panel still
+        reads as somewhere to go rather than a plain swatch. */}
+    <span aria-hidden="true" className="absolute top-4 left-4 text-sm select-none" style={{ color: accent, opacity: 0.4 }}>✦</span>
+    <span aria-hidden="true" className="absolute top-9 right-5 text-xs select-none" style={{ color: accent, opacity: 0.3 }}>✦</span>
 
     {/* Count of things waiting behind this door — only when there are any. */}
     {badge !== undefined && badge > 0 && (
       <span
-        className="absolute top-3.5 right-3.5 min-w-[36px] h-[36px] px-2.5 inline-flex items-center justify-center
-                   rounded-full bg-white font-display font-black text-base z-10"
-        style={{ color: shadow, boxShadow: '0 2px 0 rgba(0,0,0,.12)' }}
+        className="absolute top-3.5 right-3.5 min-w-[30px] h-[30px] px-2 inline-flex items-center justify-center
+                   rounded-full text-white font-display font-black text-sm z-10"
+        style={{ background: accent, boxShadow: '0 2px 0 rgba(0,0,0,.12)' }}
       >
         {badge}
       </span>
@@ -307,55 +310,47 @@ export const ActionTile: React.FC<{
       <Pic
         emoji={emoji}
         name={artKey}
-        size={88}
-        className="drop-shadow-[0_4px_6px_rgba(0,0,0,.22)] transition-transform duration-200 group-hover:scale-105"
+        size={104}
+        className="drop-shadow-[0_6px_10px_rgba(0,0,0,.16)] transition-transform duration-200 group-hover:scale-105"
       />
     </span>
 
-    <span
-      className="font-display font-black text-white text-lg xl:text-xl leading-tight tracking-wide"
-      style={{ textShadow: '0 2px 3px rgba(0,0,0,.22)' }}
-    >
+    <span className="font-display font-black text-lg xl:text-xl leading-tight tracking-wide" style={{ color: accent }}>
       {label}
     </span>
 
     {subtitle && (
-      <span className="font-bold text-[11px] xl:text-xs text-white/85 leading-snug mt-0.5 mb-3 px-1">
+      <span className="font-bold text-xs leading-snug mt-1 px-1" style={{ color: T.ink.muted }}>
         {subtitle}
       </span>
     )}
 
-    {/* Footer: how far along this child is behind this door. */}
+    {/* Footer: how far along this child is behind this door. Thin, so it
+        supplements the calm tile rather than dominating it. */}
     {meter ? (
-      <span
-        className="w-full mt-auto flex items-center gap-2 px-2.5 py-2"
-        style={{ borderRadius: T.radius.sm, background: 'rgba(255,255,255,.22)' }}
-      >
+      <span className="w-full mt-3 flex items-center gap-2">
         <span
-          className="flex items-center justify-center shrink-0"
-          style={{ width: 26, height: 26, borderRadius: 8, background: 'rgba(255,255,255,.92)' }}
+          className="flex-1 overflow-hidden"
+          style={{ height: 8, borderRadius: 999, background: '#FFFFFF', border: `1px solid color-mix(in srgb, ${accent} 22%, white)` }}
         >
-          <Pic emoji={meter.emoji} size={16} />
-        </span>
-        <span className="flex-1 overflow-hidden" style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,.35)' }}>
           <span
             className="block h-full"
             style={{
               width: `${meter.max > 0 ? Math.min(100, Math.round((meter.value / meter.max) * 100)) : 0}%`,
               borderRadius: 999,
-              background: '#FFFFFF',
+              background: accent,
               transition: 'width .5s ease-out',
             }}
           />
         </span>
-        <span className="font-display font-black text-[11px] text-white whitespace-nowrap">
-          {meter.readout ?? `${meter.value} / ${meter.max}`}
+        <span className="font-display font-black text-[11px] whitespace-nowrap" style={{ color: accent }}>
+          {meter.readout ?? `${meter.value}/${meter.max}`}
         </span>
       </span>
     ) : caption ? (
       <span
-        className="w-full mt-auto px-2.5 py-2 font-display font-black text-[11px] text-white"
-        style={{ borderRadius: T.radius.sm, background: 'rgba(255,255,255,.22)' }}
+        className="mt-3 px-3 py-1.5 font-display font-black text-[11px]"
+        style={{ borderRadius: 999, background: '#FFFFFF', color: accent, border: `1px solid color-mix(in srgb, ${accent} 24%, white)` }}
       >
         {caption}
       </span>
@@ -493,4 +488,112 @@ export const Skeleton: React.FC<{ height?: number; className?: string }> = ({ he
     style={{ height, borderRadius: T.radius.md, background: T.surface.sunk }}
     aria-hidden="true"
   />
+);
+
+/* ── Game chrome ───────────────────────────────────────────────────────────
+ *
+ * Every one of the 17 game engines hand-rolled its own progress dots, answer
+ * buttons and finish screen — same idea, 15+ slightly different
+ * implementations (amber-400 in one file, amber-500 in the next, a raw
+ * lucide <Star> loop instead of StarRow, "rounded-2xl" here and
+ * "rounded-xl" there). That's why a Fraction game and a Crossword didn't
+ * quite feel like the same product. These three cover the shared 90% of
+ * every engine's chrome; each engine keeps its own board/canvas/drag logic —
+ * only the surrounding UI language is now one thing.
+ * ────────────────────────────────────────────────────────────────────── */
+
+/** The row of dots every engine shows for "question 2 of 5". */
+export const GameProgressDots: React.FC<{ total: number; current: number }> = ({ total, current }) => (
+  <div
+    className="flex gap-2"
+    role="progressbar"
+    aria-valuenow={current + 1}
+    aria-valuemin={1}
+    aria-valuemax={total}
+    aria-label={`Question ${current + 1} of ${total}`}
+  >
+    {Array.from({ length: total }).map((_, i) => (
+      <span
+        key={i}
+        className="rounded-full transition-all duration-200"
+        style={{
+          width: i === current ? 16 : 13,
+          height: i === current ? 16 : 13,
+          background: i < current ? '#3FA84B' : i === current ? '#F2A03D' : T.surface.line,
+        }}
+      />
+    ))}
+  </div>
+);
+
+export type GameOptionState = 'idle' | 'correct' | 'wrong' | 'dimmed';
+
+const OPTION_PALETTE: Record<GameOptionState, { bg: string; color: string; border: string; shadow: string }> = {
+  idle: { bg: '#FFFFFF', color: T.ink.strong, border: T.surface.line, shadow: '0 3px 0 rgba(20,90,140,.10)' },
+  correct: { bg: '#3FCB6E', color: '#FFFFFF', border: 'transparent', shadow: '0 3px 0 #2E9E54' },
+  wrong: { bg: '#F0554C', color: '#FFFFFF', border: 'transparent', shadow: '0 3px 0 #C33F38' },
+  dimmed: { bg: T.surface.sunk, color: T.ink.faint, border: T.surface.line, shadow: 'none' },
+};
+
+/**
+ * The dominant control inside every game — an answer choice. One visual
+ * language for all of it: a number square, a word pill, an MCQ row, a
+ * crossword-pool tile. Sizing/layout (width, padding, grid placement) stays
+ * with each engine via `className`/`style`; this owns color, state and feel.
+ */
+export const GameOption: React.FC<{
+  children: React.ReactNode;
+  onClick?: () => void;
+  state?: GameOptionState;
+  disabled?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
+  ariaLabel?: string;
+}> = ({ children, onClick, state = 'idle', disabled = false, className = '', style, ariaLabel }) => {
+  const p = OPTION_PALETTE[state];
+  const anim = state === 'correct' ? 'animate-glow-green' : state === 'wrong' ? 'animate-game-shake' : '';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={ariaLabel}
+      className={`font-display font-black select-none ${disabled && state === 'idle' ? 'opacity-60' : PRESS} ${anim} ${className}`}
+      style={{
+        minHeight: T.tap,
+        borderRadius: T.radius.sm,
+        background: p.bg,
+        color: p.color,
+        border: `2px solid ${p.border}`,
+        boxShadow: p.shadow,
+        ...style,
+      }}
+    >
+      {children}
+    </button>
+  );
+};
+
+/**
+ * The screen every game ends on: trophy, stars, an optional score line (hidden
+ * for Class 1–2 per the pre-reader rule the rest of the kit follows), Play
+ * Again. Real clay trophy art via `<Pic>` once generated — emoji until then,
+ * automatically, same seam as everywhere else.
+ */
+export const GameFinishScreen: React.FC<{
+  earned: number;
+  /** e.g. "4 of 5 correct" — omit for pre-readers or when a count doesn't apply. */
+  scoreLabel?: string;
+  onPlayAgain: () => void;
+}> = ({ earned, scoreLabel, onPlayAgain }) => (
+  <div className="flex flex-col items-center gap-4 py-10 anim-fade-up">
+    <Pic emoji="🏆" name="nav-trophies" size={76} className="drop-shadow-[0_4px_6px_rgba(0,0,0,.18)]" />
+    <StarRow earned={earned} size={34} />
+    {scoreLabel && (
+      <p className="font-display font-bold text-sm" style={{ color: T.ink.muted }}>{scoreLabel}</p>
+    )}
+    <Button tone="primary" onClick={onPlayAgain} className="mt-1">
+      🔄 Play Again
+    </Button>
+  </div>
 );

@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronRight, Hand, Loader2, Radio } from 'lucide-react';
+import { ChevronRight, Clock, Hand, Loader2, Radio } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 import { Button, Card, Pic, T } from './ui';
+import { getClassTheme } from './theme';
+import { useApp } from '../../context/AppContext';
 
 /**
  * "Your class is starting" — the Batch 1 live-session card.
@@ -33,7 +35,9 @@ const teacherName = (s: ActiveSession): string => {
   return Array.isArray(up) ? (up[0]?.full_name ?? 'your teacher') : up.full_name;
 };
 
-export const LiveClassCard: React.FC<{ mascot: string }> = ({ mascot }) => {
+export const LiveClassCard: React.FC = () => {
+  const { currentClass } = useApp();
+  const theme = getClassTheme(currentClass);
   const [session, setSession] = useState<ActiveSession | null | undefined>(undefined);
   const [hasJoined, setHasJoined] = useState(false);
   const [raisedHand, setRaisedHand] = useState(false);
@@ -148,51 +152,53 @@ export const LiveClassCard: React.FC<{ mascot: string }> = ({ mascot }) => {
     );
   }
 
-  /* Live now. This is the loudest thing on the page by design. */
+  /* Live now. This is the loudest thing on the page by design. Tinted with
+     the child's own class colour (green for Class 1, purple for Class 3, …)
+     rather than a fixed brand colour, so the banner still carries the same
+     per-class identity as the avatar ring and class pill in the header. */
+  const soft = `color-mix(in srgb, ${theme.accent} 16%, white)`;
+  const softer = `color-mix(in srgb, ${theme.accent} 26%, white)`;
+
   return (
     <div
       className="relative overflow-hidden px-5 py-4 sm:px-7 sm:py-5 flex flex-col sm:flex-row sm:items-center gap-4"
       style={{
         borderRadius: 26,
-        background: 'linear-gradient(100deg,#7BD94A 0%,#4FC93F 55%,#2FBE6A 100%)',
-        boxShadow: '0 6px 0 #34A32F, 0 18px 32px rgba(79,201,63,.30)',
+        background: `linear-gradient(100deg, ${soft} 0%, ${softer} 100%)`,
+        boxShadow: '0 10px 26px rgba(20,90,140,.10)',
       }}
     >
       <span
-        aria-hidden="true"
-        className="absolute inset-x-0 top-0 pointer-events-none"
-        style={{ height: '48%', background: 'linear-gradient(180deg, rgba(255,255,255,.24), rgba(255,255,255,0))' }}
-      />
-      {/* Sparkles around the mascot, as in the design. */}
-      <span aria-hidden="true" className="absolute text-white/70 text-lg select-none" style={{ top: 14, right: '30%' }}>✦</span>
-      <span aria-hidden="true" className="absolute text-white/50 text-sm select-none" style={{ bottom: 16, right: '26%' }}>✦</span>
-      <span aria-hidden="true" className="absolute text-white/60 text-xs select-none" style={{ top: 30, right: '21%' }}>✦</span>
-
-      <span
         className="relative flex items-center justify-center shrink-0"
-        style={{ width: 58, height: 58, borderRadius: 18, background: 'rgba(255,255,255,.95)' }}
+        style={{ width: 54, height: 54, borderRadius: 16, background: 'rgba(255,255,255,.85)' }}
       >
-        <Radio size={30} className="text-emerald-600 animate-pulse" />
+        <Radio size={26} style={{ color: theme.accentDark }} className="animate-pulse" />
       </span>
 
       <div className="relative flex-1 min-w-0">
-        <p
-          className="font-display font-black text-xl sm:text-2xl text-white leading-tight"
-          style={{ textShadow: '0 2px 3px rgba(0,0,0,.18)' }}
-        >
-          Your class is live now!
+        <p className="flex items-center gap-1.5 font-display font-black text-xl sm:text-2xl leading-tight" style={{ color: theme.accentDark }}>
+          <span aria-hidden="true">✨</span>
+          Your class is live!
         </p>
-        <p className="font-bold text-sm text-white/90 truncate">
+        <p className="font-bold text-sm mt-0.5 truncate" style={{ color: T.ink.strong }}>
           {session.subject ? `${session.subject} with ` : 'With '}{teacherName(session)}
+        </p>
+        <p className="flex items-center gap-1.5 font-bold text-xs mt-1" style={{ color: T.ink.muted }}>
+          <Clock size={13} />
+          Started {startedAtLabel(session.started_at)}
         </p>
       </div>
 
-      {/* The class mascot, waving the child in. Hidden on narrow screens so it
-          never squeezes the one control that matters. */}
+      {/* A mascot to wave the child in. Bigger than before, and shown from
+          `md` up rather than only `lg` — sized in responsive steps (not one
+          fixed px value) so it stays proportionate rather than either
+          crowding a mid-size screen or looking small on a wide one. The
+          banner's own `overflow-hidden` is the backstop against clipping. */}
       <Pic
-        emoji={mascot}
-        size={76}
-        className="relative hidden lg:block shrink-0 anim-bob drop-shadow-[0_4px_6px_rgba(0,0,0,.25)]"
+        emoji={theme.mascot}
+        name="live-banner-robot"
+        size={260}
+        className="relative hidden md:block shrink-0 anim-bob drop-shadow-[0_6px_6px_rgba(0,0,0,.2)] md:!w-44 md:!h-44 lg:!w-44 lg:!h-44 xl:!w-44 xl:!h-44"
       />
 
       <div className="relative flex items-center gap-2.5 shrink-0">
@@ -201,9 +207,13 @@ export const LiveClassCard: React.FC<{ mascot: string }> = ({ mascot }) => {
             type="button"
             onClick={handleJoin}
             disabled={isJoining}
-            className="inline-flex items-center gap-2 bg-white font-display font-black text-base sm:text-lg px-7
+            className="inline-flex items-center gap-2 text-white font-display font-black text-base sm:text-lg px-7
                        transition-transform duration-100 active:translate-y-[3px] cursor-pointer disabled:opacity-60"
-            style={{ minHeight: 60, borderRadius: 999, color: '#2C8F27', boxShadow: '0 4px 0 #CFE6CB' }}
+            style={{
+              minHeight: 60, borderRadius: 999,
+              background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentDark})`,
+              boxShadow: `0 4px 0 ${theme.accentDark}`,
+            }}
           >
             {isJoining ? <Loader2 size={20} className="animate-spin" /> : (<>Join now <ChevronRight size={20} strokeWidth={3} /></>)}
           </button>
@@ -217,8 +227,8 @@ export const LiveClassCard: React.FC<{ mascot: string }> = ({ mascot }) => {
             style={{
               minHeight: 60, borderRadius: 999,
               background: raisedHand ? '#FFC400' : '#FFFFFF',
-              color: raisedHand ? '#7A5200' : '#2C8F27',
-              boxShadow: `0 4px 0 ${raisedHand ? '#D79E00' : '#CFE6CB'}`,
+              color: raisedHand ? '#7A5200' : theme.accentDark,
+              boxShadow: `0 4px 0 ${raisedHand ? '#D79E00' : 'rgba(20,90,140,.14)'}`,
             }}
           >
             <Hand size={20} />
@@ -229,3 +239,10 @@ export const LiveClassCard: React.FC<{ mascot: string }> = ({ mascot }) => {
     </div>
   );
 };
+
+/** A day a child can read, e.g. "10:30 AM" — never a raw timestamp. There is
+ *  no scheduled end time on `ActiveSession`, so unlike the mockup this shows
+ *  only when the class started rather than guessing an end time. */
+const startedAtLabel = (iso: string): string =>
+  new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+

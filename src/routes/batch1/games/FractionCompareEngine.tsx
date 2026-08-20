@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Star } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { GameFinishScreen, GameOption, GameProgressDots, T } from '../ui';
 
 /* Ported from EducationAI-Games-master's Grade4 "FractionCompare" and
    restyled to this app's Adventure Island look — amber/emerald palette,
@@ -111,61 +111,48 @@ export const FractionCompareEngine: React.FC<FractionCompareEngineProps> = ({ ga
   if (finished) {
     const earned = starsForCompare(correctCount, problems.length);
     return (
-      <div className="flex flex-col items-center gap-5 py-10 anim-fade-up">
-        <span className="text-6xl">🏆</span>
-        <div className="flex gap-1">{[1, 2, 3].map((n) => (<Star key={n} size={32} className={n <= earned ? 'fill-amber-400 text-amber-400' : 'text-slate-200'} />))}</div>
-        {!isPreReader && <p className="font-display font-bold text-slate-600 text-sm">{correctCount} / {problems.length} correct</p>}
-        <button onClick={handlePlayAgain} className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer" style={{ minHeight: 48, minWidth: 120 }}>
-          🔄 Play Again
-        </button>
-      </div>
+      <GameFinishScreen
+        earned={earned}
+        scoreLabel={isPreReader ? undefined : `${correctCount} of ${problems.length} correct`}
+        onPlayAgain={handlePlayAgain}
+      />
     );
   }
 
   return (
     <div className="flex flex-col items-center gap-5 max-w-lg mx-auto anim-fade-up">
-      <div className="flex gap-2">
-        {problems.map((_, i) => (
-          <div key={i} className={`w-3.5 h-3.5 rounded-full transition-all ${i < idx ? 'bg-emerald-400' : i === idx ? 'bg-amber-400 scale-125' : 'bg-slate-200'}`} />
-        ))}
-      </div>
+      <GameProgressDots total={problems.length} current={idx} />
 
-      {!isPreReader && <p className="font-display font-black text-lg text-slate-700">Which is bigger?</p>}
+      {!isPreReader && <p className="font-display font-black text-lg" style={{ color: T.ink.strong }}>Which is bigger?</p>}
 
       <div className="flex items-center justify-center gap-6">
-        <div className="flex flex-col items-center gap-2 bg-white rounded-3xl border border-slate-100 p-4" style={{ boxShadow: '0 4px 0 rgba(20,90,140,.08)' }}>
+        <div className="flex flex-col items-center gap-2 bg-white p-4" style={{ borderRadius: T.radius.md, boxShadow: T.shadow.card }}>
           <PieSVG num={problem.a.num} den={problem.a.den} color={PIE_A_COLOR} />
           <span className="font-display font-black text-lg" style={{ color: PIE_A_COLOR }}>{problem.a.num}/{problem.a.den}</span>
         </div>
 
         <div className="flex flex-col items-center gap-3">
           {(['<', '=', '>'] as const).map((sym) => {
-            let cls = 'w-14 h-14 rounded-2xl font-display font-black text-2xl border-2 flex items-center justify-center transition-all ';
-            if (result === null) {
-              cls += selected === sym ? 'bg-amber-400 text-white border-amber-400 scale-110' : 'bg-white border-slate-200 hover:border-amber-300 text-slate-600 cursor-pointer';
-            } else if (sym === answer) {
-              cls += 'bg-emerald-500 text-white border-emerald-500 scale-110';
-            } else if (sym === selected) {
-              cls += 'bg-red-400 text-white border-red-400';
-            } else {
-              cls += 'bg-white border-slate-200 text-slate-300';
-            }
+            const state = result === null ? 'idle' : sym === answer ? 'correct' : sym === selected ? 'wrong' : 'dimmed';
             return (
-              <button key={sym} onClick={() => handleSelect(sym)} disabled={result !== null} className={cls}>
+              <GameOption key={sym} state={state} disabled={result !== null} onClick={() => handleSelect(sym)} className="text-2xl" style={{ width: 56, height: 56, minHeight: 56 }}>
                 {sym}
-              </button>
+              </GameOption>
             );
           })}
         </div>
 
-        <div className="flex flex-col items-center gap-2 bg-white rounded-3xl border border-slate-100 p-4" style={{ boxShadow: '0 4px 0 rgba(20,90,140,.08)' }}>
+        <div className="flex flex-col items-center gap-2 bg-white p-4" style={{ borderRadius: T.radius.md, boxShadow: T.shadow.card }}>
           <PieSVG num={problem.b.num} den={problem.b.den} color={PIE_B_COLOR} />
           <span className="font-display font-black text-lg" style={{ color: PIE_B_COLOR }}>{problem.b.num}/{problem.b.den}</span>
         </div>
       </div>
 
       {result && (
-        <div className={`w-full rounded-2xl px-6 py-4 font-display font-bold text-center anim-fade-up ${result === 'correct' ? 'bg-emerald-50 border-2 border-emerald-300 text-emerald-700' : 'bg-red-50 border-2 border-red-300 text-red-600'}`}>
+        <div
+          className="w-full px-6 py-4 font-display font-bold text-center anim-fade-up"
+          style={{ borderRadius: T.radius.sm, background: result === 'correct' ? '#EAFBF0' : '#FDEDEC', border: `2px solid ${result === 'correct' ? '#A8E8BC' : '#F5B3AD'}`, color: result === 'correct' ? '#1B7F41' : '#B23930' }}
+        >
           {result === 'correct' ? '🎉 Correct!' : `Not quite — ${problem.a.num}/${problem.a.den} ${answer} ${problem.b.num}/${problem.b.den}`}
         </div>
       )}

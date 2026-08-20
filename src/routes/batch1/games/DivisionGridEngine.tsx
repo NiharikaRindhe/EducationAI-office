@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Star } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { Button, GameFinishScreen, GameOption, GameProgressDots, T } from '../ui';
 
 /* Ported from EducationAI-Games-master's Grade3 "MissingSide" (division as
    grid-row-building — "Division Detective") and restyled to this app's
@@ -78,6 +78,7 @@ export const DivisionGridEngine: React.FC<DivisionGridEngineProps> = ({ game, is
   const [phase, setPhase] = useState<'build' | 'answer'>('build');
   const [choices, setChoices] = useState<number[]>([]);
   const [result, setResult] = useState<'correct' | 'wrong' | null>(null);
+  const [selected, setSelected] = useState<number | null>(null);
   const [finished, setFinished] = useState(false);
 
   const { dividend, divisor, quotient, remainder } = puzzle;
@@ -102,6 +103,7 @@ export const DivisionGridEngine: React.FC<DivisionGridEngineProps> = ({ game, is
 
   function handleSelect(choice: number) {
     if (result !== null) return;
+    setSelected(choice);
     const ok = choice === quotient;
     setResult(ok ? 'correct' : 'wrong');
     if (ok) confetti({ particleCount: 30, spread: 40, origin: { y: 0.7 } });
@@ -119,6 +121,7 @@ export const DivisionGridEngine: React.FC<DivisionGridEngineProps> = ({ game, is
         setShadedRows(0);
         setPhase('build');
         setResult(null);
+        setSelected(null);
       }
     }, ok ? 1400 : 1800);
   }
@@ -131,40 +134,34 @@ export const DivisionGridEngine: React.FC<DivisionGridEngineProps> = ({ game, is
     setShadedRows(0);
     setPhase('build');
     setResult(null);
+    setSelected(null);
   }
 
   if (finished) {
     const earned = starsForDivision(correctCount, TOTAL_ROUNDS);
     return (
-      <div className="flex flex-col items-center gap-5 py-10 anim-fade-up">
-        <span className="text-6xl">🏆</span>
-        <div className="flex gap-1">{[1, 2, 3].map((n) => (<Star key={n} size={32} className={n <= earned ? 'fill-amber-400 text-amber-400' : 'text-slate-200'} />))}</div>
-        {!isPreReader && <p className="font-display font-bold text-slate-600 text-sm">{correctCount} / {TOTAL_ROUNDS} correct</p>}
-        <button onClick={handlePlayAgain} className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer" style={{ minHeight: 48, minWidth: 120 }}>
-          🔄 Play Again
-        </button>
-      </div>
+      <GameFinishScreen
+        earned={earned}
+        scoreLabel={isPreReader ? undefined : `${correctCount} of ${TOTAL_ROUNDS} correct`}
+        onPlayAgain={handlePlayAgain}
+      />
     );
   }
 
   return (
     <div className="flex flex-col items-center gap-5 max-w-lg mx-auto anim-fade-up">
-      <div className="flex gap-2">
-        {Array.from({ length: TOTAL_ROUNDS }).map((_, i) => (
-          <div key={i} className={`w-3.5 h-3.5 rounded-full transition-all ${i < round ? 'bg-emerald-400' : i === round ? 'bg-amber-400 scale-125' : 'bg-slate-200'}`} />
-        ))}
-      </div>
+      <GameProgressDots total={TOTAL_ROUNDS} current={round} />
 
-      <div className="w-full bg-amber-50/60 border border-amber-100 rounded-3xl px-6 py-4 text-center flex items-center justify-center gap-3">
+      <div className="w-full px-6 py-4 text-center flex items-center justify-center gap-3" style={{ borderRadius: T.radius.md, background: T.surface.sunk }}>
         <span className="font-display font-black text-2xl" style={{ color: BLUE.text }}>{dividend}</span>
-        <span className="text-slate-400 text-xl">÷</span>
+        <span className="text-xl" style={{ color: T.ink.faint }}>÷</span>
         <span className="font-display font-black text-2xl" style={{ color: ORANGE.text }}>{divisor}</span>
-        <span className="text-slate-400 text-xl">=</span>
-        <span className="font-display font-black text-2xl text-slate-300">{result === 'correct' ? quotient : '?'}</span>
+        <span className="text-xl" style={{ color: T.ink.faint }}>=</span>
+        <span className="font-display font-black text-2xl" style={{ color: T.surface.line }}>{result === 'correct' ? quotient : '?'}</span>
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-100 p-4 flex flex-col items-center gap-2" style={{ boxShadow: '0 4px 0 rgba(20,90,140,.08)' }}>
-        {!isPreReader && <p className="text-xs text-slate-400 font-semibold">Drag to build rows of {divisor}</p>}
+      <div className="bg-white p-4 flex flex-col items-center gap-2" style={{ borderRadius: T.radius.md, boxShadow: T.shadow.card }}>
+        {!isPreReader && <p className="text-xs font-semibold" style={{ color: T.ink.faint }}>Drag to build rows of {divisor}</p>}
         <div style={{ display: 'flex', gap: 2 }} className="flex-col">
           {Array.from({ length: totalGridRows }, (_, r) => {
             const rowShaded = r < shadedRows;
@@ -175,7 +172,7 @@ export const DivisionGridEngine: React.FC<DivisionGridEngineProps> = ({ game, is
                     key={`${r}-${c}`}
                     onPointerDown={() => cellDown(r)}
                     onPointerEnter={() => cellEnter(r)}
-                    style={{ width: cs, height: cs, background: rowShaded ? BLUE.bg : '#e2e8f0', borderRadius: 4, cursor: phase === 'build' ? 'pointer' : 'default', userSelect: 'none' }}
+                    style={{ width: cs, height: cs, background: rowShaded ? BLUE.bg : T.surface.sunk, borderRadius: 4, cursor: phase === 'build' ? 'pointer' : 'default', userSelect: 'none' }}
                   />
                 ))}
               </div>
@@ -190,23 +187,26 @@ export const DivisionGridEngine: React.FC<DivisionGridEngineProps> = ({ game, is
       </div>
 
       {phase === 'build' && (
-        <button onClick={confirmGrid} disabled={shadedRows === 0} className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold px-8 py-3 rounded-full shadow-md transition-all disabled:bg-slate-200 disabled:text-slate-400">
+        <Button tone="amber" onClick={confirmGrid} disabled={shadedRows === 0}>
           Confirm My Grid
-        </button>
+        </Button>
       )}
 
       {phase === 'answer' && (
         <div className="w-full flex flex-col items-center gap-4">
-          {!isPreReader && <p className="text-xs font-bold text-slate-400">What's the missing side?</p>}
+          {!isPreReader && <p className="text-xs font-bold" style={{ color: T.ink.faint }}>What's the missing side?</p>}
           <div className="flex gap-3 justify-center flex-wrap">
             {choices.map((c) => (
-              <button key={c} onClick={() => handleSelect(c)} disabled={result !== null} className="w-16 h-16 rounded-2xl font-display font-black text-2xl shadow-sm transition-all active:scale-95 bg-white border-2 border-slate-200 hover:border-amber-300 text-slate-700 disabled:opacity-50">
+              <GameOption key={c} state={result !== null ? (c === quotient ? 'correct' : c === selected ? 'wrong' : 'dimmed') : 'idle'} disabled={result !== null} onClick={() => handleSelect(c)} className="text-2xl" style={{ width: 64, height: 64 }}>
                 {c}
-              </button>
+              </GameOption>
             ))}
           </div>
           {result && (
-            <div className={`w-full rounded-2xl px-6 py-4 font-display font-bold text-center anim-fade-up ${result === 'correct' ? 'bg-emerald-50 border-2 border-emerald-300 text-emerald-700' : 'bg-red-50 border-2 border-red-300 text-red-600'}`}>
+            <div
+              className="w-full px-6 py-4 font-display font-bold text-center anim-fade-up"
+              style={{ borderRadius: T.radius.sm, background: result === 'correct' ? '#EAFBF0' : '#FDEDEC', border: `2px solid ${result === 'correct' ? '#A8E8BC' : '#F5B3AD'}`, color: result === 'correct' ? '#1B7F41' : '#B23930' }}
+            >
               {result === 'correct'
                 ? `🎉 ${dividend} ÷ ${divisor} = ${quotient}${remainder > 0 ? ` R${remainder}` : ''}`
                 : `Not quite — it's ${quotient}${remainder > 0 ? ` R${remainder}` : ''}.`}

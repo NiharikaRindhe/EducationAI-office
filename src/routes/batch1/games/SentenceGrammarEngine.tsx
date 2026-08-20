@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Star, CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Lightbulb } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { Button, GameFinishScreen, GameProgressDots, T } from '../ui';
 
 /* Ported from EducationAI-Games-master's Grade3 "SentenceBuilder" (tap
    word-tiles by part-of-speech into slots) and restyled to this app's
@@ -117,15 +118,7 @@ export const SentenceGrammarEngine: React.FC<SentenceGrammarEngineProps> = ({ ga
 
   if (finished) {
     const earned = starsForGrammar(mistakes);
-    return (
-      <div className="flex flex-col items-center gap-5 py-10 anim-fade-up">
-        <span className="text-6xl">🏆</span>
-        <div className="flex gap-1">{[1, 2, 3].map((n) => (<Star key={n} size={32} className={n <= earned ? 'fill-amber-400 text-amber-400' : 'text-slate-200'} />))}</div>
-        <button onClick={handlePlayAgain} className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer" style={{ minHeight: 48, minWidth: 120 }}>
-          🔄 Play Again
-        </button>
-      </div>
-    );
+    return <GameFinishScreen earned={earned} onPlayAgain={handlePlayAgain} />;
   }
 
   const grouped = new Map<Pos, WordTile[]>();
@@ -137,11 +130,7 @@ export const SentenceGrammarEngine: React.FC<SentenceGrammarEngineProps> = ({ ga
 
   return (
     <div className="flex flex-col items-center gap-5 max-w-xl mx-auto anim-fade-up">
-      <div className="flex gap-2">
-        {sentences.map((_, i) => (
-          <div key={i} className={`w-3.5 h-3.5 rounded-full transition-all ${i < idx ? 'bg-emerald-400' : i === idx ? 'bg-amber-400 scale-125' : 'bg-slate-200'}`} />
-        ))}
-      </div>
+      <GameProgressDots total={sentences.length} current={idx} />
 
       <div className="flex gap-3 flex-wrap justify-center">
         {sentence.slots.map((slot) => {
@@ -150,30 +139,31 @@ export const SentenceGrammarEngine: React.FC<SentenceGrammarEngineProps> = ({ ga
           return (
             <button
               key={slot.id}
+              type="button"
               onClick={() => tile && removeFromSlot(slot.id)}
-              className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed transition-all px-4 py-3 ${tile ? `${style!.light} border-solid` : 'bg-white border-slate-300'}`}
-              style={{ minWidth: 96, minHeight: 68 }}
+              className={`flex flex-col items-center justify-center transition-all px-4 py-3 ${tile ? style!.light : 'bg-white'}`}
+              style={{ minWidth: 96, minHeight: 68, borderRadius: T.radius.sm, border: `2px ${tile ? 'solid' : 'dashed'} ${tile ? 'transparent' : T.surface.line}` }}
             >
-              <span className={`text-[9px] font-display font-black tracking-widest uppercase mb-1 ${tile ? style!.text : 'text-slate-300'}`}>{slot.label}</span>
-              {tile ? <span className={`font-display font-black text-base ${style!.text}`}>{tile.word}</span> : <span className="text-slate-200 text-xl font-black">—</span>}
+              <span className={`text-[9px] font-display font-black tracking-widest uppercase mb-1 ${tile ? style!.text : ''}`} style={!tile ? { color: T.ink.faint } : undefined}>{slot.label}</span>
+              {tile ? <span className={`font-display font-black text-base ${style!.text}`}>{tile.word}</span> : <span className="text-xl font-black" style={{ color: T.surface.line }}>—</span>}
             </button>
           );
         })}
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-300 rounded-2xl px-5 py-2.5 text-sm text-red-600 font-semibold text-center anim-fade-up">
+        <div className="px-5 py-2.5 text-sm font-semibold text-center anim-fade-up" style={{ borderRadius: T.radius.sm, border: '1px solid #F5B3AD', background: '#FDEDEC', color: '#B23930' }}>
           ⚠️ {error}
         </div>
       )}
       {showHint && !isPreReader && (
-        <div className="bg-amber-50 border border-amber-300 rounded-2xl px-5 py-2.5 text-sm text-amber-700 font-semibold text-center">
+        <div className="px-5 py-2.5 text-sm font-semibold text-center" style={{ borderRadius: T.radius.sm, border: '1px solid #FFD53E', background: '#FFF7E0', color: '#96690A' }}>
           💡 e.g. <em>{sentence.example}</em>
         </div>
       )}
 
-      <div className="w-full bg-white rounded-3xl border border-slate-100 shadow-sm px-5 py-4">
-        <p className="text-[10px] font-display font-black tracking-widest text-slate-400 text-center uppercase mb-3">🗂 Word Bank</p>
+      <div className="w-full bg-white px-5 py-4" style={{ borderRadius: T.radius.md, boxShadow: T.shadow.card }}>
+        <p className="text-[10px] font-display font-black tracking-widest text-center uppercase mb-3" style={{ color: T.ink.faint }}>🗂 Word Bank</p>
         <div className="grid grid-cols-2 gap-4">
           {Array.from(grouped.entries()).map(([pos, tiles]) => {
             const style = POS_STYLE[pos];
@@ -186,9 +176,11 @@ export const SentenceGrammarEngine: React.FC<SentenceGrammarEngineProps> = ({ ga
                     return (
                       <button
                         key={tile.word}
+                        type="button"
                         onClick={() => tapTile(tile)}
                         disabled={used || result !== null}
-                        className={`px-3.5 py-2 rounded-xl text-sm font-display font-bold transition-all active:scale-95 ${used ? 'bg-slate-100 text-slate-300' : `${style.bg} text-white shadow-sm hover:opacity-90`}`}
+                        className={`px-3.5 py-2 text-sm font-display font-bold transition-all active:scale-95 ${used ? '' : `${style.bg} text-white shadow-sm hover:opacity-90`}`}
+                        style={{ borderRadius: T.radius.sm, ...(used ? { background: T.surface.sunk, color: T.ink.faint } : {}) }}
                       >
                         {tile.word}
                       </button>
@@ -201,8 +193,8 @@ export const SentenceGrammarEngine: React.FC<SentenceGrammarEngineProps> = ({ ga
         </div>
       </div>
 
-      <div className="w-full bg-amber-50/60 border border-amber-100 rounded-3xl px-6 py-4 text-center">
-        <p className={`font-display font-black text-xl ${result === 'correct' ? 'text-emerald-600' : 'text-slate-700'}`}>
+      <div className="w-full px-6 py-4 text-center" style={{ borderRadius: T.radius.md, background: T.surface.sunk }}>
+        <p className="font-display font-black text-xl" style={{ color: result === 'correct' ? '#1B7F41' : T.ink.strong }}>
           {result === 'correct' ? `🎉 ${sentenceStr}.` : sentenceStr === sentence.slots.map(() => '___').join(' ') ? (isPreReader ? '?' : 'Tap words to build your sentence…') : `${sentenceStr}.`}
         </p>
       </div>
@@ -210,19 +202,19 @@ export const SentenceGrammarEngine: React.FC<SentenceGrammarEngineProps> = ({ ga
       <div className="flex gap-3 flex-wrap justify-center">
         {result === null ? (
           <>
-            <button onClick={checkGrammar} disabled={!allFilled} className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400 text-white font-display font-bold px-6 py-3 rounded-full shadow-md transition-all">
-              <CheckCircle2 size={18} /> Check
-            </button>
+            <Button tone="primary" onClick={checkGrammar} disabled={!allFilled} icon={<CheckCircle2 size={18} />}>
+              Check
+            </Button>
             {!isPreReader && (
-              <button onClick={() => setShowHint((h) => !h)} className="bg-white border border-slate-200 text-slate-500 font-display font-bold px-5 py-3 rounded-full text-sm hover:bg-slate-50">
-                💡 Hint
-              </button>
+              <Button tone="quiet" onClick={() => setShowHint((h) => !h)} icon={<Lightbulb size={16} style={{ color: '#DB9A00' }} />}>
+                Hint
+              </Button>
             )}
           </>
         ) : (
-          <button onClick={nextSentence} className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold px-8 py-3 rounded-full shadow-md transition-all">
+          <Button tone="amber" onClick={nextSentence}>
             {idx + 1 >= sentences.length ? 'Finish' : 'Next →'}
-          </button>
+          </Button>
         )}
       </div>
     </div>

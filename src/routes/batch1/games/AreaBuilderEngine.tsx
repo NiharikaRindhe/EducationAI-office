@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Star, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { Button, GameFinishScreen, GameOption, GameProgressDots, T } from '../ui';
 
 /* Ported from EducationAI-Games-master's Grade3 "AreaBuilder" (drag-to-shade
    area-as-multiplication) and restyled to this app's Adventure Island look —
@@ -112,7 +113,7 @@ const DragGrid: React.FC<{ targetRows: number; targetCols: number; colorIdx: num
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <p className="text-xs font-bold text-slate-500 text-center">
+      <p className="text-xs font-bold text-center" style={{ color: T.ink.muted }}>
         Shade <span className="font-display font-black" style={{ color: color.bg }}>{targetRows} × {targetCols}</span>
       </p>
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${totalCols}, ${cs}px)`, gap: 2, cursor: 'crosshair' }}>
@@ -125,7 +126,7 @@ const DragGrid: React.FC<{ targetRows: number; targetCols: number; colorIdx: num
                 onPointerDown={() => cellDown(r, c)}
                 onPointerEnter={() => cellEnter(r, c)}
                 style={{
-                  width: cs, height: cs, background: shaded ? color.bg : '#e2e8f0', borderRadius: 4,
+                  width: cs, height: cs, background: shaded ? color.bg : T.surface.sunk, borderRadius: 4,
                   transition: 'background 0.08s', userSelect: 'none',
                 }}
               />
@@ -133,20 +134,29 @@ const DragGrid: React.FC<{ targetRows: number; targetCols: number; colorIdx: num
           }),
         )}
       </div>
-      <div className={`text-xs font-bold px-3 py-1 rounded-full ${exact ? 'bg-emerald-100 text-emerald-700' : 'text-slate-400'}`}>
+      <div
+        className="text-xs font-bold px-3 py-1"
+        style={{ borderRadius: 999, background: exact ? '#EAFBF0' : 'transparent', color: exact ? '#1B7F41' : T.ink.faint }}
+      >
         {shadedRows > 0 ? `${shadedRows} × ${shadedCols} = ${shadedRows * shadedCols}` : 'Drag to shade'}
       </div>
       {!done && (
         <button
+          type="button"
           onClick={confirm}
           disabled={shadedRows === 0}
-          className="px-5 py-2 rounded-full font-display font-bold text-sm text-white shadow-md disabled:bg-slate-200 disabled:text-slate-400"
-          style={shadedRows > 0 ? { background: color.bg } : {}}
+          className="px-5 py-2 font-display font-bold text-sm"
+          style={{
+            borderRadius: 999, minHeight: 44,
+            background: shadedRows > 0 ? color.bg : T.surface.sunk,
+            color: shadedRows > 0 ? '#FFFFFF' : T.ink.faint,
+            boxShadow: shadedRows > 0 ? '0 3px 0 rgba(0,0,0,.18)' : 'none',
+          }}
         >
           Confirm
         </button>
       )}
-      {done && <div className="text-sm font-display font-bold text-emerald-600">✅ Done!</div>}
+      {done && <div className="text-sm font-display font-bold" style={{ color: '#1B7F41' }}>✅ Done!</div>}
     </div>
   );
 };
@@ -166,6 +176,7 @@ export const AreaBuilderEngine: React.FC<AreaBuilderEngineProps> = ({ game, isPr
   const [badRegion, setBadRegion] = useState(false);
   const [choices, setChoices] = useState<number[]>([]);
   const [result, setResult] = useState<'correct' | 'wrong' | null>(null);
+  const [selected, setSelected] = useState<number | null>(null);
   const [finished, setFinished] = useState(false);
 
   const regions = decompose(puzzle.rows, puzzle.cols, allowDecompose);
@@ -184,6 +195,7 @@ export const AreaBuilderEngine: React.FC<AreaBuilderEngineProps> = ({ game, isPr
 
   function handleSelect(choice: number) {
     if (result !== null) return;
+    setSelected(choice);
     const ok = choice === product;
     setResult(ok ? 'correct' : 'wrong');
     if (ok) confetti({ particleCount: 30, spread: 40, origin: { y: 0.7 } });
@@ -202,6 +214,7 @@ export const AreaBuilderEngine: React.FC<AreaBuilderEngineProps> = ({ game, isPr
         setCurrentRegion(0);
         setBadRegion(false);
         setResult(null);
+        setSelected(null);
       }
     }, ok ? 1400 : 1800);
   }
@@ -220,44 +233,32 @@ export const AreaBuilderEngine: React.FC<AreaBuilderEngineProps> = ({ game, isPr
   if (finished) {
     const earned = starsForArea(correctCount, TOTAL_ROUNDS);
     return (
-      <div className="flex flex-col items-center gap-5 py-10 anim-fade-up">
-        <span className="text-6xl">🏆</span>
-        <div className="flex gap-1">
-          {[1, 2, 3].map((n) => (<Star key={n} size={32} className={n <= earned ? 'fill-amber-400 text-amber-400' : 'text-slate-200'} />))}
-        </div>
-        {!isPreReader && <p className="font-display font-bold text-slate-600 text-sm">{correctCount} / {TOTAL_ROUNDS} correct</p>}
-        <button onClick={handlePlayAgain} className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer" style={{ minHeight: 48, minWidth: 120 }}>
-          🔄 Play Again
-        </button>
-      </div>
+      <GameFinishScreen
+        earned={earned}
+        scoreLabel={isPreReader ? undefined : `${correctCount} of ${TOTAL_ROUNDS} correct`}
+        onPlayAgain={handlePlayAgain}
+      />
     );
   }
 
   return (
     <div className="flex flex-col items-center gap-5 max-w-lg mx-auto anim-fade-up">
-      <div className="flex gap-2">
-        {Array.from({ length: TOTAL_ROUNDS }).map((_, i) => (
-          <div key={i} className={`w-3.5 h-3.5 rounded-full transition-all ${i < round ? 'bg-emerald-400' : i === round ? 'bg-amber-400 scale-125' : 'bg-slate-200'}`} />
-        ))}
-      </div>
+      <GameProgressDots total={TOTAL_ROUNDS} current={round} />
 
-      <div className="w-full bg-amber-50/60 border border-amber-100 rounded-3xl px-6 py-4 text-center">
-        <p className="font-display font-black text-2xl text-slate-700">🟦 {puzzle.rows} × {puzzle.cols} = ?</p>
+      <div className="w-full px-6 py-4 text-center" style={{ borderRadius: T.radius.md, background: T.surface.sunk }}>
+        <p className="font-display font-black text-2xl" style={{ color: T.ink.strong }}>🟦 {puzzle.rows} × {puzzle.cols} = ?</p>
       </div>
 
       {phase === 'intro' && (
         <div className="flex flex-col items-center gap-4 py-4">
-          <p className="text-slate-500 font-semibold text-sm text-center max-w-xs">
+          <p className="font-semibold text-sm text-center max-w-xs" style={{ color: T.ink.muted }}>
             {isPreReader ? 'Shade the grid! 🟦' : regions.length > 1
               ? `Build ${regions.length} colored grids to find the area!`
               : `Drag to shade ${puzzle.rows} rows × ${puzzle.cols} columns.`}
           </p>
-          <button
-            onClick={() => setPhase('build')}
-            className="flex items-center gap-2 bg-amber-400 hover:bg-amber-500 text-white font-display font-bold px-8 py-3 rounded-full shadow-md transition-all"
-          >
-            Start <ChevronRight size={18} />
-          </button>
+          <Button tone="amber" onClick={() => setPhase('build')} icon={<ChevronRight size={18} />}>
+            Start
+          </Button>
         </div>
       )}
 
@@ -277,11 +278,11 @@ export const AreaBuilderEngine: React.FC<AreaBuilderEngineProps> = ({ game, isPr
             </div>
           )}
           {badRegion && (
-            <div className="bg-red-50 border border-red-300 text-red-600 rounded-2xl px-4 py-2 text-xs font-semibold text-center">
+            <div className="px-4 py-2 text-xs font-semibold text-center" style={{ borderRadius: T.radius.sm, background: '#FDEDEC', border: '1px solid #F5B3AD', color: '#B23930' }}>
               ❌ Try {regions[currentRegion].rows} × {regions[currentRegion].cols} again
             </div>
           )}
-          <div className="bg-white rounded-3xl border border-slate-100 p-4" style={{ boxShadow: '0 4px 0 rgba(20,90,140,.08)' }}>
+          <div className="bg-white p-4" style={{ borderRadius: T.radius.md, boxShadow: T.shadow.card }}>
             <DragGrid
               key={`${currentRegion}-${puzzle.rows}-${puzzle.cols}`}
               targetRows={regions[currentRegion].rows}
@@ -296,24 +297,22 @@ export const AreaBuilderEngine: React.FC<AreaBuilderEngineProps> = ({ game, isPr
       {phase === 'answer' && (
         <div className="w-full flex flex-col items-center gap-4">
           {regions.length > 1 && (
-            <p className="text-sm font-display font-bold text-slate-500 text-center">
+            <p className="text-sm font-display font-bold text-center" style={{ color: T.ink.muted }}>
               {regions.map((r) => r.product).join(' + ')} = ?
             </p>
           )}
           <div className="flex gap-3 justify-center flex-wrap">
             {choices.map((c) => (
-              <button
-                key={c}
-                onClick={() => handleSelect(c)}
-                disabled={result !== null}
-                className="w-16 h-16 rounded-2xl font-display font-black text-2xl shadow-sm transition-all active:scale-95 bg-white border-2 border-slate-200 hover:border-amber-300 text-slate-700 disabled:opacity-50"
-              >
+              <GameOption key={c} state={result !== null ? (c === product ? 'correct' : c === selected ? 'wrong' : 'dimmed') : 'idle'} disabled={result !== null} onClick={() => handleSelect(c)} className="text-2xl" style={{ width: 64, height: 64 }}>
                 {c}
-              </button>
+              </GameOption>
             ))}
           </div>
           {result && (
-            <div className={`w-full rounded-2xl px-6 py-4 font-display font-bold text-center anim-fade-up ${result === 'correct' ? 'bg-emerald-50 border-2 border-emerald-300 text-emerald-700' : 'bg-red-50 border-2 border-red-300 text-red-600'}`}>
+            <div
+              className="w-full px-6 py-4 font-display font-bold text-center anim-fade-up"
+              style={{ borderRadius: T.radius.sm, background: result === 'correct' ? '#EAFBF0' : '#FDEDEC', border: `2px solid ${result === 'correct' ? '#A8E8BC' : '#F5B3AD'}`, color: result === 'correct' ? '#1B7F41' : '#B23930' }}
+            >
               {result === 'correct' ? '🎉 Correct!' : `Not quite — it's ${product}.`}
             </div>
           )}

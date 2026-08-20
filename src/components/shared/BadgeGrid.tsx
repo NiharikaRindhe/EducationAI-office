@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, Trophy } from 'lucide-react';
 import { api } from '../../lib/api';
+import { BADGE_ART, artUrl } from '../../routes/batch1/art';
 
 type Accent = 'amber' | 'indigo' | 'sky';
 type Variant = 'grid' | 'medallion'; // medallion = Batch 1 large circles
@@ -26,7 +27,37 @@ interface BadgeDetailModal {
   badge: BadgeEntry;
 }
 
-const BadgeDetail: React.FC<BadgeDetailModal & { onClose: () => void; accent: Accent }> = ({ badge, onClose, accent }) => {
+/**
+ * The badge medal, as artwork when Batch 1 has it and the emoji otherwise.
+ *
+ * Gated on `useArt` (Batch 1's medallion variant only) on purpose: the clay
+ * medals belong to the Class 1-4 visual language, and this component is also
+ * mounted by Class 5-8, which should keep the flat emoji treatment it has.
+ * Unearned badges stay desaturated and dimmed either way, so "not yet won"
+ * still reads at a glance.
+ */
+const BadgeFace: React.FC<{ name: string; icon: string; earned: boolean; size: number; useArt: boolean }> = ({
+  name, icon, earned, size, useArt,
+}) => {
+  const src = useArt ? artUrl(BADGE_ART[name]) : null;
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt=""
+        aria-hidden="true"
+        width={size}
+        height={size}
+        className={`object-contain select-none ${earned ? '' : 'grayscale opacity-45'}`}
+        style={{ width: size, height: size }}
+        draggable={false}
+      />
+    );
+  }
+  return <span className={earned ? '' : 'grayscale'}>{icon}</span>;
+};
+
+const BadgeDetail: React.FC<BadgeDetailModal & { onClose: () => void; accent: Accent; useArt: boolean }> = ({ badge, onClose, accent, useArt }) => {
   const a = ACCENT[accent];
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -35,7 +66,7 @@ const BadgeDetail: React.FC<BadgeDetailModal & { onClose: () => void; accent: Ac
         onClick={(e) => e.stopPropagation()}
       >
         <div className={`text-5xl w-20 h-20 flex items-center justify-center rounded-3xl ${badge.earned ? 'bg-gradient-to-br from-amber-100 to-yellow-50 shadow-inner' : 'bg-slate-100'}`}>
-          {badge.icon}
+          <BadgeFace name={badge.name} icon={badge.icon} earned={badge.earned} size={64} useArt={useArt} />
         </div>
         <div className="text-center">
           <h3 className="font-display font-bold text-lg text-slate-800">{badge.name}</h3>
@@ -135,7 +166,7 @@ export const BadgeGrid: React.FC<{ accent: Accent; variant?: Variant }> = ({ acc
               <div className={`${isMedallion ? 'w-16 h-16 text-4xl' : 'w-12 h-12 text-2xl'} rounded-2xl flex items-center justify-center 
                 ${badge.earned ? 'bg-gradient-to-br from-amber-50 to-yellow-50 shadow-inner ring-2 ' + a.ring : 'bg-slate-100'}`}
               >
-                <span className={badge.earned ? '' : 'grayscale'}>{badge.icon}</span>
+                <BadgeFace name={badge.name} icon={badge.icon} earned={badge.earned} size={isMedallion ? 56 : 34} useArt={isMedallion} />
               </div>
               {badge.earned && (
                 <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center text-white text-[8px]">✓</span>
@@ -168,7 +199,7 @@ export const BadgeGrid: React.FC<{ accent: Accent; variant?: Variant }> = ({ acc
         </div>
       )}
 
-      {selected && <BadgeDetail badge={selected} accent={accent} onClose={() => setSelected(null)} />}
+      {selected && <BadgeDetail badge={selected} accent={accent} useArt={isMedallion} onClose={() => setSelected(null)} />}
     </div>
   );
 };

@@ -9,6 +9,7 @@ import {
   getLetterAccuracy, getAllStrokeRenderProps,
   getState, subscribe, LETTERS,
 } from '../../../lib/tracing/tracingEngine.js';
+import { Button, Pic, StarRow, T } from '../ui';
 
 /* The real letter-tracing game from EducationAI-Games-master's Grade 1
    "Tracing", running on that project's own engine — path sampling, stroke
@@ -137,13 +138,15 @@ export const LetterTracingEngine: React.FC<Props> = ({ game, isPreReader, onFini
 
   if (done) {
     const mean = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+    const stars = mean >= 85 ? 3 : mean >= 65 ? 2 : 1;
     return (
-      <div className="flex flex-col items-center gap-3 py-10">
-        <span className="text-5xl">{game.icon}</span>
-        <p className="font-display text-2xl font-black text-slate-800">
-          {isPreReader ? '⭐⭐⭐' : `${mean}% accurate`}
+      <div className="flex flex-col items-center gap-3 py-10 anim-fade-up">
+        <Pic emoji="🏆" name="nav-trophies" size={72} className="drop-shadow-[0_4px_6px_rgba(0,0,0,.18)]" />
+        <StarRow earned={stars} size={32} />
+        <p className="font-display text-xl font-black" style={{ color: T.ink.strong }}>
+          {isPreReader ? 'Great tracing!' : `${mean}% accurate`}
         </p>
-        <p className="text-sm font-medium text-slate-500">
+        <p className="text-sm font-medium" style={{ color: T.ink.muted }}>
           {letters.length} letter{letters.length === 1 ? '' : 's'} traced
         </p>
       </div>
@@ -156,24 +159,23 @@ export const LetterTracingEngine: React.FC<Props> = ({ game, isPreReader, onFini
         {letters.map((l, i) => (
           <span
             key={l}
-            className={`flex h-8 w-8 items-center justify-center rounded-xl font-display text-sm font-black ${
-              i < index
-                ? 'bg-emerald-100 text-emerald-700'
-                : i === index
-                  ? 'bg-amber-400 text-white'
-                  : 'bg-slate-100 text-slate-400'
-            }`}
+            className="flex h-8 w-8 items-center justify-center font-display text-sm font-black"
+            style={{
+              borderRadius: T.radius.sm,
+              background: i < index ? '#EAFBF0' : i === index ? '#FFB100' : T.surface.sunk,
+              color: i < index ? '#1B7F41' : i === index ? '#FFFFFF' : T.ink.faint,
+            }}
           >
             {l}
           </span>
         ))}
       </div>
 
-      <p className="font-display text-lg font-black text-slate-700">
+      <p className="font-display text-lg font-black" style={{ color: T.ink.strong }}>
         {isPreReader ? currentLetter : `Trace the letter ${currentLetter}`}
       </p>
 
-      <div className="relative rounded-3xl border-2 border-amber-200 bg-amber-50/40 p-2">
+      <div className="relative p-2" style={{ borderRadius: T.radius.md, background: T.surface.sunk, border: `2px solid ${T.surface.line}` }}>
         <svg
           ref={svgRef}
           viewBox="0 0 400 400"
@@ -213,7 +215,10 @@ export const LetterTracingEngine: React.FC<Props> = ({ game, isPreReader, onFini
 
         {feedback && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <span className="rounded-2xl bg-slate-900/80 px-4 py-2 font-display text-lg font-black text-white">
+            <span
+              className="font-display text-lg font-black text-white px-4 py-2"
+              style={{ borderRadius: T.radius.sm, background: 'rgba(23,66,95,.85)' }}
+            >
               {feedback}
             </span>
           </div>
@@ -221,15 +226,11 @@ export const LetterTracingEngine: React.FC<Props> = ({ game, isPreReader, onFini
       </div>
 
       <div className="flex items-center gap-3">
-        <button
-          onClick={() => { resetLetter(); setFeedback(null); }}
-          className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
-        >
-          {/* Pre-readers get the icon alone — no text, and no second glyph. */}
-          <RotateCcw size={13} /> Try this letter again
-        </button>
-        <span className="flex items-center gap-1 text-xs font-bold text-slate-400">
-          <Star size={13} className="text-amber-400" />
+        <Button tone="quiet" onClick={() => { resetLetter(); setFeedback(null); }} className="text-xs px-4" icon={<RotateCcw size={13} />}>
+          Try this letter again
+        </Button>
+        <span className="flex items-center gap-1 text-xs font-bold" style={{ color: T.ink.faint }}>
+          <Star size={13} style={{ color: '#FFC400', fill: '#FFC400' }} />
           {snapshot.currentStrokeIndex + 1} / {Math.max(totalStrokes, 1)}
         </span>
       </div>

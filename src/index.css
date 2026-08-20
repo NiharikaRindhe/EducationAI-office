@@ -195,6 +195,11 @@
   0%, 100% { transform: rotate(-4deg); }
   50% { transform: rotate(4deg); }
 }
+@keyframes island-squish {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.94); }
+  100% { transform: scale(1); }
+}
 .anim-bob { animation: island-bob 3s ease-in-out infinite; }
 .anim-bob-big { animation: island-bob-big 3.4s ease-in-out infinite; }
 .anim-twinkle { animation: island-twinkle 3s ease-in-out infinite; }
@@ -202,9 +207,70 @@
 .anim-pulse-ring { animation: island-pulse-ring 2.2s infinite; }
 .cloud-drift { animation: island-drift 70s linear infinite; }
 .cloud-drift-rtl { animation: island-drift-rtl 95s linear infinite; }
+/* Clay-style tap feedback: a small squish, layered under the existing
+   press-down translate so a tap reads as "squeezed" rather than just
+   "moved". Applied via the shared PRESS constant in ui.tsx. */
+.anim-squish-tap:active { animation: island-squish 0.18s ease-out; }
 @media (prefers-reduced-motion: reduce) {
   .anim-bob, .anim-bob-big, .anim-twinkle, .anim-wiggle, .anim-pulse-ring,
-  .cloud-drift, .cloud-drift-rtl { animation: none; }
+  .cloud-drift, .cloud-drift-rtl, .anim-squish-tap { animation: none; }
+}
+
+/* ── Batch 1 game-engine chrome ──────────────────────────────
+   Was injected at runtime by Games.tsx on mount, which meant Quizzes/Tasks
+   (both of which render the shared `Skeleton` before a child ever opens
+   Games) had no shimmer until Games.tsx had mounted at least once in the
+   session. Defined globally instead, so every page has it from cold load. */
+@keyframes game-shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-6px); }
+  20%, 40%, 60%, 80% { transform: translateX(6px); }
+}
+.animate-game-shake {
+  animation: game-shake 0.5s ease-in-out;
+}
+@keyframes game-glow-green {
+  0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
+  50% { box-shadow: 0 0 24px 8px rgba(34,197,94,0.35); }
+  100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+}
+.animate-glow-green {
+  animation: game-glow-green 0.6s ease-out;
+}
+@keyframes game-pulse-hint {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.85; }
+}
+.animate-pulse-hint {
+  animation: game-pulse-hint 0.6s ease-in-out 3;
+}
+@keyframes xp-float {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-60px) scale(1.3); }
+}
+.animate-xp-float {
+  animation: xp-float 1.4s ease-out forwards;
+}
+@keyframes card-bounce-tap {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.93); }
+  100% { transform: scale(1); }
+}
+.card-bounce-tap:active {
+  animation: card-bounce-tap 0.25s ease-out;
+}
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+.skeleton-pulse {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-game-shake, .animate-glow-green, .animate-pulse-hint,
+  .animate-xp-float, .card-bounce-tap:active { animation: none; }
 }
 
 /* Custom CSS Classes as specified in UI_FEATURES.md */

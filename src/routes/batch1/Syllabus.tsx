@@ -52,7 +52,6 @@ export const Batch1Syllabus: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [activeSubject, setActiveSubject] = useState<string>('');
 
-  const isPreReader = currentClass <= 2;
   const theme = getClassTheme(currentClass);
 
   useEffect(() => {
@@ -215,7 +214,7 @@ export const Batch1Syllabus: React.FC = () => {
                               : { background: 'linear-gradient(180deg,#DDE9F2,#C3D5E2)', boxShadow: '0 6px 0 #A8BDCC', color: '#8CA6B8' }
                       }
                     >
-                      {playable ? ch.chapterNum : '🔒'}
+                      {playable ? ch.chapterNum : <Pic emoji="🔒" size={28} alt="Locked" />}
                     </span>
                     {playable && (
                       <span className="absolute -bottom-2 pointer-events-none">
@@ -256,11 +255,10 @@ export const Batch1Syllabus: React.FC = () => {
 
             {/* Treasure at the end of the book */}
             <span
-              className="absolute -translate-x-1/2 -translate-y-1/2 text-6xl anim-wiggle"
+              className="absolute -translate-x-1/2 -translate-y-1/2 anim-wiggle"
               style={{ left: treasure.x, top: treasure.y, filter: 'drop-shadow(0 5px 6px rgba(0,0,0,.22))' }}
-              aria-label="Treasure — finish every chapter!"
             >
-              🎁
+              <Pic emoji="🎁" size={72} alt="Treasure — finish every chapter!" />
             </span>
           </div>
         </div>

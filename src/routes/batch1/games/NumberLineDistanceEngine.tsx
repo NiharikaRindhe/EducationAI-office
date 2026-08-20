@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Star } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { GameFinishScreen, GameOption, GameProgressDots, T } from '../ui';
 
 /* Ported from EducationAI-Games-master's Grade2 "Distance" (number-line
    distance finder) and restyled to this app's Adventure Island look —
@@ -250,80 +250,70 @@ export const NumberLineDistanceEngine: React.FC<NumberLineDistanceEngineProps> =
   if (finished) {
     const earned = starsForDistance(correctCount, TOTAL_ROUNDS);
     return (
-      <div className="flex flex-col items-center gap-5 py-10 anim-fade-up">
-        <span className="text-6xl">🏆</span>
-        <div className="flex gap-1">
-          {[1, 2, 3].map((n) => (
-            <Star key={n} size={32} className={n <= earned ? 'fill-amber-400 text-amber-400' : 'text-slate-200'} />
-          ))}
-        </div>
-        {!isPreReader && (
-          <p className="font-display font-bold text-slate-600 text-sm">{correctCount} / {TOTAL_ROUNDS} correct</p>
-        )}
-        <button
-          onClick={handlePlayAgain}
-          className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer"
-          style={{ minHeight: 48, minWidth: 120 }}
-        >
-          🔄 Play Again
-        </button>
-      </div>
+      <GameFinishScreen
+        earned={earned}
+        scoreLabel={isPreReader ? undefined : `${correctCount} of ${TOTAL_ROUNDS} correct`}
+        onPlayAgain={handlePlayAgain}
+      />
     );
   }
 
   return (
     <div className="flex flex-col items-center gap-5 max-w-lg mx-auto anim-fade-up">
-      <div className="flex gap-2">
-        {Array.from({ length: TOTAL_ROUNDS }).map((_, i) => (
-          <div key={i} className={`w-3.5 h-3.5 rounded-full transition-all ${i < round ? 'bg-emerald-400' : i === round ? 'bg-amber-400 scale-125' : 'bg-slate-200'}`} />
-        ))}
-      </div>
+      <GameProgressDots total={TOTAL_ROUNDS} current={round} />
 
-      <div className="w-full bg-amber-50/60 border border-amber-100 rounded-3xl px-6 py-4 text-center">
-        <p className="font-display font-black text-xl text-slate-700">
+      <div className="w-full px-6 py-4 text-center" style={{ borderRadius: T.radius.md, background: T.surface.sunk }}>
+        <p className="font-display font-black text-xl" style={{ color: T.ink.strong }}>
           🐸 {!isPreReader ? 'How far ' : ''}{pair.from} → {pair.to}?
         </p>
       </div>
 
-      <div className="w-full bg-white rounded-2xl border border-slate-100 px-2 py-3" style={{ boxShadow: '0 4px 0 rgba(20,90,140,.08)' }}>
+      <div className="w-full bg-white px-2 py-3" style={{ borderRadius: T.radius.sm, boxShadow: T.shadow.card }}>
         <canvas ref={canvasRef} className="w-full" style={{ height: 140 }} />
       </div>
 
       <div className="flex justify-center gap-3 flex-wrap">
-        <button onClick={() => hop(-10)} className="w-16 h-14 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-display font-black text-sm active:scale-95 transition-all">-10</button>
-        <button onClick={() => hop(-1)} className="w-16 h-14 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-display font-black text-sm active:scale-95 transition-all">-1</button>
+        <GameOption onClick={() => hop(-10)} className="text-sm" style={{ width: 64, height: 56, minHeight: 56 }}>-10</GameOption>
+        <GameOption onClick={() => hop(-1)} className="text-sm" style={{ width: 64, height: 56, minHeight: 56 }}>-1</GameOption>
         <button
+          type="button"
           onClick={undo}
           disabled={hops.length === 0}
-          className={`w-16 h-14 rounded-2xl font-display font-black text-xs transition-all ${hops.length > 0 ? 'bg-red-50 border border-red-200 text-red-500 hover:bg-red-100 active:scale-95' : 'bg-slate-50 text-slate-300 cursor-not-allowed'}`}
+          aria-label="Undo last hop"
+          className="font-display font-black text-xs transition-all"
+          style={{
+            width: 64, height: 56, borderRadius: T.radius.sm,
+            background: hops.length > 0 ? '#FDEDEC' : T.surface.sunk,
+            border: `2px solid ${hops.length > 0 ? '#F5B3AD' : T.surface.line}`,
+            color: hops.length > 0 ? '#B23930' : T.ink.faint,
+          }}
         >
           ↺
         </button>
-        <button onClick={() => hop(+1)} className="w-16 h-14 rounded-2xl bg-amber-300 hover:bg-amber-400 text-white font-display font-black text-sm active:scale-95 transition-all">+1</button>
-        <button onClick={() => hop(+10)} className="w-16 h-14 rounded-2xl bg-amber-400 hover:bg-amber-500 text-white font-display font-black text-sm active:scale-95 transition-all">+10</button>
+        <GameOption onClick={() => hop(1)} className="text-sm" style={{ width: 64, height: 56, minHeight: 56, background: '#FFD53E', color: '#7A5200', border: 'none', boxShadow: '0 3px 0 #DB9A00' }}>+1</GameOption>
+        <GameOption onClick={() => hop(10)} className="text-sm" style={{ width: 64, height: 56, minHeight: 56, background: '#FFB100', color: '#FFFFFF', border: 'none', boxShadow: '0 3px 0 #DB9A00' }}>+10</GameOption>
       </div>
 
       {!checked && (
         <div className="w-full flex flex-col items-center gap-3">
-          <p className="text-xs font-bold text-slate-400 text-center">
+          <p className="text-xs font-bold text-center" style={{ color: T.ink.faint }}>
             {isPreReader ? 'Hop, then pick! 🐸' : 'Hop the frog to explore, then pick the distance.'}
           </p>
           <div className="flex gap-3 justify-center flex-wrap">
             {choices.map((c) => (
-              <button
-                key={c}
-                onClick={() => handleSelect(c)}
-                className="w-16 h-16 rounded-2xl font-display font-black text-2xl shadow-sm transition-all active:scale-95 bg-white border-2 border-slate-200 hover:border-amber-300 text-slate-700"
-              >
+              <GameOption key={c} onClick={() => handleSelect(c)} className="text-2xl" style={{ width: 64, height: 64 }}>
                 {c}
-              </button>
+              </GameOption>
             ))}
           </div>
         </div>
       )}
 
       {checked && (
-        <div className={`w-full rounded-2xl px-6 py-4 font-display font-bold text-center anim-fade-up ${correct ? 'bg-emerald-50 border-2 border-emerald-300 text-emerald-700' : 'bg-red-50 border-2 border-red-300 text-red-600'}`}>
+        <div
+          className="w-full px-6 py-4 font-display font-bold text-center anim-fade-up"
+          style={{ borderRadius: T.radius.sm, background: correct ? '#EAFBF0' : '#FDEDEC', border: `2px solid ${correct ? '#A8E8BC' : '#F5B3AD'}`, color: correct ? '#1B7F41' : '#B23930' }}
+        >
           {correct ? '🎉 Correct!' : `Not quite — the distance is ${correctDist}.`}
         </div>
       )}

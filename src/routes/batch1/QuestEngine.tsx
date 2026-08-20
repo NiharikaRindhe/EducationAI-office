@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Star } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { GameFinishScreen, GameOption, GameOptionState, GameProgressDots, Pic, T } from './ui';
 
 /**
  * QuestEngine — one visual-MCQ engine, many mechanics.
@@ -390,15 +390,38 @@ const ClockFace: React.FC<{ h: number; m: number }> = ({ h, m }) => {
   );
 };
 
+/** `v.text` is a plain string built by `'🍎'.repeat(n)` (or several such runs
+ *  joined by spaces/newlines — see place-value and tally above), so it still
+ *  has to be split back into individual glyphs to route each one through
+ *  `<Pic>`. `Array.from` splits on Unicode code points, not UTF-16 units,
+ *  which is what every emoji this generator produces needs. Newlines become
+ *  rows (tally's two counted kinds); spaces become a gap within a row
+ *  (place-value's tens/ones groups) without breaking into a new row. */
+const EmojiText: React.FC<{ text: string }> = ({ text }) => (
+  <div className="flex flex-col items-center gap-2.5">
+    {text.split('\n').map((row, ri) => (
+      <div key={ri} className="flex items-center justify-center gap-3 flex-wrap">
+        {row.split(' ').filter(Boolean).map((group, gi) => (
+          <div key={gi} className="flex items-center gap-1 flex-wrap justify-center">
+            {Array.from(group).map((ch, ci) => (
+              <Pic key={ci} emoji={ch} size={36} />
+            ))}
+          </div>
+        ))}
+      </div>
+    ))}
+  </div>
+);
+
 const VisualView: React.FC<{ v: Visual }> = ({ v }) => {
   switch (v.kind) {
     case 'emojis':
-      return <div className="text-4xl leading-relaxed text-center whitespace-pre-wrap" style={{ letterSpacing: 2 }}>{v.text}</div>;
+      return <EmojiText text={v.text} />;
     case 'grid':
       return (
         <div className="grid gap-1.5 justify-center" style={{ gridTemplateColumns: `repeat(${v.cols}, minmax(0,1fr))` }}>
           {Array.from({ length: v.rows * v.cols }).map((_, i) => (
-            <span key={i} className="text-3xl">{v.emoji}</span>
+            <Pic key={i} emoji={v.emoji} size={30} />
           ))}
         </div>
       );
@@ -500,47 +523,26 @@ export const QuestEngine: React.FC<QuestProps> = ({ game, numChoices, isPreReade
   if (finished) {
     const earned = starsFor(correctCount);
     return (
-      <div className="flex flex-col items-center gap-5 py-10 anim-fade-up">
-        <span className="text-6xl">{earned >= 2 ? '🏆' : '💪'}</span>
-        <div className="flex gap-1">
-          {[1, 2, 3].map((n) => (
-            <Star key={n} size={34} className={n <= earned ? 'fill-amber-400 text-amber-400' : 'text-slate-200'} />
-          ))}
-        </div>
-        {!isPreReader && (
-          <p className="font-display font-bold text-slate-600 text-sm">{correctCount} / {totalRounds} correct</p>
-        )}
-        <button
-          onClick={handlePlayAgain}
-          className="text-white font-display font-black text-sm rounded-2xl px-8 py-3.5 cursor-pointer transition-transform
-                     hover:-translate-y-0.5 active:translate-y-0.5"
-          style={{ background: 'linear-gradient(180deg,#74DE22,#55C400)', boxShadow: '0 5px 0 #3F9C00' }}
-        >
-          🔄 Play Again
-        </button>
-      </div>
+      <GameFinishScreen
+        earned={earned}
+        scoreLabel={isPreReader ? undefined : `${correctCount} of ${totalRounds} correct`}
+        onPlayAgain={handlePlayAgain}
+      />
     );
   }
 
   return (
     <div className="flex flex-col items-center gap-6 max-w-lg mx-auto anim-fade-up">
-      {/* Progress dots */}
-      <div className="flex gap-2">
-        {Array.from({ length: totalRounds }).map((_, i) => (
-          <div key={i}
-               className={`w-3.5 h-3.5 rounded-full transition-all ${
-                 i < round ? 'bg-emerald-400' : i === round ? 'bg-amber-400 scale-125' : 'bg-slate-200'}`} />
-        ))}
-      </div>
+      <GameProgressDots total={totalRounds} current={round} />
 
       {/* Prompt bubble */}
-      <div className="bg-amber-50 border-2 border-amber-200 rounded-3xl px-6 py-3 text-center">
+      <div className="px-6 py-3 text-center" style={{ borderRadius: T.radius.md, background: '#FFF7E0', border: '2px solid #FFE9A8' }}>
         <span className="font-display font-black text-lg" style={{ color: '#8A5B00' }}>{current.prompt}</span>
       </div>
 
       {/* Visual */}
       {current.visual.kind !== 'none' && (
-        <div className="w-full bg-slate-50 border border-slate-100 rounded-3xl p-6 flex items-center justify-center min-h-[120px]">
+        <div className="w-full flex items-center justify-center min-h-[120px] p-6" style={{ borderRadius: T.radius.md, background: T.surface.sunk }}>
           <VisualView v={current.visual} />
         </div>
       )}
@@ -550,22 +552,26 @@ export const QuestEngine: React.FC<QuestProps> = ({ game, numChoices, isPreReade
         {current.options.map((opt, idx) => {
           const isAnswer = idx === current.answer;
           const isSelected = selected === idx;
-          let cls = 'bg-white border-2 border-slate-200 hover:border-amber-300 text-slate-700';
-          let style: React.CSSProperties = {};
+          let state: GameOptionState = 'idle';
+          let extra = '';
           if (selected !== null) {
-            if (isAnswer) { cls = 'bg-emerald-500 border-2 border-emerald-500 text-white animate-glow-green'; style = { transform: 'scale(1.12)' }; }
-            else if (isSelected) cls = 'bg-red-400 border-2 border-red-400 text-white animate-game-shake opacity-60';
-            else cls = 'bg-slate-100 border-2 border-slate-100 text-slate-300';
-            if (isAnswer && selected !== current.answer) cls += ' animate-pulse-hint';
+            if (isAnswer) { state = 'correct'; extra = 'scale-[1.12]'; }
+            else if (isSelected) state = 'wrong';
+            else state = 'dimmed';
+            if (isAnswer && selected !== current.answer) extra += ' animate-pulse-hint';
           }
           const long = opt.length > 4;
           return (
-            <button key={idx} onClick={() => handleSelect(idx)} disabled={selected !== null}
-                    className={`rounded-2xl font-display font-extrabold flex items-center justify-center transition-all cursor-pointer shadow-sm px-4 ${cls}
-                                ${long ? 'text-base min-w-[120px]' : 'text-2xl w-16'}`}
-                    style={{ minHeight: 64, ...style }}>
+            <GameOption
+              key={idx}
+              state={state}
+              disabled={selected !== null}
+              onClick={() => handleSelect(idx)}
+              className={`${extra} ${long ? 'text-base' : 'text-2xl'}`}
+              style={{ minWidth: long ? 120 : 64, paddingLeft: 16, paddingRight: 16 }}
+            >
               {opt}
-            </button>
+            </GameOption>
           );
         })}
       </div>

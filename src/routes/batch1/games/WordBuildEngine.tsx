@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Hand, Delete, RotateCcw, CheckCircle2, Star } from 'lucide-react';
+import { Hand, Delete, RotateCcw, CheckCircle2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { Button, GameFinishScreen, GameOption, GameProgressDots, Pic, PRESS, T } from '../ui';
 
 /* Ported from EducationAI-Games-master's Grade2 "SentenceStrip" spelling
    game and restyled to this app's Adventure Island look — amber tiles,
@@ -166,137 +167,110 @@ export const WordBuildEngine: React.FC<WordBuildEngineProps> = ({ game, isPreRea
 
   if (finished) {
     const earned = starsForWordBuild(mistakes, hintsUsed);
-    return (
-      <div className="flex flex-col items-center gap-5 py-10 anim-fade-up">
-        <span className="text-6xl">🏆</span>
-        <div className="flex gap-1">
-          {[1, 2, 3].map((n) => (
-            <Star key={n} size={32} className={n <= earned ? 'fill-amber-400 text-amber-400' : 'text-slate-200'} />
-          ))}
-        </div>
-        <button
-          onClick={handlePlayAgain}
-          className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer"
-          style={{ minHeight: 48, minWidth: 120 }}
-        >
-          🔄 Play Again
-        </button>
-      </div>
-    );
+    return <GameFinishScreen earned={earned} onPlayAgain={handlePlayAgain} />;
   }
 
   const parts = puzzle.sentence.split('______');
   const before = parts[0];
   const after = parts[1] ?? '';
 
-  function slotStyle(slot: Slot, idx: number) {
-    if (!checked || !slot.letter) return 'border-dashed border-2 border-slate-300 bg-amber-50/60';
-    const correct = slot.letter === puzzle.answer[idx];
-    return correct ? 'border-2 border-emerald-400 bg-emerald-50 text-emerald-700' : 'border-2 border-red-400 bg-red-50 text-red-600';
+  function slotState(slot: Slot, idx: number): 'idle' | 'correct' | 'wrong' {
+    if (!checked || !slot.letter) return 'idle';
+    return slot.letter === puzzle.answer[idx] ? 'correct' : 'wrong';
   }
 
   return (
     <div className="flex flex-col items-center gap-5 anim-fade-up max-w-2xl mx-auto">
-      {/* Progress dots */}
-      <div className="flex gap-2">
-        {puzzles.map((_, i) => (
-          <div
-            key={i}
-            className={`w-3.5 h-3.5 rounded-full transition-all ${
-              i < puzzleIdx ? 'bg-emerald-400' : i === puzzleIdx ? 'bg-amber-400 scale-125' : 'bg-slate-200'
-            }`}
-          />
-        ))}
+      <GameProgressDots total={puzzles.length} current={puzzleIdx} />
+
+      <div className="bg-white flex flex-col items-center gap-2 px-10 py-5" style={{ borderRadius: T.radius.md, boxShadow: T.shadow.card }}>
+        <Pic emoji={puzzle.emoji} size={60} />
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-100 px-10 py-5 flex flex-col items-center gap-2" style={{ boxShadow: '0 4px 0 rgba(20,90,140,.08)' }}>
-        <div className="text-6xl">{puzzle.emoji}</div>
-      </div>
-
-      <div className="w-full bg-amber-50/60 border border-amber-100 rounded-2xl px-6 py-4 text-center">
-        <p className="text-slate-700 text-lg font-semibold leading-relaxed">
-          {before}
-          <span className="text-amber-600 underline decoration-amber-300 underline-offset-4 tracking-widest mx-1">{'_'.repeat(puzzle.answer.length)}</span>
-          {after}
+      <div className="w-full px-6 py-4 text-center" style={{ borderRadius: T.radius.sm, background: T.surface.sunk }}>
+        <p className="text-lg font-semibold leading-relaxed" style={{ color: T.ink.strong }}>
+          {/* Class 1-2 can't read the sentence yet — the picture above and the
+              blank's letter-count are the whole puzzle for them; the full
+              sentence is for Class 3-4, who are reading it as a spelling clue. */}
+          {!isPreReader && before}
+          <span className="underline decoration-2 underline-offset-4 tracking-widest mx-1" style={{ color: '#DB9A00', textDecorationColor: '#FFD53E' }}>
+            {'_'.repeat(puzzle.answer.length)}
+          </span>
+          {!isPreReader && after}
         </p>
       </div>
 
       <div className="flex gap-2 justify-center flex-wrap">
         {slots.map((slot, idx) => (
-          <button
+          <GameOption
             key={idx}
+            state={slotState(slot, idx)}
             onClick={() => removeSlot(idx)}
-            style={{ width: 60, height: 64 }}
-            className={`rounded-2xl flex items-center justify-center text-xl font-display font-black transition-all cursor-pointer ${slotStyle(slot, idx)}`}
+            className="text-xl"
+            style={{ width: 60, height: 64, minHeight: 64, borderStyle: slot.letter ? 'solid' : 'dashed' }}
           >
             {slot.letter ?? ''}
-          </button>
+          </GameOption>
         ))}
       </div>
 
       <div className="flex gap-2 flex-wrap justify-center">
         {pool.map((item) => (
-          <button
+          <GameOption
             key={item.id}
-            onClick={() => placeLetter(item)}
+            state={item.used ? 'dimmed' : 'idle'}
             disabled={item.used}
-            style={{ width: 60, height: 60 }}
-            className={`rounded-2xl text-2xl font-display font-black shadow-sm transition-all ${
-              item.used ? 'bg-amber-100 text-amber-200 opacity-50 cursor-not-allowed' : 'bg-amber-400 hover:bg-amber-500 text-white cursor-pointer active:scale-95'
-            }`}
+            onClick={() => placeLetter(item)}
+            className="text-2xl"
+            style={{ width: 60, height: 60, minHeight: 60 }}
           >
             {item.letter}
-          </button>
+          </GameOption>
         ))}
       </div>
 
       <div className="flex gap-2 w-full">
-        <button onClick={handleHint} className="flex items-center justify-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-display font-bold px-4 py-3 rounded-full text-xs">
-          <Hand size={14} /> HINT
-        </button>
+        <Button tone="amber" onClick={handleHint} className="text-xs px-4" icon={<Hand size={14} />}>
+          Hint
+        </Button>
         <button
+          type="button"
           onClick={deleteLast}
           disabled={!hasAnyFilled}
-          className={`flex items-center justify-center gap-1 px-4 rounded-2xl font-display font-bold text-xs ${
-            hasAnyFilled ? 'bg-red-500 hover:bg-red-600 text-white active:scale-95' : 'bg-slate-100 text-slate-300 cursor-not-allowed'
-          }`}
+          aria-label="Delete last letter"
+          className={`flex items-center justify-center px-4 ${hasAnyFilled ? PRESS : 'opacity-40'}`}
+          style={{ minHeight: T.tap, borderRadius: T.radius.sm, background: hasAnyFilled ? '#F0554C' : T.surface.sunk, color: '#FFFFFF', boxShadow: hasAnyFilled ? '0 3px 0 #C33F38' : 'none' }}
         >
-          <Delete size={16} />
+          <Delete size={18} color={hasAnyFilled ? '#FFFFFF' : T.ink.faint} />
         </button>
         <button
+          type="button"
           onClick={resetPuzzle}
           disabled={!hasAnyFilled}
-          className={`flex items-center justify-center gap-1 px-4 rounded-2xl font-display font-bold text-xs ${
-            hasAnyFilled ? 'bg-slate-200 hover:bg-slate-300 text-slate-600 active:scale-95' : 'bg-slate-100 text-slate-300 cursor-not-allowed'
-          }`}
+          aria-label="Start this word over"
+          className={`flex items-center justify-center px-4 bg-white ${hasAnyFilled ? PRESS : 'opacity-40'}`}
+          style={{ minHeight: T.tap, borderRadius: T.radius.sm, border: `2px solid ${T.surface.line}`, boxShadow: '0 3px 0 rgba(20,90,140,.10)' }}
         >
-          <RotateCcw size={16} />
+          <RotateCcw size={18} style={{ color: T.ink.muted }} />
         </button>
-        <button
-          onClick={handleCheck}
-          disabled={!allFilled}
-          className={`flex-1 flex items-center justify-center gap-2 font-display font-bold py-3 rounded-full text-sm ${
-            allFilled ? 'bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer' : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-          }`}
-        >
-          {won ? (
-            <>
-              <CheckCircle2 size={18} /> CORRECT!
-            </>
-          ) : (
-            'CHECK'
-          )}
-        </button>
+        <Button tone="primary" onClick={handleCheck} disabled={!allFilled} className="flex-1" icon={won ? <CheckCircle2 size={18} /> : undefined}>
+          {won ? 'Correct!' : 'Check'}
+        </Button>
       </div>
 
-      {checked && !won && <p className="text-red-500 font-display font-semibold text-sm">Not quite — tap a letter to remove it and try again!</p>}
+      {checked && !won && (
+        <p className="font-display font-semibold text-sm" style={{ color: '#C0362E' }}>
+          Not quite — tap a letter to remove it and try again!
+        </p>
+      )}
 
       {won && (
-        <div className="w-full bg-emerald-50 border-2 border-emerald-300 rounded-3xl px-8 py-4 flex flex-col items-center gap-2 anim-fade-up">
-          <p className="font-display font-black text-emerald-700">🎉 The word was {puzzle.answer}!</p>
-          <button onClick={nextPuzzle} className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold py-2.5 px-8 rounded-full text-sm">
-            Next →
-          </button>
+        <div
+          className="w-full flex flex-col items-center gap-3 px-8 py-4 anim-fade-up"
+          style={{ borderRadius: T.radius.md, background: '#EAFBF0', border: '2px solid #A8E8BC' }}
+        >
+          <p className="font-display font-black" style={{ color: '#1B7F41' }}>🎉 The word was {puzzle.answer}!</p>
+          <Button tone="amber" onClick={nextPuzzle}>Next →</Button>
         </div>
       )}
     </div>

@@ -1,7 +1,30 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Volume2, ChevronLeft, ChevronRight, Check, Star, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Volume2, ChevronLeft, ChevronRight, Check, ArrowLeft, ArrowRight } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { getClassTheme } from './theme';
+import { Button, Pic, PageHeader, ProgressBar, StarRow, T, PRESS } from './ui';
+
+/**
+ * Stories — the one Batch 1 page that predated the shared UI kit.
+ *
+ * It used to be its own visual system entirely (`bento-card`, `pill-amber`,
+ * hand-rolled `.progress-bar`) built before `ui.tsx` existed, so it was the
+ * one screen in the portal that didn't match anything else. It also read
+ * "+50 XP Earned" at the end of a quiz, while every other reward in the
+ * portal (the Games finish screen, the header stat) calls the same number
+ * Stars — this now says the same thing everyone else does.
+ *
+ * The story list used a `<div onClick>` as its card, which a keyboard or
+ * screen-reader user cannot reach at all. It's a real `<button>` now.
+ *
+ * Content and logic (the four stories, the reading flow, the three-question
+ * quiz, the confetti and Star award) are unchanged — only the markup and
+ * styling moved onto the shared kit. `completedStories` is still
+ * component-only state, not persisted anywhere in the API, which is why the
+ * Home tile for this page shows a story count rather than a progress bar —
+ * see the note next to `STORIES_CAPTION` in Home.tsx.
+ */
 
 interface Story {
   id: string;
@@ -19,13 +42,14 @@ interface Story {
 }
 
 export const Batch1Stories: React.FC = () => {
-  const { incrementXP } = useApp();
+  const { incrementXP, currentClass } = useApp();
+  const theme = getClassTheme(currentClass);
 
   const [activeTab, setActiveTab] = useState<'All' | 'English' | 'Maths' | 'Science'>('All');
   const [selectedStory, setSelectedStory] = useState<Story | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-  
+
   // Quiz states
   const [isQuizMode, setIsQuizMode] = useState(false);
   const [currentQuizQuestion, setCurrentQuizQuestion] = useState(0);
@@ -149,7 +173,7 @@ export const Batch1Stories: React.FC = () => {
   const handleAnswerClick = (option: string) => {
     if (selectedAnswer !== null || !selectedStory) return;
     setSelectedAnswer(option);
-    
+
     const correctAns = selectedStory.quiz[currentQuizQuestion].correct;
     if (option === correctAns) {
       setQuizScore(prev => prev + 1);
@@ -163,7 +187,7 @@ export const Batch1Stories: React.FC = () => {
       setCurrentQuizQuestion(prev => prev + 1);
     } else {
       setIsQuizFinished(true);
-      // Award XP
+      // Award Stars
       incrementXP(50);
       // Mark story as completed
       if (selectedStory && !completedStories.includes(selectedStory.id)) {
@@ -178,266 +202,306 @@ export const Batch1Stories: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col gap-6 font-sans select-none anim-fade-up">
-      {/* If reading a story */}
+    <div className="flex flex-col gap-5 select-none anim-fade-up">
       {selectedStory ? (
-        <div className="bg-white border border-amber-100 rounded-3xl p-6 md:p-8 shadow-md">
-          {/* Header row */}
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
-            <button
-              onClick={() => setSelectedStory(null)}
-              className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+        /* ── Reading / quiz ── */
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-3">
+            <Button tone="quiet" onClick={() => setSelectedStory(null)} icon={<ArrowLeft size={20} strokeWidth={3} />}>
+              Back
+            </Button>
+            <span
+              className="px-3.5 py-2 font-display font-black text-xs"
+              style={{ borderRadius: 999, background: T.surface.sunk, color: T.ink.muted }}
             >
-              <ArrowLeft size={16} />
-              Back to Stories
-            </button>
-            <span className="badge pill-amber text-[10px] font-black">{selectedStory.subject}</span>
+              {selectedStory.subject}
+            </span>
           </div>
 
-          {!isQuizMode ? (
-            /* STORY READING MODE */
-            <div className="flex flex-col gap-8">
-              {/* Illustrated emoji banner */}
-              <div className="h-44 bg-gradient-to-tr from-amber-50 to-orange-50/50 rounded-2xl flex items-center justify-center text-7xl select-none anim-float">
-                {selectedStory.emoji}
-              </div>
-
-              {/* Progress Dots */}
-              <div className="flex justify-center items-center gap-1.5">
-                {selectedStory.pages.map((_, idx) => (
-                  <div 
-                    key={idx} 
-                    className={`w-2.5 h-2.5 rounded-full transition-all ${
-                      currentPage === idx ? 'bg-amber-500 scale-125' : 'bg-slate-200'
-                    }`}
-                  ></div>
-                ))}
-              </div>
-
-              {/* Story Page content */}
-              <div className="px-4 text-center max-w-2xl mx-auto">
-                <h3 className="font-display font-extrabold text-2xl text-slate-800 mb-4">{selectedStory.title}</h3>
-                <p className="font-sans text-lg md:text-xl text-slate-600 leading-relaxed font-medium">
-                  {selectedStory.pages[currentPage]}
-                </p>
-              </div>
-
-              {/* Audio & Navigation Controls */}
-              <div className="flex items-center justify-between mt-6 pt-6 border-t border-slate-100">
-                {/* Audio Narrator */}
-                <button
-                  onClick={handleAudioSimulate}
-                  disabled={isPlayingAudio}
-                  className={`flex items-center gap-1.5 py-2 px-4 rounded-xl border border-amber-200 font-sans font-bold text-xs cursor-pointer shadow-xs transition-all ${
-                    isPlayingAudio ? 'bg-amber-500 text-white border-transparent animate-pulse' : 'bg-amber-50/50 text-amber-700 hover:bg-amber-100/50'
-                  }`}
+          <div className="bg-white p-5 sm:p-8" style={{ borderRadius: T.radius.md, boxShadow: T.shadow.card }}>
+            {!isQuizMode ? (
+              /* STORY READING MODE */
+              <div className="flex flex-col gap-8">
+                <div
+                  className="h-44 flex items-center justify-center anim-float"
+                  style={{ borderRadius: T.radius.md, background: `linear-gradient(160deg, ${theme.accent}26, ${theme.accent}0d)` }}
                 >
-                  <Volume2 size={16} />
-                  {isPlayingAudio ? 'Playing Audio...' : 'Read Aloud'}
-                </button>
+                  <Pic emoji={selectedStory.emoji} size={104} />
+                </div>
 
-                {/* Page turners */}
-                <div className="flex items-center gap-3">
+                {/* Progress dots */}
+                <div className="flex justify-center items-center gap-1.5">
+                  {selectedStory.pages.map((_, idx) => (
+                    <span
+                      key={idx}
+                      className="rounded-full transition-all"
+                      style={{
+                        width: currentPage === idx ? 11 : 8,
+                        height: currentPage === idx ? 11 : 8,
+                        background: currentPage === idx ? theme.accent : T.surface.line,
+                      }}
+                    />
+                  ))}
+                </div>
+
+                {/* Story page content */}
+                <div className="px-2 sm:px-4 text-center max-w-2xl mx-auto">
+                  <h3 className="font-display font-black text-2xl mb-4" style={{ color: T.ink.strong }}>
+                    {selectedStory.title}
+                  </h3>
+                  <p className="text-lg md:text-xl leading-relaxed font-semibold" style={{ color: T.ink.muted }}>
+                    {selectedStory.pages[currentPage]}
+                  </p>
+                </div>
+
+                {/* Audio & page controls */}
+                <div
+                  className="flex items-center justify-between gap-3 pt-6"
+                  style={{ borderTop: `1px solid ${T.surface.line}` }}
+                >
                   <button
-                    onClick={handlePrevPage}
-                    disabled={currentPage === 0}
-                    className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 disabled:opacity-30 cursor-pointer transition-all"
+                    type="button"
+                    onClick={handleAudioSimulate}
+                    disabled={isPlayingAudio}
+                    className={`inline-flex items-center gap-2 px-4 font-display font-black text-xs ${isPlayingAudio ? 'animate-pulse' : PRESS}`}
+                    style={{
+                      height: 48, borderRadius: T.radius.sm,
+                      background: isPlayingAudio ? theme.accent : T.surface.sunk,
+                      color: isPlayingAudio ? '#FFFFFF' : T.ink.strong,
+                    }}
                   >
-                    <ChevronLeft size={18} />
+                    <Volume2 size={16} />
+                    {isPlayingAudio ? 'Playing…' : 'Read Aloud'}
                   </button>
 
-                  <span className="font-sans text-xs text-slate-400 font-semibold select-none">
-                    Page {currentPage + 1} of {selectedStory.pages.length}
-                  </span>
+                  <div className="flex items-center gap-2.5">
+                    <PageNavButton onClick={handlePrevPage} disabled={currentPage === 0} label="Previous page">
+                      <ChevronLeft size={18} />
+                    </PageNavButton>
 
-                  {currentPage < selectedStory.pages.length - 1 ? (
-                    <button
-                      onClick={handleNextPage}
-                      className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 cursor-pointer transition-all"
-                    >
-                      <ChevronRight size={18} />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setIsQuizMode(true)}
-                      className="py-2.5 px-5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-sans font-bold text-xs shadow-md shadow-amber-500/10 cursor-pointer transition-all"
-                    >
-                      Take the Quiz!
-                    </button>
-                  )}
+                    <span className="font-bold text-xs hidden sm:inline" style={{ color: T.ink.faint }}>
+                      Page {currentPage + 1} of {selectedStory.pages.length}
+                    </span>
+
+                    {currentPage < selectedStory.pages.length - 1 ? (
+                      <PageNavButton onClick={handleNextPage} label="Next page">
+                        <ChevronRight size={18} />
+                      </PageNavButton>
+                    ) : (
+                      <Button tone="primary" onClick={() => setIsQuizMode(true)}>
+                        Take the Quiz!
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : (
-            /* STORY QUIZ MODE */
-            <div className="flex flex-col gap-6 max-w-xl mx-auto">
-              {!isQuizFinished ? (
-                /* QUIZ FLOW */
-                <div className="flex flex-col gap-6">
-                  {/* Progress */}
-                  <div>
-                    <span className="font-sans text-[10px] font-bold text-slate-400 uppercase tracking-wide">
-                      QUESTION {currentQuizQuestion + 1} OF 3
-                    </span>
-                    <div className="progress-bar mt-1 bg-slate-100">
-                      <div 
-                        className="progress-fill bg-amber-500" 
-                        style={{ width: `${((currentQuizQuestion + 1) / 3) * 100}%` }}
-                      ></div>
+            ) : (
+              /* STORY QUIZ MODE */
+              <div className="flex flex-col gap-6 max-w-xl mx-auto">
+                {!isQuizFinished ? (
+                  <div className="flex flex-col gap-6">
+                    <div>
+                      <span className="font-display font-black text-[10px] tracking-[.1em] uppercase" style={{ color: T.ink.faint }}>
+                        Question {currentQuizQuestion + 1} of {selectedStory.quiz.length}
+                      </span>
+                      <ProgressBar value={currentQuizQuestion + 1} max={selectedStory.quiz.length} className="mt-1.5" />
                     </div>
-                  </div>
 
-                  {/* Question */}
-                  <h3 className="font-display font-extrabold text-xl text-slate-800 leading-snug">
-                    {selectedStory.quiz[currentQuizQuestion].q}
-                  </h3>
-
-                  {/* Options */}
-                  <div className="flex flex-col gap-2.5 mt-2">
-                    {selectedStory.quiz[currentQuizQuestion].options.map((opt) => {
-                      const correctAns = selectedStory.quiz[currentQuizQuestion].correct;
-                      const isSelected = selectedAnswer === opt;
-                      const isCorrect = opt === correctAns;
-                      
-                      let btnClass = 'border-slate-200 hover:bg-slate-50 text-slate-700';
-                      if (selectedAnswer !== null) {
-                        if (isCorrect) btnClass = 'bg-emerald-500 text-white border-transparent shadow-md shadow-emerald-500/10';
-                        else if (isSelected) btnClass = 'bg-red-500 text-white border-transparent shadow-md shadow-red-500/10';
-                        else btnClass = 'opacity-40 border-slate-100 text-slate-400';
-                      }
-
-                      return (
-                        <button
-                          key={opt}
-                          onClick={() => handleAnswerClick(opt)}
-                          disabled={selectedAnswer !== null}
-                          className={`w-full text-left py-4 px-5 rounded-2xl border font-sans text-xs font-semibold cursor-pointer transition-all ${btnClass}`}
-                        >
-                          {opt}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Next question indicator */}
-                  {selectedAnswer !== null && (
-                    <button
-                      onClick={advanceQuiz}
-                      className="w-full py-3.5 mt-4 rounded-xl bg-slate-900 text-white font-sans font-bold text-xs hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      {currentQuizQuestion < selectedStory.quiz.length - 1 ? 'Next Question' : 'Finish Quiz'}
-                      <ArrowRight size={14} />
-                    </button>
-                  )}
-                </div>
-              ) : (
-                /* QUIZ SCORE SCREEN */
-                <div className="text-center flex flex-col items-center gap-6 py-6 animate-fade-up">
-                  <div className="w-20 h-20 bg-amber-500/10 rounded-full flex items-center justify-center text-4xl select-none">
-                    🏆
-                  </div>
-                  
-                  <div>
-                    <h3 className="font-display font-black text-2xl text-slate-800">
-                      {quizScore === 3 ? 'Perfect Score!' : quizScore >= 2 ? 'Great effort!' : 'Keep practicing!'}
+                    <h3 className="font-display font-black text-xl leading-snug" style={{ color: T.ink.strong }}>
+                      {selectedStory.quiz[currentQuizQuestion].q}
                     </h3>
-                    <p className="font-sans text-xs text-slate-400 mt-1">
-                      You collected {quizScore} stars in this quiz adventure.
-                    </p>
-                  </div>
 
-                  {/* Stars Collection indicator */}
-                  <div className="flex gap-2">
-                    {[1, 2, 3].map((star) => (
-                      <Star 
-                        key={star}
-                        size={32}
-                        className={star <= quizScore ? 'text-amber-500 fill-amber-500' : 'text-slate-200'}
-                      />
-                    ))}
-                  </div>
+                    <div className="flex flex-col gap-2.5">
+                      {selectedStory.quiz[currentQuizQuestion].options.map((opt) => {
+                        const correctAns = selectedStory.quiz[currentQuizQuestion].correct;
+                        const isSelected = selectedAnswer === opt;
+                        const isCorrect = opt === correctAns;
 
-                  <div className="bg-amber-50 border border-amber-100/50 p-4 rounded-2xl w-full flex justify-between items-center px-6 text-xs font-bold text-amber-800 select-none">
-                    <span>XP REWARD</span>
-                    <span>+50 XP Earned</span>
-                  </div>
+                        let bg: string = '#FFFFFF';
+                        let color: string = T.ink.strong;
+                        let border: string = T.surface.line;
+                        let anim = '';
+                        if (selectedAnswer !== null) {
+                          if (isCorrect) {
+                            bg = '#3FCB6E'; color = '#FFFFFF'; border = 'transparent'; anim = 'animate-glow-green';
+                          } else if (isSelected) {
+                            bg = '#F0554C'; color = '#FFFFFF'; border = 'transparent'; anim = 'animate-game-shake';
+                          } else {
+                            bg = T.surface.sunk; color = T.ink.faint; border = T.surface.line;
+                          }
+                        }
 
-                  <button
-                    onClick={() => setSelectedStory(null)}
-                    className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-sans font-bold text-xs shadow-md shadow-indigo-600/15 cursor-pointer transition-all"
-                  >
-                    Back to Stories
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+                        return (
+                          <button
+                            key={opt}
+                            type="button"
+                            onClick={() => handleAnswerClick(opt)}
+                            disabled={selectedAnswer !== null}
+                            className={`w-full text-left py-4 px-5 font-display font-bold text-sm ${PRESS} ${anim}`}
+                            style={{ borderRadius: T.radius.sm, background: bg, color, border: `2px solid ${border}` }}
+                          >
+                            {opt}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {selectedAnswer !== null && (
+                      <Button tone="primary" block onClick={advanceQuiz}>
+                        {currentQuizQuestion < selectedStory.quiz.length - 1 ? 'Next Question' : 'Finish Quiz'}
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  /* QUIZ SCORE SCREEN */
+                  <div className="text-center flex flex-col items-center gap-5 py-6 anim-fade-up">
+                    <Pic emoji="🏆" size={72} />
+
+                    <div>
+                      <h3 className="font-display font-black text-2xl" style={{ color: T.ink.strong }}>
+                        {quizScore === 3 ? 'Perfect Score!' : quizScore >= 2 ? 'Great effort!' : 'Keep practicing!'}
+                      </h3>
+                      <p className="text-sm font-bold mt-1" style={{ color: T.ink.muted }}>
+                        You collected {quizScore} stars in this quiz adventure.
+                      </p>
+                    </div>
+
+                    <StarRow earned={quizScore} size={40} />
+
+                    <div
+                      className="w-full flex justify-between items-center px-5 py-3.5"
+                      style={{ borderRadius: T.radius.sm, background: '#FFF3D6' }}
+                    >
+                      <span className="font-display font-black text-xs" style={{ color: '#96690A' }}>STAR REWARD</span>
+                      <span className="font-display font-black text-xs" style={{ color: '#96690A' }}>+50 ⭐</span>
+                    </div>
+
+                    <Button tone="secondary" block onClick={() => setSelectedStory(null)}>
+                      Back to Stories
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       ) : (
-        /* STORIES LIST VIEW */
-        <div className="flex flex-col gap-6">
-          {/* Tabs header */}
-          <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2 select-none">
-              {(['All', 'English', 'Maths', 'Science'] as const).map((tab) => (
+        /* ── Story list ── */
+        <>
+          <PageHeader emoji="📖" artKey="nav-stories" title="Stories" hint="Pick a story and read along" />
+
+          <div className="flex gap-2.5 flex-wrap" role="tablist" aria-label="Choose a subject">
+            {(['All', 'English', 'Maths', 'Science'] as const).map((tab) => {
+              const on = activeTab === tab;
+              return (
                 <button
                   key={tab}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
                   onClick={() => setActiveTab(tab)}
-                  className={`py-2 px-5 rounded-full font-sans text-xs font-bold transition-all cursor-pointer ${
-                    activeTab === tab 
-                      ? 'bg-amber-500 text-white shadow-md shadow-amber-500/10' 
-                      : 'text-slate-400 hover:text-slate-700'
-                  }`}
+                  className={`font-display font-black text-sm sm:text-base px-5 ${PRESS}`}
+                  style={{
+                    minHeight: 52,
+                    borderRadius: T.radius.sm,
+                    background: on ? theme.accent : '#FFFFFF',
+                    color: on ? '#FFFFFF' : T.ink.strong,
+                    border: `2px solid ${on ? theme.accent : T.surface.line}`,
+                    boxShadow: `0 3px 0 ${on ? theme.accentDark : '#CBDDE9'}`,
+                  }}
                 >
                   {tab}
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
 
-          {/* Stories Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredStories.map((story) => {
               const isDone = completedStories.includes(story.id);
               return (
-                <div 
+                <button
                   key={story.id}
+                  type="button"
                   onClick={() => startReading(story)}
-                  className="bento-card border border-amber-100/50 bg-white flex flex-col justify-between gap-6 card-interactive cursor-pointer p-6"
+                  className={`flex flex-col gap-5 bg-white p-5 text-left ${PRESS}`}
+                  style={{ borderRadius: T.radius.md, boxShadow: T.shadow.card }}
                 >
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3.5">
-                      <span className="text-4xl bg-slate-50 border border-slate-100 p-2.5 rounded-2xl select-none">
-                        {story.emoji}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <span
+                        className="flex items-center justify-center shrink-0"
+                        style={{ width: 60, height: 60, borderRadius: T.radius.sm, background: T.surface.sunk }}
+                      >
+                        <Pic emoji={story.emoji} size={38} />
                       </span>
-                      <div>
-                        <h3 className="font-display font-bold text-sm text-slate-800 leading-tight">
+                      <div className="min-w-0">
+                        <h3 className="font-display font-black text-sm leading-tight" style={{ color: T.ink.strong }}>
                           {story.title}
                         </h3>
-                        <span className="badge pill-amber text-[9px] font-black mt-1.5">{story.subject}</span>
+                        <span
+                          className="inline-block mt-1.5 px-2.5 py-1 font-display font-black text-[10px]"
+                          style={{ borderRadius: 999, background: T.surface.sunk, color: T.ink.muted }}
+                        >
+                          {story.subject}
+                        </span>
                       </div>
                     </div>
                     {isDone && (
-                      <span className="badge pill-green text-[9px] font-bold flex items-center gap-1 select-none">
-                        <Check size={10} />
+                      <span
+                        className="flex items-center gap-1 px-2.5 py-1.5 font-display font-black text-[10px] shrink-0"
+                        style={{ borderRadius: 999, background: '#DCF7E3', color: '#1B7F41' }}
+                      >
+                        <Check size={12} strokeWidth={3} />
                         Read
                       </span>
                     )}
                   </div>
 
-                  <div className="flex justify-between items-center pt-3 border-t border-slate-50 mt-2 select-none text-[11px] font-bold">
-                    <span className="text-slate-400">Time: {story.readTime}</span>
-                    <span className="text-amber-600 group-hover:translate-x-1 transition-transform flex items-center gap-0.5">
+                  <div
+                    className="flex justify-between items-center pt-3 font-bold text-xs"
+                    style={{ borderTop: `1px solid ${T.surface.line}`, color: T.ink.muted }}
+                  >
+                    <span>⏱ {story.readTime}</span>
+                    <span className="flex items-center gap-1 font-display font-black" style={{ color: theme.accent }}>
                       Read Story
                       <ArrowRight size={14} />
                     </span>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
-        </div>
+        </>
       )}
     </div>
   );
 };
+
+/** The small round chevron buttons that turn a story's page. Local to this
+ *  file — it's the same shape as `IconButton` in ui.tsx but needs a disabled
+ *  state, which that primitive doesn't have. */
+const PageNavButton: React.FC<{
+  children: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}> = ({ children, label, onClick, disabled = false }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    aria-label={label}
+    title={label}
+    className={`inline-flex items-center justify-center bg-white ${disabled ? 'opacity-40' : PRESS}`}
+    style={{
+      width: 44, height: 44,
+      borderRadius: T.radius.sm,
+      color: T.ink.muted,
+      border: `2px solid ${T.surface.line}`,
+      boxShadow: disabled ? 'none' : '0 3px 0 rgba(20,90,140,.10)',
+    }}
+  >
+    {children}
+  </button>
+);

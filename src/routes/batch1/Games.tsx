@@ -3,10 +3,10 @@ import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Lock, Star } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getClassTheme, getSubjectCardColors } from './theme';
-import { Button, Card, EmptyState, PageHeader, Pic, ProgressBar, Skeleton, StarRow, T } from './ui';
+import { Button, EmptyState, GameFinishScreen, GameOption, GameOptionState, GameProgressDots, PageHeader, Pic, ProgressBar, Skeleton, StarRow, T } from './ui';
 import { QuestEngine, type QuestParams } from './QuestEngine';
 import { LetterTracingEngine } from './games/LetterTracingEngine';
 import { NumberHopEngine } from './games/NumberHopEngine';
@@ -107,66 +107,6 @@ interface AttemptResponse {
   newBadges: string[];
 }
 
-/* ───────────────────────── CSS keyframe injection ───────────────────────── */
-
-const INJECTED_STYLES_ID = 'games-dynamic-styles';
-
-function injectStyles() {
-  if (document.getElementById(INJECTED_STYLES_ID)) return;
-  const style = document.createElement('style');
-  style.id = INJECTED_STYLES_ID;
-  style.textContent = `
-    @keyframes game-shake {
-      0%, 100% { transform: translateX(0); }
-      10%, 30%, 50%, 70%, 90% { transform: translateX(-6px); }
-      20%, 40%, 60%, 80% { transform: translateX(6px); }
-    }
-    .animate-game-shake {
-      animation: game-shake 0.5s ease-in-out;
-    }
-    @keyframes game-glow-green {
-      0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
-      50% { box-shadow: 0 0 24px 8px rgba(34,197,94,0.35); }
-      100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
-    }
-    .animate-glow-green {
-      animation: game-glow-green 0.6s ease-out;
-    }
-    @keyframes game-pulse-hint {
-      0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.15); opacity: 0.85; }
-    }
-    .animate-pulse-hint {
-      animation: game-pulse-hint 0.6s ease-in-out 3;
-    }
-    @keyframes xp-float {
-      0% { opacity: 1; transform: translateY(0) scale(1); }
-      100% { opacity: 0; transform: translateY(-60px) scale(1.3); }
-    }
-    .animate-xp-float {
-      animation: xp-float 1.4s ease-out forwards;
-    }
-    @keyframes card-bounce-tap {
-      0% { transform: scale(1); }
-      50% { transform: scale(0.93); }
-      100% { transform: scale(1); }
-    }
-    .card-bounce-tap:active {
-      animation: card-bounce-tap 0.25s ease-out;
-    }
-    @keyframes skeleton-pulse {
-      0%, 100% { opacity: 0.4; }
-      50% { opacity: 0.8; }
-    }
-    .skeleton-pulse {
-      animation: skeleton-pulse 1.5s ease-in-out infinite;
-      background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
-      background-size: 200% 100%;
-    }
-  `;
-  document.head.appendChild(style);
-}
-
 /* ───────────────────────── Helpers ───────────────────────── */
 
 function starsForCountAdd(correct: number): number {
@@ -206,10 +146,6 @@ export const Batch1Games: React.FC = () => {
   /* Chrome variant */
   const isPreReader = currentClass <= 2;
   const numChoices = isPreReader ? 3 : 4;
-
-  useEffect(() => {
-    injectStyles();
-  }, []);
 
   /* ── Auto-open game from chapter param ── */
   useEffect(() => {
@@ -523,7 +459,7 @@ export const Batch1Games: React.FC = () => {
         {challengeGames.length > 0 && !activeSubject && (
           <section className="flex flex-col gap-3">
             <div className="flex items-center gap-3 px-1">
-              <Pic emoji="\U0001F680" size={40} />
+              <Pic emoji="🚀" size={40} />
               <h2 className="font-display font-black text-base sm:text-lg" style={{ color: T.ink.strong }}>
                 Try something harder
               </h2>
@@ -697,9 +633,9 @@ export const Batch1Games: React.FC = () => {
         );
       default:
         return (
-          <div className="text-center py-12 anim-fade-up">
-            <span className="text-5xl">{activeGame.icon}</span>
-            <p className="font-display font-bold text-slate-500 mt-4">Coming soon!</p>
+          <div className="flex flex-col items-center gap-3 py-12 anim-fade-up">
+            <Pic emoji={activeGame.icon} size={56} />
+            <p className="font-display font-bold" style={{ color: T.ink.muted }}>Coming soon!</p>
           </div>
         );
     }
@@ -725,7 +661,7 @@ export const Batch1Games: React.FC = () => {
               it for Class 1–2, which is the one control a stuck child needs to
               find; it now always says what it does. */}
           <div className="flex items-center gap-3">
-            <Button tone="quiet" onClick={() => setActiveGame(null)} icon={<ArrowLeft size={20} strokeWidth={3} />}>
+            <Button tone="quiet" onClick={() => setActiveGame(null)}>
               Back
             </Button>
             <div className="flex items-center gap-2.5 min-w-0">
@@ -736,7 +672,12 @@ export const Batch1Games: React.FC = () => {
             </div>
           </div>
 
-          <Card className="anim-fade-up">{renderActiveGame()}</Card>
+          {/* No outer Card here on purpose — each engine sits directly on the
+              page's own frame instead of inside a second nested white panel.
+              A little horizontal padding on narrow screens takes the place of
+              the Card's old edge margin, so controls don't sit flush against
+              the frame edge on a phone. */}
+          <div className="anim-fade-up px-1 sm:px-0">{renderActiveGame()}</div>
         </div>
       ) : (
         /* ── Choosing ── */
@@ -746,6 +687,11 @@ export const Batch1Games: React.FC = () => {
             artKey="nav-games"
             title="Games"
             hint="Play, and collect stars for every chapter"
+            right={
+              <Button to="/batch1/syllabus" tone="quiet" icon={<Pic emoji="🗺️" name="nav-journey" size={22} />}>
+                See my map
+              </Button>
+            }
           />
           {renderGallery()}
         </>
@@ -765,9 +711,18 @@ interface EngineProps {
   onFinish: (gameId: string, stars: number, score: number) => void;
 }
 
+/** Stable fallback so `ops` doesn't become a fresh array on every render —
+ *  `game.params.ops ?? ['+']` used to inline that literal, which gave
+ *  `generateProblem`'s useCallback a new dependency identity every render
+ *  and fed straight into `useEffect(() => generateProblem(), [generateProblem])`:
+ *  an infinite render loop. Never hit by a real seeded game (every count-add
+ *  row's params sets `ops` explicitly), but any game that ever doesn't would
+ *  have crashed the whole page. */
+const DEFAULT_COUNT_ADD_OPS = ['+'];
+
 const CountAddEngine: React.FC<EngineProps> = ({ game, numChoices, isPreReader, onFinish }) => {
   const maxVal = game.params.max ?? 9;
-  const ops = game.params.ops ?? ['+'];
+  const ops = game.params.ops ?? DEFAULT_COUNT_ADD_OPS;
 
   const [round, setRound] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
@@ -876,26 +831,11 @@ const CountAddEngine: React.FC<EngineProps> = ({ game, numChoices, isPreReader, 
   if (finished) {
     const earned = starsForCountAdd(correctCount);
     return (
-      <div className="flex flex-col items-center gap-5 py-10 anim-fade-up">
-        <span className="text-6xl">🏆</span>
-        <div className="flex gap-1">
-          {[1, 2, 3].map((n) => (
-            <Star key={n} size={32} className={n <= earned ? 'fill-amber-400 text-amber-400' : 'text-slate-200'} />
-          ))}
-        </div>
-        {!isPreReader && (
-          <p className="font-display font-bold text-slate-600 text-sm">
-            {correctCount} / {TOTAL_ROUNDS} correct
-          </p>
-        )}
-        <button
-          onClick={handlePlayAgain}
-          className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer"
-          style={{ minHeight: 48, minWidth: 120 }}
-        >
-          🔄 Play Again
-        </button>
-      </div>
+      <GameFinishScreen
+        earned={earned}
+        scoreLabel={isPreReader ? undefined : `${correctCount} of ${TOTAL_ROUNDS} correct`}
+        onPlayAgain={handlePlayAgain}
+      />
     );
   }
 
@@ -904,37 +844,27 @@ const CountAddEngine: React.FC<EngineProps> = ({ game, numChoices, isPreReader, 
 
   return (
     <div className="flex flex-col items-center gap-6 max-w-lg mx-auto anim-fade-up">
-      {/* Progress dots */}
-      <div className="flex gap-2">
-        {Array.from({ length: TOTAL_ROUNDS }).map((_, i) => (
-          <div
-            key={i}
-            className={`w-3.5 h-3.5 rounded-full transition-all ${
-              i < round ? 'bg-emerald-400' : i === round ? 'bg-amber-400 scale-125' : 'bg-slate-200'
-            }`}
-          />
-        ))}
-      </div>
+      <GameProgressDots total={TOTAL_ROUNDS} current={round} />
 
       {/* Visual equation – emoji items */}
-      <div className="flex items-center gap-5 bg-amber-50/60 border border-amber-100 p-6 rounded-3xl select-none">
+      <div className="flex items-center gap-5 p-6 select-none" style={{ borderRadius: T.radius.md, background: T.surface.sunk }}>
         <div className="grid grid-cols-3 gap-1 min-h-[64px] items-center justify-items-center">
           {Array.from({ length: left }).map((_, i) => (
-            <span key={'l' + i} className="text-3xl" style={{ animationDelay: `${i * 80}ms` }}>
-              {emojiItem}
+            <span key={'l' + i} style={{ animationDelay: `${i * 80}ms` }}>
+              <Pic emoji={emojiItem} size={30} />
             </span>
           ))}
         </div>
         <span className="text-3xl">{opEmoji}</span>
         <div className="grid grid-cols-3 gap-1 min-h-[64px] items-center justify-items-center">
           {Array.from({ length: right }).map((_, i) => (
-            <span key={'r' + i} className="text-3xl" style={{ animationDelay: `${i * 80}ms` }}>
-              {emojiItem}
+            <span key={'r' + i} style={{ animationDelay: `${i * 80}ms` }}>
+              <Pic emoji={emojiItem} size={30} />
             </span>
           ))}
         </div>
-        <span className="font-display font-black text-3xl text-slate-400">=</span>
-        <span className="font-display font-black text-4xl text-amber-500">?</span>
+        <span className="font-display font-black text-3xl" style={{ color: T.ink.faint }}>=</span>
+        <span className="font-display font-black text-4xl" style={{ color: '#DB9A00' }}>?</span>
       </div>
 
       {/* Answer buttons */}
@@ -942,36 +872,19 @@ const CountAddEngine: React.FC<EngineProps> = ({ game, numChoices, isPreReader, 
         {options.map((opt) => {
           const isSelected = selected === opt;
           const isCorrectOpt = opt === answer;
-          let cls =
-            'bg-white border-2 border-slate-200 hover:border-amber-300 text-slate-700';
-          let extraStyle: React.CSSProperties = {};
-
+          let state: GameOptionState = 'idle';
+          let extra = '';
           if (selected !== null) {
-            if (isCorrectOpt) {
-              cls = 'bg-emerald-500 border-2 border-emerald-500 text-white animate-glow-green';
-              extraStyle = { transform: 'scale(1.15)' };
-            } else if (isSelected && !isCorrectOpt) {
-              cls = 'bg-red-400 border-2 border-red-400 text-white animate-game-shake opacity-50';
-            } else {
-              cls = 'bg-slate-100 border-2 border-slate-100 text-slate-300';
-            }
+            if (isCorrectOpt) { state = 'correct'; extra = 'scale-[1.15]'; }
+            else if (isSelected) state = 'wrong';
+            else state = 'dimmed';
           }
-
-          // Pulse correct answer after wrong selection
-          if (selected !== null && feedback === 'wrong' && isCorrectOpt) {
-            cls += ' animate-pulse-hint';
-          }
+          if (selected !== null && feedback === 'wrong' && isCorrectOpt) extra += ' animate-pulse-hint';
 
           return (
-            <button
-              key={opt}
-              onClick={() => handleSelect(opt)}
-              disabled={selected !== null}
-              className={`w-16 h-16 rounded-2xl font-display font-extrabold text-2xl flex items-center justify-center transition-all cursor-pointer shadow-sm ${cls}`}
-              style={{ minWidth: 64, minHeight: 64, ...extraStyle }}
-            >
+            <GameOption key={opt} state={state} disabled={selected !== null} onClick={() => handleSelect(opt)} className={`text-2xl ${extra}`} style={{ width: 64, height: 64 }}>
               {opt}
-            </button>
+            </GameOption>
           );
         })}
       </div>
@@ -993,14 +906,20 @@ const CountAddEngine: React.FC<EngineProps> = ({ game, numChoices, isPreReader, 
    ENGINE: PHONICS POP (silent-lab — emoji + letter match)
    ═══════════════════════════════════════════════════════════ */
 
+/** Same stable-fallback fix as DEFAULT_COUNT_ADD_OPS above — this literal
+ *  used to be inlined at `game.params.pairs ?? [...]`, which fed a fresh
+ *  array into generateBalloons' useCallback every render and infinite-looped
+ *  the moment a game's params didn't set `pairs` explicitly. */
+const DEFAULT_PHONICS_PAIRS = [
+  { emoji: '🍎', letter: 'A' },
+  { emoji: '🐻', letter: 'B' },
+  { emoji: '🐱', letter: 'C' },
+  { emoji: '🐶', letter: 'D' },
+  { emoji: '🐘', letter: 'E' },
+];
+
 const PhonicsPopEngine: React.FC<EngineProps> = ({ game, numChoices, isPreReader, onFinish }) => {
-  const pairs = game.params.pairs ?? [
-    { emoji: '🍎', letter: 'A' },
-    { emoji: '🐻', letter: 'B' },
-    { emoji: '🐱', letter: 'C' },
-    { emoji: '🐶', letter: 'D' },
-    { emoji: '🐘', letter: 'E' },
-  ];
+  const pairs = game.params.pairs ?? DEFAULT_PHONICS_PAIRS;
 
   const TOTAL_ROUNDS = Math.min(pairs.length, 5);
 
@@ -1114,53 +1033,28 @@ const PhonicsPopEngine: React.FC<EngineProps> = ({ game, numChoices, isPreReader
   if (finished) {
     const earned = starsForPhonicsPop(mistakes);
     return (
-      <div className="flex flex-col items-center gap-5 py-10 anim-fade-up">
-        <span className="text-6xl">🎈</span>
-        <div className="flex gap-1">
-          {[1, 2, 3].map((n) => (
-            <Star key={n} size={32} className={n <= earned ? 'fill-amber-400 text-amber-400' : 'text-slate-200'} />
-          ))}
-        </div>
-        {!isPreReader && (
-          <p className="font-display font-bold text-slate-600 text-sm">
-            {TOTAL_ROUNDS - mistakes} / {TOTAL_ROUNDS} correct
-          </p>
-        )}
-        <button
-          onClick={handlePlayAgain}
-          className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer"
-          style={{ minHeight: 48 }}
-        >
-          🔄 Play Again
-        </button>
-      </div>
+      <GameFinishScreen
+        earned={earned}
+        scoreLabel={isPreReader ? undefined : `${TOTAL_ROUNDS - mistakes} of ${TOTAL_ROUNDS} correct`}
+        onPlayAgain={handlePlayAgain}
+      />
     );
   }
 
   return (
     <div className="flex flex-col items-center gap-5 max-w-lg mx-auto anim-fade-up">
-      {/* Progress dots */}
-      <div className="flex gap-2">
-        {Array.from({ length: TOTAL_ROUNDS }).map((_, i) => (
-          <div
-            key={i}
-            className={`w-3.5 h-3.5 rounded-full transition-all ${
-              i < round ? 'bg-emerald-400' : i === round ? 'bg-amber-400 scale-125' : 'bg-slate-200'
-            }`}
-          />
-        ))}
-      </div>
+      <GameProgressDots total={TOTAL_ROUNDS} current={round} />
 
       {/* Emoji prompt – "What letter does this start with?" */}
-      <div className="bg-amber-50 border-2 border-amber-200 p-5 rounded-3xl flex flex-col items-center gap-2 select-none">
-        <span className="text-6xl">{promptPair.emoji}</span>
-        <span className="text-2xl text-amber-500">❓</span>
+      <div className="p-5 flex flex-col items-center gap-2 select-none" style={{ borderRadius: T.radius.md, background: '#FFF7E0', border: '2px solid #FFE9A8' }}>
+        <Pic emoji={promptPair.emoji} size={60} />
+        <span className="text-2xl" style={{ color: '#DB9A00' }}>❓</span>
       </div>
 
       {/* Balloon field */}
       <div
-        className="w-full bg-sky-50/50 border border-sky-100/30 rounded-3xl relative overflow-hidden"
-        style={{ height: 280 }}
+        className="w-full relative overflow-hidden"
+        style={{ height: 280, borderRadius: T.radius.md, background: '#EAF6FE', border: `1px solid ${T.surface.line}` }}
       >
         {balloons.map((bal) => {
           if (bal.popped) return null;

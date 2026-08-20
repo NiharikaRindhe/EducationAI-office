@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Star } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { GameFinishScreen, GameOption, GameProgressDots, Pic, T } from '../ui';
 
 /* Ported from EducationAI-Games-master's Grade3 "MissingWord" (context-clue
    fill-in-the-blank) and restyled to this app's Adventure Island look —
@@ -100,55 +100,64 @@ export const ContextFillEngine: React.FC<ContextFillEngineProps> = ({ game, isPr
   if (finished) {
     const earned = starsForContextFill(correctCount, puzzles.length);
     return (
-      <div className="flex flex-col items-center gap-5 py-10 anim-fade-up">
-        <span className="text-6xl">🏆</span>
-        <div className="flex gap-1">{[1, 2, 3].map((n) => (<Star key={n} size={32} className={n <= earned ? 'fill-amber-400 text-amber-400' : 'text-slate-200'} />))}</div>
-        {!isPreReader && <p className="font-display font-bold text-slate-600 text-sm">{correctCount} / {puzzles.length} correct</p>}
-        <button onClick={handlePlayAgain} className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer" style={{ minHeight: 48, minWidth: 120 }}>
-          🔄 Play Again
-        </button>
-      </div>
+      <GameFinishScreen
+        earned={earned}
+        scoreLabel={isPreReader ? undefined : `${correctCount} of ${puzzles.length} correct`}
+        onPlayAgain={handlePlayAgain}
+      />
     );
   }
 
   return (
-    <div className="flex flex-col items-center gap-5 max-w-lg mx-auto anim-fade-up">
-      <div className="flex gap-2">
-        {puzzles.map((_, i) => (
-          <div key={i} className={`w-3.5 h-3.5 rounded-full transition-all ${i < idx ? 'bg-emerald-400' : i === idx ? 'bg-amber-400 scale-125' : 'bg-slate-200'}`} />
-        ))}
-      </div>
+    <div className="w-full flex flex-col items-center gap-5 sm:gap-6 max-w-lg sm:max-w-xl md:max-w-2xl mx-auto px-2 sm:px-0 anim-fade-up">
+      <GameProgressDots total={puzzles.length} current={idx} />
 
-      <div className="w-full bg-white rounded-3xl border-2 border-amber-100 shadow-sm px-6 py-6 flex flex-col items-center gap-4">
-        <span className="text-6xl anim-bob">{puzzle.emoji}</span>
-        <p className="font-display font-black text-lg text-slate-700 text-center leading-relaxed">
+      <div
+        className="w-full bg-white flex flex-col items-center gap-4 px-6 py-6 sm:px-8 sm:py-8 md:px-10 md:py-9"
+        style={{ borderRadius: T.radius.md, boxShadow: T.shadow.card }}
+      >
+        <Pic emoji={puzzle.emoji} size={60} className="anim-bob sm:!w-20 sm:!h-20 md:!w-24 md:!h-24" />
+        <p className="font-display font-black text-lg sm:text-xl md:text-2xl text-center leading-relaxed" style={{ color: T.ink.strong }}>
           {before}
-          <span className={`inline-block mx-1.5 px-3 py-0.5 rounded-xl border-2 min-w-[70px] text-center ${result === 'correct' ? 'border-emerald-400 bg-emerald-50 text-emerald-700' : result === 'wrong' ? 'border-red-400 bg-red-50 text-red-600' : 'border-amber-300 bg-amber-50 text-amber-400'}`}>
+          <span
+            className="inline-block mx-1.5 px-3 py-0.5 min-w-[70px] sm:min-w-[90px] text-center"
+            style={{
+              borderRadius: T.radius.sm,
+              border: `2px solid ${result === 'correct' ? '#3FCB6E' : result === 'wrong' ? '#F0554C' : '#FFB100'}`,
+              background: result === 'correct' ? '#EAFBF0' : result === 'wrong' ? '#FDEDEC' : '#FFF7E0',
+              color: result === 'correct' ? '#1B7F41' : result === 'wrong' ? '#B23930' : T.ink.faint,
+            }}
+          >
             {selected ?? '?'}
           </span>
           {after}
         </p>
       </div>
 
-      <div className="w-full grid grid-cols-2 gap-3">
+      <div className="w-full grid grid-cols-2 gap-3 sm:gap-4">
         {puzzle.options.map((opt) => {
           const isCorrect = opt === puzzle.correct;
           const isSelected = opt === selected;
-          let cls = 'py-3.5 rounded-2xl font-display font-black text-base border-2 transition-all active:scale-95 ';
-          if (result === null) cls += 'bg-white border-slate-200 hover:border-amber-300 text-slate-700';
-          else if (isCorrect) cls += 'bg-emerald-500 border-emerald-500 text-white animate-glow-green';
-          else if (isSelected) cls += 'bg-red-400 border-red-400 text-white animate-game-shake';
-          else cls += 'bg-slate-100 border-slate-100 text-slate-300';
+          const state = result === null ? 'idle' : isCorrect ? 'correct' : isSelected ? 'wrong' : 'dimmed';
           return (
-            <button key={opt} onClick={() => handleSelect(opt)} disabled={result !== null} className={cls}>
+            <GameOption
+              key={opt}
+              state={state}
+              disabled={result !== null}
+              onClick={() => handleSelect(opt)}
+              className="py-3.5 sm:py-4 md:py-5 text-base sm:text-lg"
+            >
               {opt}
-            </button>
+            </GameOption>
           );
         })}
       </div>
 
       {result === 'wrong' && !isPreReader && (
-        <div className="w-full bg-red-50 border-2 border-red-300 rounded-2xl px-5 py-3 text-sm font-semibold text-red-600 anim-fade-up">
+        <div
+          className="w-full px-5 py-3 text-sm sm:text-base font-semibold anim-fade-up"
+          style={{ borderRadius: T.radius.sm, border: '2px solid #F5B3AD', background: '#FDEDEC', color: '#B23930' }}
+        >
           {(selected && puzzle.wrong?.[selected]) ?? `Think about what fits best — the answer is "${puzzle.correct}".`}
         </div>
       )}

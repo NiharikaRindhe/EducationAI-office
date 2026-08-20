@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Star, CheckCircle2 } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { Button, GameFinishScreen, GameProgressDots, T } from '../ui';
 
 /* Ported from EducationAI-Games-master's Grade4 "SequencingTiles" and
    restyled to this app's Adventure Island look — amber/emerald palette,
@@ -134,28 +135,16 @@ export const StoryOrderEngine: React.FC<StoryOrderEngineProps> = ({ game, isPreR
 
   if (finished) {
     const earned = starsForStoryOrder(mistakes);
-    return (
-      <div className="flex flex-col items-center gap-5 py-10 anim-fade-up">
-        <span className="text-6xl">🏆</span>
-        <div className="flex gap-1">{[1, 2, 3].map((n) => (<Star key={n} size={32} className={n <= earned ? 'fill-amber-400 text-amber-400' : 'text-slate-200'} />))}</div>
-        <button onClick={handlePlayAgain} className="bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-sm rounded-full px-8 py-3 shadow-md transition-all cursor-pointer" style={{ minHeight: 48, minWidth: 120 }}>
-          🔄 Play Again
-        </button>
-      </div>
-    );
+    return <GameFinishScreen earned={earned} onPlayAgain={handlePlayAgain} />;
   }
 
   const allFilled = slots.every(Boolean);
 
   return (
     <div className="flex flex-col items-center gap-5 max-w-xl mx-auto anim-fade-up">
-      <div className="flex gap-2">
-        {stories.map((_, i) => (
-          <div key={i} className={`w-3.5 h-3.5 rounded-full transition-all ${i < idx ? 'bg-emerald-400' : i === idx ? 'bg-amber-400 scale-125' : 'bg-slate-200'}`} />
-        ))}
-      </div>
+      <GameProgressDots total={stories.length} current={idx} />
 
-      {!isPreReader && <p className="font-display font-black text-lg text-slate-700">{story.title}</p>}
+      {!isPreReader && <p className="font-display font-black text-lg" style={{ color: T.ink.strong }}>{story.title}</p>}
 
       <div className={`w-full grid gap-3 ${slots.length <= 3 ? 'grid-cols-3' : 'grid-cols-4'} ${shake ? 'animate-game-shake' : ''}`}>
         {slots.map((tileId, i) => {
@@ -165,33 +154,37 @@ export const StoryOrderEngine: React.FC<StoryOrderEngineProps> = ({ game, isPreR
           return (
             <button
               key={i}
+              type="button"
               onClick={() => placeInSlot(i)}
-              className="relative min-h-[100px] rounded-2xl border-2 transition-all flex flex-col items-center justify-center p-3"
-              style={
-                result === 'correct' && tile
-                  ? { background: '#DCFCE7', borderColor: '#34D399' }
+              className="relative min-h-[100px] transition-all flex flex-col items-center justify-center p-3"
+              style={{
+                borderRadius: T.radius.sm,
+                borderWidth: 2,
+                borderStyle: tile ? 'solid' : 'dashed',
+                ...(result === 'correct' && tile
+                  ? { background: '#EAFBF0', borderColor: '#3FCB6E' }
                   : isWrongSlot
-                    ? { background: '#FEF2F2', borderColor: '#FCA5A5' }
+                    ? { background: '#FDEDEC', borderColor: '#F0554C' }
                     : tile
                       ? { background: color!.bg, borderColor: color!.border }
-                      : { borderStyle: 'dashed', borderColor: '#CBD5E1', background: 'white' }
-              }
+                      : { borderColor: T.surface.line, background: '#FFFFFF' }),
+              }}
             >
-              <span className={`absolute top-2 left-3 text-xs font-display font-black ${tile ? 'opacity-30' : 'text-slate-300'}`}>{i + 1}</span>
+              <span className="absolute top-2 left-3 text-xs font-display font-black" style={{ color: tile ? color!.text : T.ink.faint, opacity: tile ? 0.5 : 1 }}>{i + 1}</span>
               {tile ? (
                 <p className="text-sm font-display font-semibold text-center leading-snug mt-2" style={{ color: color!.text }}>{tile.text}</p>
               ) : (
-                <span className="text-slate-200 text-2xl font-black">{i + 1}</span>
+                <span className="text-2xl font-black" style={{ color: T.surface.line }}>{i + 1}</span>
               )}
             </button>
           );
         })}
       </div>
 
-      <div className="w-full bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-        {!isPreReader && <p className="text-[10px] font-display font-black tracking-widest text-slate-400 mb-2 uppercase">Sentence Pool</p>}
+      <div className="w-full bg-white p-4" style={{ borderRadius: T.radius.sm, boxShadow: T.shadow.card }}>
+        {!isPreReader && <p className="text-[10px] font-display font-black tracking-widest mb-2 uppercase" style={{ color: T.ink.faint }}>Sentence Pool</p>}
         <div className="grid grid-cols-1 gap-2">
-          {pool.length === 0 && <span className="text-sm text-slate-300 font-semibold text-center py-2">All placed — press Check!</span>}
+          {pool.length === 0 && <span className="text-sm font-semibold text-center py-2" style={{ color: T.ink.faint }}>All placed — press Check!</span>}
           {pool.map((id) => {
             const tile = tileById(id);
             const color = colorFor(id);
@@ -199,9 +192,10 @@ export const StoryOrderEngine: React.FC<StoryOrderEngineProps> = ({ game, isPreR
             return (
               <button
                 key={id}
+                type="button"
                 onClick={() => tapPoolTile(id)}
-                className={`rounded-xl border-2 px-4 py-2.5 text-sm font-display font-semibold text-left transition-all ${isPicked ? 'ring-2 ring-offset-1 ring-amber-400 scale-[1.02]' : ''}`}
-                style={{ background: color.bg, borderColor: color.border, color: color.text }}
+                className={`px-4 py-2.5 text-sm font-display font-semibold text-left transition-all ${isPicked ? 'ring-2 ring-offset-1 ring-amber-400 scale-[1.02]' : ''}`}
+                style={{ borderRadius: T.radius.sm, border: `2px solid ${color.border}`, background: color.bg, color: color.text, minHeight: T.tap }}
               >
                 {tile.text}
               </button>
@@ -211,25 +205,27 @@ export const StoryOrderEngine: React.FC<StoryOrderEngineProps> = ({ game, isPreR
       </div>
 
       {result === null && (
-        <button onClick={checkAnswer} disabled={!allFilled} className="flex items-center gap-2 bg-amber-400 hover:bg-amber-500 disabled:bg-slate-200 disabled:text-slate-400 text-white font-display font-bold px-8 py-3 rounded-full shadow-md transition-all">
-          <CheckCircle2 size={18} /> Check!
-        </button>
+        <Button tone="amber" onClick={checkAnswer} disabled={!allFilled} icon={<CheckCircle2 size={18} />}>
+          Check!
+        </Button>
       )}
 
       {result === 'correct' && (
-        <div className="w-full bg-emerald-50 border-2 border-emerald-300 rounded-2xl px-6 py-4 font-display font-bold text-center text-emerald-700 anim-fade-up">
+        <div className="w-full px-6 py-4 font-display font-bold text-center anim-fade-up" style={{ borderRadius: T.radius.sm, background: '#EAFBF0', border: '2px solid #A8E8BC', color: '#1B7F41' }}>
           🎉 Perfect order!
-          <button onClick={nextStory} className="mt-2 block mx-auto bg-emerald-500 hover:bg-emerald-600 text-white font-display font-bold px-6 py-2 rounded-full text-sm">
-            {idx + 1 >= stories.length ? 'Finish' : 'Next Story →'}
-          </button>
+          <div className="mt-3 flex justify-center">
+            <Button tone="primary" onClick={nextStory}>
+              {idx + 1 >= stories.length ? 'Finish' : 'Next Story →'}
+            </Button>
+          </div>
         </div>
       )}
       {result === 'wrong' && (
-        <div className="w-full bg-red-50 border-2 border-red-300 rounded-2xl px-6 py-4 font-display font-bold text-center text-red-600 anim-fade-up">
+        <div className="w-full px-6 py-4 font-display font-bold text-center anim-fade-up" style={{ borderRadius: T.radius.sm, background: '#FDEDEC', border: '2px solid #F5B3AD', color: '#B23930' }}>
           Not quite — check the order again!
-          <button onClick={tryAgain} className="mt-2 block mx-auto bg-white border border-slate-200 text-slate-600 font-bold py-1.5 px-5 rounded-full text-sm hover:bg-slate-50">
-            Try Again
-          </button>
+          <div className="mt-3 flex justify-center">
+            <Button tone="quiet" onClick={tryAgain}>Try Again</Button>
+          </div>
         </div>
       )}
     </div>

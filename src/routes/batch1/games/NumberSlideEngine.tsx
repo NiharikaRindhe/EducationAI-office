@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Star, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { Button, StarRow, T } from '../ui';
 
 /* Ported from EducationAI-Games-master's Grade4 "NumberArrange" sliding
    number puzzle and restyled to this app's Adventure Island look —
@@ -165,10 +166,15 @@ export const NumberSlideEngine: React.FC<NumberSlideEngineProps> = ({ game, isPr
         {SIZES.map((s) => (
           <button
             key={s}
+            type="button"
             onClick={() => startGame(s)}
-            className={`py-1.5 px-4 rounded-full text-xs font-display font-black transition-colors border ${
-              s === size ? 'bg-amber-400 text-white border-amber-400' : 'bg-white text-slate-500 border-slate-200 hover:border-amber-300'
-            }`}
+            className="py-1.5 px-4 font-display font-black text-xs transition-colors"
+            style={{
+              borderRadius: 999,
+              border: `2px solid ${s === size ? '#FFB100' : T.surface.line}`,
+              background: s === size ? '#FFB100' : '#FFFFFF',
+              color: s === size ? '#FFFFFF' : T.ink.muted,
+            }}
           >
             {s}×{s}
           </button>
@@ -177,35 +183,32 @@ export const NumberSlideEngine: React.FC<NumberSlideEngineProps> = ({ game, isPr
 
       {!isPreReader && (
         <div className="flex items-center gap-3">
-          <div className="flex flex-col items-center bg-amber-50/60 border border-amber-100 rounded-2xl px-5 py-2 min-w-[80px]">
-            <span className="text-[10px] font-black tracking-widest uppercase text-slate-400">Moves</span>
-            <span className="text-xl font-display font-black text-slate-700">{moves}</span>
+          <div className="flex flex-col items-center px-5 py-2 min-w-[80px]" style={{ borderRadius: T.radius.sm, background: T.surface.sunk }}>
+            <span className="text-[10px] font-black tracking-widest uppercase" style={{ color: T.ink.faint }}>Moves</span>
+            <span className="text-xl font-display font-black" style={{ color: T.ink.strong }}>{moves}</span>
           </div>
-          <div className="flex flex-col items-center bg-amber-50/60 border border-amber-100 rounded-2xl px-5 py-2 min-w-[80px]">
-            <span className="text-[10px] font-black tracking-widest uppercase text-slate-400">Goal</span>
-            <span className="text-xl font-display font-black text-slate-700">1–{total}</span>
+          <div className="flex flex-col items-center px-5 py-2 min-w-[80px]" style={{ borderRadius: T.radius.sm, background: T.surface.sunk }}>
+            <span className="text-[10px] font-black tracking-widest uppercase" style={{ color: T.ink.faint }}>Goal</span>
+            <span className="text-xl font-display font-black" style={{ color: T.ink.strong }}>1–{total}</span>
           </div>
         </div>
       )}
 
       {won && (
-        <div className="flex flex-col items-center gap-3 bg-emerald-50 border-2 border-emerald-300 rounded-2xl px-6 py-4 anim-fade-up">
-          <div className="flex gap-1">
-            {[1, 2, 3].map((n) => (
-              <Star key={n} size={26} className={n <= starsForSlide(moves, size) ? 'fill-amber-400 text-amber-400' : 'text-slate-200'} />
-            ))}
-          </div>
-          <p className="font-display font-bold text-emerald-700 text-sm">🎉 Solved in {moves} moves!</p>
+        <div className="flex flex-col items-center gap-3 px-6 py-4 anim-fade-up" style={{ borderRadius: T.radius.sm, background: '#EAFBF0', border: '2px solid #A8E8BC' }}>
+          <StarRow earned={starsForSlide(moves, size)} size={26} />
+          <p className="font-display font-bold text-sm" style={{ color: '#1B7F41' }}>🎉 Solved in {moves} moves!</p>
         </div>
       )}
 
       <div
-        className="grid bg-white rounded-3xl border border-slate-100 p-3"
+        className="grid bg-white p-3"
         style={{
           gridTemplateColumns: `repeat(${size}, ${tileSize}px)`,
           gridTemplateRows: `repeat(${size}, ${tileSize}px)`,
           gap: 6,
-          boxShadow: '0 8px 0 rgba(20,90,140,.10)',
+          borderRadius: T.radius.md,
+          boxShadow: T.shadow.raised,
         }}
       >
         {tiles.map((num, idx) => {
@@ -213,17 +216,19 @@ export const NumberSlideEngine: React.FC<NumberSlideEngineProps> = ({ game, isPr
           const isShining = shine && diagOf(idx) === shineIdx;
           const hue = num === 0 ? 0 : Math.round((num / total) * 40);
           return (
-            <div
+            <button
               key={idx}
+              type="button"
               onClick={() => !isBlank && handleTileClick(idx)}
-              className="flex items-center justify-center font-display font-black rounded-xl transition-all duration-150 ease-in-out select-none"
+              className="flex items-center justify-center font-display font-black transition-all duration-150 ease-in-out select-none"
               style={{
                 width: tileSize,
                 height: tileSize,
                 fontSize,
+                borderRadius: T.radius.sm,
                 cursor: isBlank ? 'default' : 'pointer',
                 pointerEvents: isBlank ? 'none' : 'auto',
-                background: isBlank ? '#f1f5f9' : isShining ? '#fbbf24' : `hsl(${38 + hue}, 90%, 58%)`,
+                background: isBlank ? T.surface.sunk : isShining ? '#fbbf24' : `hsl(${38 + hue}, 90%, 58%)`,
                 color: isBlank ? 'transparent' : '#fff',
                 boxShadow: isBlank
                   ? 'none'
@@ -234,21 +239,16 @@ export const NumberSlideEngine: React.FC<NumberSlideEngineProps> = ({ game, isPr
               }}
             >
               {num !== 0 && num}
-            </div>
+            </button>
           );
         })}
       </div>
 
-      <button
-        onClick={() => startGame(size)}
-        className="flex items-center gap-2 bg-white border border-slate-200 text-slate-600 font-display font-bold text-sm px-6 py-2.5 rounded-full hover:border-amber-300 hover:text-amber-600 transition-colors active:scale-95"
-        style={{ boxShadow: '0 3px 0 rgba(20,90,140,.10)' }}
-      >
-        <RotateCcw size={16} />
+      <Button tone="quiet" onClick={() => startGame(size)} icon={<RotateCcw size={16} />}>
         Start again
-      </button>
+      </Button>
 
-      {!isPreReader && <p className="text-[11px] text-slate-400 font-medium">Tap a tile next to the empty space — or use arrow keys</p>}
+      {!isPreReader && <p className="text-[11px] font-medium" style={{ color: T.ink.faint }}>Tap a tile next to the empty space — or use arrow keys</p>}
     </div>
   );
 };
