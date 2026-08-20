@@ -68,6 +68,37 @@ const ri = (n: number) => Math.floor(Math.random() * n);
 const pick = <T,>(arr: T[]): T => arr[ri(arr.length)];
 const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
 
+const PICTURE_NAMES: Record<string, string> = {
+  '🔴': 'red circle', '🔵': 'blue circle', '🔺': 'red triangle', '🟨': 'yellow square',
+  '🌸': 'flower', '🍀': 'clover', '⭐': 'star', '🌙': 'moon',
+  '🟦': 'blue square', '🟧': 'orange square', '🟩': 'green square',
+  '🌱': 'plant', '🐟': 'fish', '🪨': 'stone', '🍃': 'leaf',
+  '🥚': 'egg', '🧱': 'brick', '🌻': 'flower', '🐚': 'shell', '🥾': 'boot',
+  '⬆️': 'up', '⬇️': 'down', '➡️': 'right', '⬅️': 'left',
+  '👨‍👩‍👧': 'family', '🚗': 'car', '🌳': 'tree',
+};
+
+const PICTURE_LABEL_PALETTE: Record<GameOptionState, { bg: string; color: string; border: string; shadow: string }> = {
+  idle: { bg: '#FFFFFF', color: T.ink.strong, border: T.surface.line, shadow: '0 3px 0 rgba(20,90,140,.10)' },
+  correct: { bg: '#3FCB6E', color: '#FFFFFF', border: 'transparent', shadow: '0 3px 0 #2E9E54' },
+  wrong: { bg: '#F0554C', color: '#FFFFFF', border: 'transparent', shadow: '0 3px 0 #C33F38' },
+  dimmed: { bg: T.surface.sunk, color: T.ink.faint, border: T.surface.line, shadow: 'none' },
+};
+
+/**
+ * Catalog answer choices use a compact `"emoji label"` string. Rendering the
+ * whole value as text made the picture only 16px in labelled choices (the
+ * giraffe/rabbit measurement round is the clearest example). Split just the
+ * leading picture so it can use the same large, artwork-aware `<Pic>` path as
+ * the rest of the child UI. Numbers, fractions and ordinary words stay text.
+ */
+function splitOptionPicture(option: string): { emoji: string; label: string } | null {
+  const [first = '', ...rest] = option.trim().split(/\s+/);
+  const isPicture = /^(?:\p{Extended_Pictographic}|[\u2190-\u2BFF])(?:\uFE0F|\u200D|\p{Emoji_Modifier}|\p{Extended_Pictographic}|[\u2190-\u2BFF])*$/u.test(first);
+  if (!isPicture) return null;
+  return { emoji: first, label: rest.join(' ') || PICTURE_NAMES[first] || 'picture' };
+}
+
 function shuffleWithAnswer(options: (string | number)[], answerValue: string | number): { options: string[]; answer: number } {
   const strs = options.map(String);
   const shuffled = [...strs].sort(() => Math.random() - 0.5);
@@ -560,17 +591,41 @@ export const QuestEngine: React.FC<QuestProps> = ({ game, numChoices, isPreReade
             else state = 'dimmed';
             if (isAnswer && selected !== current.answer) extra += ' animate-pulse-hint';
           }
+          const picture = splitOptionPicture(opt);
           const long = opt.length > 4;
+          const picturePalette = PICTURE_LABEL_PALETTE[state];
           return (
             <GameOption
               key={idx}
               state={state}
               disabled={selected !== null}
               onClick={() => handleSelect(idx)}
-              className={`${extra} ${long ? 'text-base' : 'text-2xl'}`}
-              style={{ minWidth: long ? 120 : 64, paddingLeft: 16, paddingRight: 16 }}
+              ariaLabel={picture?.label}
+              className={`${extra} ${picture ? 'flex flex-col items-center justify-start gap-2 p-1' : long ? 'text-base' : 'text-2xl'}`}
+              style={picture ? {
+                width: 156,
+                minHeight: 120,
+                background: 'transparent',
+                border: '2px solid transparent',
+                boxShadow: 'none',
+              } : { minWidth: long ? 120 : 64, paddingLeft: 16, paddingRight: 16 }}
             >
-              {opt}
+              {picture ? (
+                <>
+                  <Pic emoji={picture.emoji} size={76} className="anim-bob drop-shadow-[0_4px_4px_rgba(20,66,95,.16)]" />
+                  <span
+                    className="w-full min-h-11 px-3 py-2 rounded-2xl flex items-center justify-center text-lg leading-tight"
+                    style={{
+                      background: picturePalette.bg,
+                      color: picturePalette.color,
+                      border: `2px solid ${picturePalette.border}`,
+                      boxShadow: picturePalette.shadow,
+                    }}
+                  >
+                    {picture.label}
+                  </span>
+                </>
+              ) : opt}
             </GameOption>
           );
         })}

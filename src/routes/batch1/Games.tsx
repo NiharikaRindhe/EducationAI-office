@@ -270,7 +270,7 @@ export const Batch1Games: React.FC = () => {
       return (
         <div
           key={game.gameId}
-          className="relative flex flex-col items-center justify-center gap-2 px-3 py-5 text-center select-none"
+          className="relative w-full h-full flex flex-col items-center justify-center gap-2 px-3 py-5 text-center select-none"
           style={{
             minHeight: 170,
             borderRadius: T.radius.md,
@@ -298,7 +298,7 @@ export const Batch1Games: React.FC = () => {
       <button
         key={game.gameId}
         onClick={() => setActiveGame(game)}
-        className="relative flex flex-col items-center justify-center gap-2.5 px-3 py-5 overflow-hidden text-center
+        className="relative w-full h-full flex flex-col items-center justify-center gap-2.5 px-3 py-5 overflow-hidden text-center
                    select-none transition-transform duration-100 ease-out active:translate-y-[3px] cursor-pointer"
         style={{
           minHeight: 170,
@@ -369,9 +369,8 @@ export const Batch1Games: React.FC = () => {
        stacked in one column — roughly 4,000px for Class 2, which put the last
        games a dozen scrolls below the fold and effectively out of reach. */
     const subjects = Array.from(new Set(chapters.map((ch) => ch.subject)));
-    const shown = activeSubject && subjects.includes(activeSubject)
-      ? chapters.filter((ch) => ch.subject === activeSubject)
-      : chapters;
+    const shownSubjects = (activeSubject && subjects.includes(activeSubject) ? [activeSubject] : subjects)
+      .map((subject) => ({ subject, chapters: chapters.filter((ch) => ch.subject === subject) }));
 
     return (
       <div className="flex flex-col gap-5">
@@ -403,56 +402,68 @@ export const Batch1Games: React.FC = () => {
           </div>
         )}
 
-        {/* Chapters are PANELS that tile, not full-width rows.
+        {/* Each subject owns its own row-major grid. Numbering restarts at 1
+            inside every group, so English and Mathematics can never be
+            visually interleaved or share one running sequence. */}
+        <div className="flex flex-col gap-7">
+          {shownSubjects.map(({ subject, chapters: subjectChapters }) => (
+            <section key={subject} className="flex flex-col gap-3">
+              <div className="flex items-center gap-3 px-1">
+                <h2 className="font-display font-black text-lg" style={{ color: T.ink.strong }}>{subject}</h2>
+                <span
+                  className="rounded-full px-3 py-1 font-display font-black text-xs"
+                  style={{ background: '#FFFFFFB8', color: T.ink.muted, border: `1px solid ${T.surface.line}` }}
+                >
+                  {subjectChapters.reduce((sum, chapter) => sum + chapter.games.length, 0)}{' '}
+                  {subjectChapters.reduce((sum, chapter) => sum + chapter.games.length, 0) === 1 ? 'game' : 'games'}
+                </span>
+              </div>
 
-           Most chapters in this curriculum hold exactly one game. Giving each
-           its own row across a 1680px screen left a single card at the far left
-           with six empty columns beside it, repeated a dozen times down the
-           page. CSS columns let each panel take only the height it needs and
-           pack side by side, so the grouping survives and the whitespace goes. */}
-        <div className="columns-1 md:columns-2 2xl:columns-3 gap-4">
-          {shown.map((chapter) => {
-            const chapterStars = chapter.games.reduce((sum, g) => sum + g.stars, 0);
-            const maxStars = chapter.games.length * 3;
-            return (
-              <section
-                key={chapter.chapterRef}
-                className="break-inside-avoid mb-4 bg-white/70 p-3.5 flex flex-col gap-3"
-                style={{ borderRadius: T.radius.md, boxShadow: T.shadow.card }}
-              >
-                <div className="flex items-center gap-2.5">
-                  <span
-                    className="flex items-center justify-center font-display font-black text-base text-white shrink-0"
-                    style={{
-                      width: 38, height: 38, borderRadius: T.radius.sm,
-                      background: theme.accent, boxShadow: `0 3px 0 ${theme.accentDark}`,
-                    }}
-                  >
-                    {chapter.chapterNum > 0 ? chapter.chapterNum : '★'}
-                  </span>
-                  <h2
-                    className="flex-1 min-w-0 font-display font-black text-sm sm:text-base leading-tight"
-                    style={{ color: T.ink.strong }}
-                  >
-                    {chapter.chapterTitle}
-                  </h2>
-                  <span className="flex items-center gap-2 shrink-0">
-                    <ProgressBar value={chapterStars} max={maxStars} className="w-16 hidden sm:block" />
-                    <b className="font-display text-xs whitespace-nowrap" style={{ color: T.ink.muted }}>
-                      {chapterStars}/{maxStars}
-                    </b>
-                  </span>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4 items-stretch">
+                {subjectChapters.map((chapter, subjectIndex) => {
+                  const chapterStars = chapter.games.reduce((sum, g) => sum + g.stars, 0);
+                  const maxStars = chapter.games.length * 3;
+                  return (
+                    <article
+                      key={chapter.chapterRef}
+                      className="h-full min-h-[270px] bg-white/70 p-3.5 flex flex-col gap-3"
+                      style={{ borderRadius: T.radius.md, boxShadow: T.shadow.card }}
+                    >
+                      <div className="flex items-center gap-2.5 min-h-[42px]">
+                        <span
+                          className="flex items-center justify-center font-display font-black text-base text-white shrink-0"
+                          style={{
+                            width: 38, height: 38, borderRadius: T.radius.sm,
+                            background: theme.accent, boxShadow: `0 3px 0 ${theme.accentDark}`,
+                          }}
+                        >
+                          {subjectIndex + 1}
+                        </span>
+                        <h3
+                          className="flex-1 min-w-0 font-display font-black text-sm sm:text-base leading-tight"
+                          style={{ color: T.ink.strong }}
+                        >
+                          {chapter.chapterTitle}
+                        </h3>
+                        <span className="flex items-center gap-2 shrink-0">
+                          <ProgressBar value={chapterStars} max={maxStars} className="w-16 hidden sm:block" />
+                          <b className="font-display text-xs whitespace-nowrap" style={{ color: T.ink.muted }}>
+                            {chapterStars}/{maxStars}
+                          </b>
+                        </span>
+                      </div>
 
-                {/* Two per row inside a panel: most chapters hold one or two
-                    games, and a half-panel card is a far bigger tap target for a
-                    six-year-old than a third-panel one. */}
-                <div className="grid grid-cols-2 gap-3">
-                  {chapter.games.map((game) => renderGameCard(game))}
-                </div>
-              </section>
-            );
-          })}
+                      <div className={chapter.games.length === 1
+                        ? 'grid grid-cols-1 gap-3 w-full max-w-sm mx-auto flex-1'
+                        : 'grid grid-cols-2 gap-3 w-full flex-1'}>
+                        {chapter.games.map((game) => renderGameCard(game))}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
         </div>
 
         {/* Same skill, one class up — offered once a child has mastered theirs. */}

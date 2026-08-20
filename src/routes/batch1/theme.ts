@@ -25,7 +25,7 @@ export function getClassTheme(classNum: number): ClassTheme {
 /** Card gradient per subject for game/quiz cards. */
 export function getSubjectCardColors(subject: string): { from: string; to: string; shadow: string; text: string } {
   const s = subject.toLowerCase();
-  if (s.includes('math')) return { from: '#83E33A', to: '#54C000', shadow: '#3F9C00', text: '#3F9C00' };
-  if (s.includes('english')) return { from: '#54C7FF', to: '#1E9BE9', shadow: '#0F7FC4', text: '#0F7FC4' };
-  return { from: '#C289FF', to: '#9A4DF6', shadow: '#7C31D6', text: '#7C31D6' };
+  if (s.includes('math')) return { from: '#F8B45E', to: '#E7833D', shadow: '#C9682B', text: '#B95B25' };
+  if (s.includes('english')) return { from: '#A995F5', to: '#7863D7', shadow: '#5F4DB8', text: '#6754C4' };
+  return { from: '#F29CBC', to: '#DA6F9B', shadow: '#B9537C', text: '#B84F78' };
 }
