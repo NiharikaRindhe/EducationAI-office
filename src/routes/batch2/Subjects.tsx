@@ -5,5 +5,5 @@ import { SyllabusView } from '../../components/shared/SyllabusView';
 // per-chapter scores; now reads the school's real indexed books via
 // GET /student/syllabus. See components/shared/SyllabusView.tsx.
 export const Batch2Subjects: React.FC = () => (
-  <SyllabusView accent="indigo" chatHref="/batch2/chat" />
+  <SyllabusView accent="indigo" chatHref="/batch2/chat" practiceHref="/batch2/activities" />
 );

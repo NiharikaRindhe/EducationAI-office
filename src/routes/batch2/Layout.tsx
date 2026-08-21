@@ -20,6 +20,7 @@ export const Batch2Layout: React.FC = () => {
   const navItems: NavItem[] = ([
     { href: '/batch2/home', label: 'Home', iconName: 'home' },
     { href: '/batch2/subjects', label: 'Subjects', iconName: 'library_books' },
+    { href: '/batch2/activities', label: 'Activities', iconName: 'extension' },
     { href: '/batch2/chat', label: 'AI Doubt Tutor', iconName: 'chat', feature: 'ai_tutor' },
     { href: '/batch2/exams', label: 'Exams & Mocks', iconName: 'edit_document' },
     { href: '/batch2/tasks', label: 'My Tasks', iconName: 'assignment_turned_in' },
@@ -36,6 +37,7 @@ export const Batch2Layout: React.FC = () => {
   const getHeaderDetails = () => {
     const path = location.pathname;
     if (path.includes('/subjects')) return { title: 'Subjects & Chapters', sub: 'Complete your NCERT syllabus and take practice sets.' };
+    if (path.includes('/activities')) return { title: 'Activities', sub: 'Practice every subject in textbook chapter order.' };
     if (path.includes('/chat')) return { title: 'AI Doubt Solver', sub: 'Ask questions about mathematics and science formulas!' };
     if (path.includes('/exams')) return { title: 'Mock Exams', sub: 'Complete term exams and test your readiness.' };
     if (path.includes('/tasks')) return { title: 'My Tasks', sub: 'Complete work your teacher has assigned to earn XP.' };
