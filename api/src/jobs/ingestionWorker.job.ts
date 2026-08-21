@@ -78,6 +78,7 @@ async function processNextJob() {
 
 export function startIngestionWorker() {
   void requeueStaleJobs();
+  void processNextJob();
   timer = setInterval(() => void processNextJob(), POLL_INTERVAL_MS);
   logger.info({ workerId: WORKER_ID }, `[ingestion-worker] polling every ${POLL_INTERVAL_MS / 1000}s`);
 }

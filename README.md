@@ -34,14 +34,20 @@ npx supabase start
 ```
 This prints the local `API_URL`, `SERVICE_ROLE_KEY`, `STUDIO_URL`, etc. First run applies all migrations automatically.
 
-**3. The API** (in `api/`):
+**3. Redis** (shared tutor slots when many schools ask at once):
+```bash
+docker run -d --name eduai-redis -p 6379:6379 redis:7.4-alpine
+```
+Set `REDIS_URL=redis://127.0.0.1:6379` in `api/.env`. The API still boots without it (per-process fallback).
+
+**4. The API** (in `api/`):
 ```bash
 cd api
 npm run dev
 ```
 → listens on **http://localhost:4000**
 
-**4. The background worker** (in `api/`, separate terminal):
+**5. The background worker** (in `api/`, separate terminal):
 ```bash
 cd api
 npm run dev:worker
@@ -57,7 +63,7 @@ You only need it if you're uploading books or testing the cron jobs — the API
 serves everything else fine without it, uploads just sit in `queued` until a
 worker is running.
 
-**5. The frontend** (from the repo root, separate terminal):
+**6. The frontend** (from the repo root, separate terminal):
 ```bash
 npm run dev
 ```

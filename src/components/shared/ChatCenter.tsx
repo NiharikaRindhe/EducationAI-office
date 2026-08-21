@@ -291,9 +291,11 @@ export const ChatCenter: React.FC<{ accent: Accent }> = ({ accent }) => {
       const message =
         err instanceof ApiClientError && err.code === 'RATE_LIMITED'
           ? "You've reached today's question limit (50/day) — try again tomorrow."
-          : err instanceof ApiClientError
-            ? err.message
-            : 'Failed to send message';
+          : err instanceof ApiClientError && err.code === 'AI_RATE_LIMIT'
+            ? 'The tutor is helping other students right now — try again in a moment.'
+            : err instanceof ApiClientError
+              ? err.message
+              : 'Failed to send message';
       setError(message);
     } finally {
       setIsSending(false);

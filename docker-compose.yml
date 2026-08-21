@@ -4,6 +4,7 @@
 #    • Supabase self-hosted (Postgres + pgvector, GoTrue, PostgREST,
 #      Realtime, Storage, Studio)
 #    • EduAI Node API
+#    • Redis (shared tutor concurrency slots across API replicas)
 #    • Ollama (local LLM: mxbai-embed-large for embeddings,
 #      llama3.2 for chat — pull only the models needed)
 #    • Nginx (reverse proxy / TLS termination)
@@ -226,6 +227,21 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
 
+  # ── Redis — shared AI slots + rate-limit counters across API replicas
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   # ── EduAI Node API ─────────────────────────────────────────
   # Stateless: no background jobs, no local state. Safe to restart or run
   # behind a load balancer with several replicas (see nginx/nginx.conf).
@@ -239,10 +255,13 @@ services:
         condition: service_healthy
       auth:
         condition: service_started
+      redis:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       PORT: 3001
       HEALTH_PORT: 3001
+      REDIS_URL: redis://redis:6379
       SUPABASE_URL: http://kong:8000
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
@@ -288,9 +307,12 @@ services:
         condition: service_healthy
       auth:
         condition: service_started
+      redis:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       WORKER_PORT: 3002
+      REDIS_URL: redis://redis:6379
       HEALTH_PORT: 3002
       SUPABASE_URL: http://kong:8000
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
@@ -390,3 +412,4 @@ volumes:
   db_data:
   storage_data:
   ollama_data:
+  redis_data:

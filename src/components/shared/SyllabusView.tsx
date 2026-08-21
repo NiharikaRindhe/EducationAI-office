@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, ChevronDown, BookOpen, MessageSquare, Loader2, Inbox, AlertTriangle } from 'lucide-react';
 import { api } from '../../lib/api';
+import { practicePath } from '../../data/activities';
 
 /**
  * Syllabus browser for Classes 5-10, shared by Batch 2 and Batch 3.
@@ -40,7 +41,7 @@ interface StudentSyllabus {
   subjects: SyllabusSubject[];
 }
 
-export const SyllabusView: React.FC<{ accent: Accent; chatHref: string }> = ({ accent, chatHref }) => {
+export const SyllabusView: React.FC<{ accent: Accent; chatHref: string; practiceHref?: string }> = ({ accent, chatHref, practiceHref }) => {
   const a = ACCENT[accent];
   const [data, setData] = useState<StudentSyllabus | null>(null);
   const [error, setError] = useState('');
@@ -180,12 +181,22 @@ export const SyllabusView: React.FC<{ accent: Accent; chatHref: string }> = ({ a
                         <span className="font-sans text-[10px] text-slate-400 flex items-center gap-1.5">
                           <BookOpen size={11} /> From {ch.bookTitle}
                         </span>
-                        <Link
-                          to={chatHref}
-                          className={`inline-flex items-center gap-1.5 font-sans text-[11px] font-bold ${a.link} hover:underline w-fit`}
-                        >
-                          <MessageSquare size={12} /> Ask the AI tutor about this chapter
-                        </Link>
+                        <div className="flex flex-wrap gap-3">
+                          {practiceHref && (
+                            <Link
+                              to={practicePath(practiceHref, current.subject, ch.chapterNum)}
+                              className={`inline-flex items-center gap-1.5 font-sans text-[11px] font-bold ${a.link} hover:underline w-fit`}
+                            >
+                              Practice this chapter
+                            </Link>
+                          )}
+                          <Link
+                            to={chatHref}
+                            className={`inline-flex items-center gap-1.5 font-sans text-[11px] font-bold ${a.link} hover:underline w-fit`}
+                          >
+                            <MessageSquare size={12} /> Ask the AI tutor about this chapter
+                          </Link>
+                        </div>
                       </div>
                     )}
                   </div>

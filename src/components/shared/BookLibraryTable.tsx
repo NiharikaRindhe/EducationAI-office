@@ -230,6 +230,14 @@ export const BookLibraryTable: React.FC<Props> = ({
         </span>
       </div>
 
+      {lib.all.some((j) => j.status === 'queued') && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[12.5px] leading-5 text-amber-900">
+          A PDF is sitting on <span className="font-semibold">Queued</span>. Indexing only starts when the background worker is running
+          — in the <code className="rounded bg-amber-100 px-1">api</code> folder run{' '}
+          <code className="rounded bg-amber-100 px-1">npm run dev:worker</code>. The API alone stores the file; it does not process it.
+        </div>
+      )}
+
       <div className="portal-toolbar">
         <div className="relative min-w-[200px] max-w-xs flex-1">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />

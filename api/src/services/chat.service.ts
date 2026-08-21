@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
 import { chatCompletion, embedText, aiConfigured } from '../lib/ai.js';
+import { withAiSlot } from '../lib/aiSlots.js';
 import { requireWhitelistedSubject } from '../lib/classSubjects.js';
 import type { CreateChatSessionInput, RenameChatSessionInput } from '../schemas/chat.schema.js';
 
@@ -161,6 +162,13 @@ export async function sendMessage(studentId: string, sessionId: string, text: st
     .maybeSingle();
   const usageContext = { schoolId: studentProfile?.school_id ?? null, userId: studentId };
 
+  return withAiSlot(
+    {
+      kind: imageBase64 ? 'vision' : 'chat',
+      userId: studentId,
+      schoolId: studentProfile?.school_id ?? null,
+    },
+    async () => {
   // Fetched BEFORE inserting this turn's user message, so it's exactly the
   // prior conversation — never the message we're about to answer.
   const { data: priorMessages } = await supabaseAdmin
@@ -353,4 +361,6 @@ ${imageContext}`,
   await supabaseAdmin.from('chat_sessions').update({ updated_at: new Date().toISOString() }).eq('id', sessionId);
 
   return { answer, sources, returnedImages, imageUrl, subjectWarning };
+    },
+  );
 }

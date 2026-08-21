@@ -57,6 +57,16 @@ export const env = {
   ollamaUrl: process.env.OLLAMA_URL ?? 'http://127.0.0.1:11434',
   ollamaEmbedModel: process.env.OLLAMA_EMBED_MODEL ?? 'mxbai-embed-large',
 
+  // Shared AI gate across API replicas. Empty = in-process fallback only.
+  redisUrl: process.env.REDIS_URL ?? '',
+  aiChatMaxGlobal: Number(process.env.AI_CHAT_MAX_GLOBAL ?? 30),
+  aiChatMaxPerSchool: Number(process.env.AI_CHAT_MAX_PER_SCHOOL ?? 12),
+  aiChatMaxPerStudent: Number(process.env.AI_CHAT_MAX_PER_STUDENT ?? 1),
+  aiVisionMaxGlobal: Number(process.env.AI_VISION_MAX_GLOBAL ?? 8),
+  aiVisionMaxPerSchool: Number(process.env.AI_VISION_MAX_PER_SCHOOL ?? 4),
+  aiVisionMaxPerStudent: Number(process.env.AI_VISION_MAX_PER_STUDENT ?? 1),
+  aiSlotTtlSec: Number(process.env.AI_SLOT_TTL_SEC ?? 180),
+
   // ── Transactional email (credential mails etc.) ───────────
   // Unset SMTP_HOST disables sending entirely — credentials are still
   // shown once in the UI, so email is an enhancement, never a dependency.

@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
 import { env } from './lib/env.js';
 import { logger } from './lib/logger.js';
+import { connectRedis, disconnectRedis, redisHealth } from './lib/redis.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { superAdminRouter } from './routes/superAdmin.routes.js';
 import { schoolAdminRouter } from './routes/schoolAdmin.routes.js';
@@ -27,8 +28,13 @@ app.use(cors({ origin: env.frontendUrl, credentials: true }));
 app.use(express.json({ limit: '8mb' }));
 app.use(pinoHttp({ logger }));
 
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime(), env: env.nodeEnv });
+app.get('/health', async (_req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+    env: env.nodeEnv,
+    redis: await redisHealth(),
+  });
 });
 
 app.use('/api/auth', authRouter);
@@ -44,6 +50,7 @@ app.use(errorHandler);
 
 const server = app.listen(env.port, () => {
   logger.info(`EduAI API listening on http://localhost:${env.port}`);
+  void connectRedis();
 });
 
 // Rolling restarts and `docker compose up -d` send SIGTERM. Without this the
@@ -55,8 +62,10 @@ const SHUTDOWN_GRACE_MS = 15_000;
 function shutdown(signal: string) {
   logger.info({ signal }, 'API shutting down…');
   server.close(() => {
-    logger.info('API stopped cleanly');
-    process.exit(0);
+    void disconnectRedis().finally(() => {
+      logger.info('API stopped cleanly');
+      process.exit(0);
+    });
   });
   // A hung upstream (a stalled LLM call) must not keep the container alive
   // forever — past the grace period, exit anyway.
