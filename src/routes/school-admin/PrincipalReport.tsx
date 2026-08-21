@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Printer } from 'lucide-react';
+import { Loader2, Printer, AlertTriangle } from 'lucide-react';
 import { api } from '../../lib/api';
 
 interface PrincipalReportData {
@@ -15,16 +15,34 @@ interface PrincipalReportData {
 
 export const SchoolAdminPrincipalReport: React.FC = () => {
   const [report, setReport] = useState<PrincipalReportData | null>(null);
+  // Held separately from "still loading" — report===null used to mean both
+  // "hasn't loaded yet" and "failed to load," so a real API error rendered
+  // as a permanent spinner with no error and no way to retry.
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = () => {
+    setError(null);
     api.get<PrincipalReportData>('/school-admin/reports/principal')
       .then(setReport)
-      .catch(() => setReport(null));
-  }, []);
+      .catch((err) => setError(err instanceof Error ? err.message : 'Could not load the principal report.'));
+  };
+
+  useEffect(() => { load(); }, []);
 
   const handlePrint = () => {
     window.print();
   };
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-16 text-center">
+        <AlertTriangle size={28} className="text-amber-500" strokeWidth={1.5} />
+        <p className="text-[13px] font-semibold text-slate-700">This report could not be loaded.</p>
+        <p className="text-[12px] text-slate-400">{error}</p>
+        <button onClick={load} className="mt-2 text-[12px] font-semibold text-rose-600 hover:underline cursor-pointer">Try again</button>
+      </div>
+    );
+  }
 
   if (report === null) {
     return <div className="flex justify-center py-16"><Loader2 className="animate-spin text-rose-400" size={32} /></div>;

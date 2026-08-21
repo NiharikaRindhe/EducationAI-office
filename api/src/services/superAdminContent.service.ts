@@ -3,6 +3,7 @@ import { ApiError } from '../lib/errors.js';
 import { tryEmbedText } from '../lib/ai.js';
 import { extractPdf, parseChapterMap } from '../lib/pdfExtract.js';
 import { requireWhitelistedSubject } from '../lib/classSubjects.js';
+import { writeAuditLog } from './auditLog.service.js';
 import { parse } from 'csv-parse/sync';
 import ExcelJS from 'exceljs';
 import { z } from 'zod';
@@ -143,10 +144,10 @@ export async function addGlobalQuestion(
   return data;
 }
 
-export async function deleteGlobalQuestion(questionId: string) {
+export async function deleteGlobalQuestion(questionId: string, actorId: string) {
   const { data: existing } = await supabaseAdmin
     .from('question_bank')
-    .select('id, scope')
+    .select('id, scope, text')
     .eq('id', questionId)
     .maybeSingle();
   if (!existing) throw new ApiError('NOT_FOUND', 'Question not found');
@@ -155,6 +156,16 @@ export async function deleteGlobalQuestion(questionId: string) {
   }
   const { error } = await supabaseAdmin.from('question_bank').delete().eq('id', questionId);
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to delete question', error.message);
+
+  await writeAuditLog({
+    schoolId: null,
+    actorId,
+    action: 'question_bank.deleted',
+    entity: 'question_bank',
+    entityId: questionId,
+    metadata: { textPreview: String(existing.text ?? '').slice(0, 120) },
+  });
+
   return { deleted: true };
 }
 
@@ -558,7 +569,7 @@ export async function runIngestionPipeline(jobId: string) {
  *  for it, and the original PDF + extracted figures from Storage. Uses the
  *  same (class_num, subject, book_title) delete key the pipeline itself uses
  *  for idempotent re-runs, so this can never leave orphaned chunks behind. */
-export async function deleteIngestionJob(jobId: string) {
+export async function deleteIngestionJob(jobId: string, actorId: string) {
   const { data: job, error: jobError } = await supabaseAdmin
     .from('ncert_ingestion_jobs')
     .select('id, class_num, subject, book_title, storage_path, status, school_id')
@@ -600,6 +611,19 @@ export async function deleteIngestionJob(jobId: string) {
 
   const { error } = await supabaseAdmin.from('ncert_ingestion_jobs').delete().eq('id', jobId);
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to delete ingestion job', error.message);
+
+  // Deletes a whole book's indexed content — attributable whether it's a
+  // Super Admin removing global NCERT content or a School Admin removing
+  // their own school's upload.
+  await writeAuditLog({
+    schoolId: (job.school_id as string | null) ?? null,
+    actorId,
+    action: 'ingestion_job.deleted',
+    entity: 'ncert_ingestion_job',
+    entityId: jobId,
+    metadata: { classNum: job.class_num, subject: job.subject, bookTitle: job.book_title },
+  });
+
   return { deleted: true };
 }
 

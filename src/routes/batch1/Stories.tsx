@@ -187,8 +187,10 @@ export const Batch1Stories: React.FC = () => {
       setCurrentQuizQuestion(prev => prev + 1);
     } else {
       setIsQuizFinished(true);
-      // Award Stars
-      incrementXP(50);
+      // Stars scale with how many quiz questions were actually answered
+      // correctly — this used to award the full 50 unconditionally, even on
+      // a 0-correct attempt, which didn't reflect the child's performance.
+      incrementXP(Math.round(50 * (quizScore / selectedStory.quiz.length)));
       // Mark story as completed
       if (selectedStory && !completedStories.includes(selectedStory.id)) {
         setCompletedStories(prev => [...prev, selectedStory.id]);

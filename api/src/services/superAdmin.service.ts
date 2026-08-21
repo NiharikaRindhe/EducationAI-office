@@ -15,7 +15,7 @@ import type { CreateSchoolInput } from '../schemas/superAdmin.schema.js';
 /** The package whose contents equal the full feature catalogue. See createSchool. */
 const FULL_ACCESS_PLAN = 'enterprise';
 
-export async function createSchool(input: CreateSchoolInput) {
+export async function createSchool(input: CreateSchoolInput, actorId: string) {
   const { data: existing } = await supabaseAdmin
     .from('schools')
     .select('id')
@@ -105,6 +105,18 @@ export async function createSchool(input: CreateSchoolInput) {
       password,
     });
   }
+
+  // Provisioning a whole school (and optionally its first admin account) is
+  // as wide-blast-radius on the create side as suspension is on the remove
+  // side — attributable for the same reason.
+  await writeAuditLog({
+    schoolId: school.id as string,
+    actorId,
+    action: 'school.created',
+    entity: 'school',
+    entityId: school.id as string,
+    metadata: { code: input.code, name: input.name, adminProvisioned: adminCredential !== null },
+  });
 
   return { ...school, adminCredential };
 }
@@ -329,7 +341,7 @@ export interface UpdateSchoolInput {
   contactPhone?: string | null;
 }
 
-export async function updateSchool(schoolId: string, patch: UpdateSchoolInput) {
+export async function updateSchool(schoolId: string, patch: UpdateSchoolInput, actorId: string) {
   const updates: Record<string, unknown> = {};
   if (patch.name !== undefined) updates.name = patch.name;
   if (patch.board !== undefined) updates.board = patch.board;
@@ -345,6 +357,15 @@ export async function updateSchool(schoolId: string, patch: UpdateSchoolInput) {
 
   const { data, error } = await supabaseAdmin.from('schools').update(updates).eq('id', schoolId).select().single();
   if (error || !data) throw new ApiError('NOT_FOUND', 'School not found');
+
+  await writeAuditLog({
+    schoolId,
+    actorId,
+    action: 'school.updated',
+    entity: 'school',
+    entityId: schoolId,
+    metadata: { changes: updates },
+  });
 
   return data;
 }
@@ -440,7 +461,7 @@ export async function setSchoolEntitlements(
   return getSchoolEntitlements(schoolId);
 }
 
-export async function addSchoolAdmin(schoolId: string, input: { fullName: string; email: string }) {
+export async function addSchoolAdmin(schoolId: string, input: { fullName: string; email: string }, actorId: string) {
   const { data: school } = await supabaseAdmin.from('schools').select('id, name, code').eq('id', schoolId).maybeSingle();
   if (!school) throw new ApiError('NOT_FOUND', 'School not found');
 
@@ -472,6 +493,17 @@ export async function addSchoolAdmin(schoolId: string, input: { fullName: string
     schoolCode: school.code as string,
     email: input.email,
     password,
+  });
+
+  // Provisioning a new school_admin account is a privilege grant — attributable,
+  // same as the credential resets and entitlement changes already logged here.
+  await writeAuditLog({
+    schoolId,
+    actorId,
+    action: 'school_admin.added',
+    entity: 'school_admin',
+    entityId: authUser.user.id,
+    metadata: { fullName: input.fullName, email: input.email },
   });
 
   return { fullName: input.fullName, email: input.email, password };

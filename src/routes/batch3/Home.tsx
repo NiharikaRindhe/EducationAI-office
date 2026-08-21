@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { ChevronRight, Clock, Loader2 } from 'lucide-react';
+import { ChevronRight, Clock, Loader2, AlertTriangle } from 'lucide-react';
 import { TodayPanel } from '../../components/shared/TodayPanel';
 import { api } from '../../lib/api';
 
@@ -35,6 +35,10 @@ export const Batch3Home: React.FC = () => {
   const [exams, setExams] = useState<ExamListItem[] | null>(null);
   const [subjects, setSubjects] = useState<SyllabusSubject[] | null>(null);
   const [challenges, setChallenges] = useState<DailyChallengeItem[] | null>(null);
+  // Held separately from "still loading" (challenges === null) on purpose — a
+  // fetch failure used to leave challenges null forever, which rendered the
+  // same spinner as a request that just hasn't returned yet.
+  const [challengesError, setChallengesError] = useState<string | null>(null);
 
   useEffect(() => {
     // 1. Exams
@@ -52,7 +56,7 @@ export const Batch3Home: React.FC = () => {
     // 3. Daily challenges
     api.get<DailyChallengeItem[]>('/student/daily-challenges')
       .then(res => setChallenges(res.slice(0, 2)))
-      .catch(() => setChallenges(null));
+      .catch((err: unknown) => setChallengesError(err instanceof Error ? err.message : 'Could not load daily challenges.'));
   }, []);
 
   const openExams = (exams ?? []).filter(e => e.state === 'open');
@@ -174,7 +178,11 @@ export const Batch3Home: React.FC = () => {
             </div>
 
             <div className="flex flex-col gap-2 font-sans text-xs">
-              {challenges === null ? (
+              {challengesError ? (
+                <p className="flex items-start gap-1.5 text-[10px] font-semibold text-rose-600">
+                  <AlertTriangle size={12} className="shrink-0 mt-0.5" /> {challengesError}
+                </p>
+              ) : challenges === null ? (
                 <div className="flex justify-center py-2"><Loader2 size={14} className="animate-spin text-sky-500" /></div>
               ) : challenges.length === 0 ? (
                 <p className="text-[10px] text-slate-400">All caught up! 🎉</p>

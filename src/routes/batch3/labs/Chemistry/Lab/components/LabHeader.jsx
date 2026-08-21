@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, FlaskConical, Trophy, BookOpen } from "lucide-react";
+import { ArrowLeft, FlaskConical, Trophy } from "lucide-react";
 
 export default function LabHeader({ navigate, questionIndex, totalQuestions, score }) {
   const progressPct = ((questionIndex) / totalQuestions) * 100;
@@ -39,16 +39,6 @@ export default function LabHeader({ navigate, questionIndex, totalQuestions, sco
             </div>
           </div>
         </div>
-
-        {/* Right — teacher mode button */}
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.96 }}
-          onClick={() => navigate("/batch3/labs/chemistry/teacher")}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-violet-600 bg-violet-50 hover:bg-violet-100 transition-colors border border-violet-200 shadow-sm"
-        >
-          <BookOpen size={13} /> Customize Questions
-        </motion.button>
       </div>
     </motion.header>
   );

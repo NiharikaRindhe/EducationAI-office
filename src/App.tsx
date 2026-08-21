@@ -32,6 +32,7 @@ import { Batch2Chat } from './routes/batch2/Chat';
 import { Batch2Exams } from './routes/batch2/Exams';
 import { Batch2Tasks } from './routes/batch2/Tasks';
 import { Batch2Help } from './routes/batch2/Help';
+import { Batch2Activities } from './routes/batch2/Activities';
 import {
   Batch2Notes,
   Batch2Pyq,
@@ -56,7 +57,9 @@ const BioHub = lazy(() => import('./routes/batch3/labs/Biology/BioHub'));
 const BiologyModule = lazy(() => import('./routes/batch3/labs/Biology/BiologyModule'));
 const ChemistryLab = lazy(() => import('./routes/batch3/labs/Chemistry/Lab/Lab'));
 const PeriodicTable = lazy(() => import('./routes/batch3/labs/Chemistry/PeriodicTable'));
-const TeacherQuestionBuilder = lazy(() => import('./routes/batch3/labs/Chemistry/Lab/TeacherQuestionBuilder'));
+// TeacherQuestionBuilder intentionally not routed here — it was reachable by any
+// student via /batch3/labs/chemistry/teacher with no role check. A real teacher-side
+// lab customization feature should live under /teacher/*, not the student route tree.
 const PhysicsHub = lazy(() => import('./routes/batch3/labs/Physics/PhysicsHub/PhysicsHub'));
 const PhysicsLab = lazy(() => import('./routes/batch3/labs/Physics/PhysicsLab'));
 const FrictionSimulator = lazy(() => import('./routes/batch3/labs/Physics/FrictionSimulator/FrictionSimulator'));
@@ -173,6 +176,7 @@ function App() {
               <Route index element={<Navigate to="/batch2/home" replace />} />
               <Route path="home" element={<Batch2Home />} />
               <Route path="subjects" element={<Batch2Subjects />} />
+              <Route path="activities" element={<Batch2Activities />} />
               <Route path="chat" element={<Batch2Chat />} />
               <Route path="exams" element={<Batch2Exams />} />
               <Route path="tasks" element={<Batch2Tasks />} />
@@ -220,7 +224,6 @@ function App() {
               {/* Chemistry */}
               <Route path="labs/chemistry" element={<ChemistryLab />} />
               <Route path="labs/chemistry/periodic-table" element={<PeriodicTable />} />
-              <Route path="labs/chemistry/teacher" element={<TeacherQuestionBuilder />} />
               {/* Physics */}
               <Route path="labs/physics" element={<PhysicsHub />} />
               <Route path="labs/physics/motion" element={<PhysicsLab />} />

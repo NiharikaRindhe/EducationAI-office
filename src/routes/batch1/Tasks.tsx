@@ -58,6 +58,10 @@ export const Batch1Tasks: React.FC = () => {
   const [assignments, setAssignments] = useState<TaskAssignment[] | null>(null);
   // Which card is mid-update, so a double tap cannot fire two status changes.
   const [busyId, setBusyId] = useState<string | null>(null);
+  // A tap that fails used to just do nothing — no `.catch()` at all, so the
+  // rejected promise vanished silently and a child would keep tapping a card
+  // that would never change. Short and simple: this is for Class 1-4.
+  const [oops, setOops] = useState(false);
 
   const load = useCallback(async () => {
     setAssignments(await api.get<TaskAssignment[]>('/student/tasks'));
@@ -73,6 +77,9 @@ export const Batch1Tasks: React.FC = () => {
     try {
       await api.patch(`/student/tasks/${id}/status`, {});
       await load();
+    } catch {
+      setOops(true);
+      setTimeout(() => setOops(false), 2200);
     } finally {
       setBusyId(null);
     }
@@ -89,6 +96,22 @@ export const Batch1Tasks: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-5 anim-fade-up">
+      {/* Brief, kid-simple feedback when a tap fails to save — was previously
+          silent (no `.catch()` at all), so a failed tap looked identical to a
+          successful one and a child had no idea anything went wrong. */}
+      {oops && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-white px-5 py-3 anim-fade-up"
+          style={{ borderRadius: T.radius.sm, boxShadow: T.shadow.raised, border: '2px solid #FFD9D6' }}
+          role="alert"
+        >
+          <Pic emoji="😅" size={28} />
+          <span className="font-display font-black text-sm" style={{ color: T.ink.strong }}>
+            Oops, try again!
+          </span>
+        </div>
+      )}
+
       {/* Progress rides in the header rather than in a card of its own: a
           full-width panel wrapped around a single progress bar stretched that
           bar across the whole screen and said very little for the space. */}

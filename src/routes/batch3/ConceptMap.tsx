@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ZoomIn, ZoomOut, Download } from 'lucide-react';
+import { ZoomIn, ZoomOut } from 'lucide-react';
 
 interface Node {
   id: string;
@@ -59,10 +59,6 @@ export const Batch3ConceptMap: React.FC = () => {
   const handleZoomIn = () => setZoomScale(prev => Math.min(2, prev + 0.1));
   const handleZoomOut = () => setZoomScale(prev => Math.max(0.5, prev - 0.1));
 
-  const handleExportSimulate = () => {
-    alert('Concept map exported as PNG image successfully!');
-  };
-
   return (
     <div className="grid grid-cols-12 gap-6 font-sans select-none anim-fade-up">
       {/* Top Filter Header */}
@@ -115,14 +111,6 @@ export const Batch3ConceptMap: React.FC = () => {
             className="w-10 h-10 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center justify-center text-slate-500 cursor-pointer"
           >
             <ZoomIn size={16} />
-          </button>
-          
-          <button
-            onClick={handleExportSimulate}
-            className="py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-sans text-xs font-bold shadow-md flex items-center gap-1.5 cursor-pointer ml-2"
-          >
-            <Download size={14} />
-            Export Image
           </button>
         </div>
       </div>

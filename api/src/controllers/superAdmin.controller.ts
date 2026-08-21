@@ -13,7 +13,7 @@ import { ApiError } from '../lib/errors.js';
 export async function createSchoolController(req: Request, res: Response, next: NextFunction) {
   try {
     const input = createSchoolSchema.parse(req.body);
-    const school = await superAdminService.createSchool(input);
+    const school = await superAdminService.createSchool(input, req.user!.id);
     res.status(201).json(school);
   } catch (err) {
     next(err);
@@ -68,7 +68,7 @@ export async function updateSchoolController(req: Request, res: Response, next: 
     const { id } = req.params;
     if (!id) throw new ApiError('VALIDATION_ERROR', 'Missing school id in path');
     const patch = updateSchoolSchema.parse(req.body);
-    const school = await superAdminService.updateSchool(id, patch);
+    const school = await superAdminService.updateSchool(id, patch, req.user!.id);
     res.json(school);
   } catch (err) {
     next(err);
@@ -80,7 +80,7 @@ export async function addSchoolAdminController(req: Request, res: Response, next
     const { id } = req.params;
     if (!id) throw new ApiError('VALIDATION_ERROR', 'Missing school id in path');
     const input = addSchoolAdminSchema.parse(req.body);
-    const credential = await superAdminService.addSchoolAdmin(id, input);
+    const credential = await superAdminService.addSchoolAdmin(id, input, req.user!.id);
     res.status(201).json(credential);
   } catch (err) {
     next(err);

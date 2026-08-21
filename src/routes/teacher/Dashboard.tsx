@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Users, BarChart3, ClipboardList, Activity, Plus, Loader2, PenLine, BookOpen, CalendarClock, Ban, FlaskConical, ArrowRight } from 'lucide-react';
+import { Users, BarChart3, ClipboardList, Activity, Plus, Loader2, PenLine, BookOpen, CalendarClock, Ban, FlaskConical, ArrowRight, AlertTriangle } from 'lucide-react';
 import { api } from '../../lib/api';
 
 interface PendingReview {
@@ -27,13 +27,20 @@ export const TeacherDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [atRisk, setAtRisk] = useState<AtRiskStudent[] | null>(null);
+  // Held separately from "still loading" — an unhandled fetch failure used to
+  // leave stats/atRisk null forever, which looked identical to a permanent
+  // loading spinner with no error and no way to retry.
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void api.get<DashboardStats>('/teacher/dashboard').then(setStats);
-    void api.get<AtRiskStudent[]>('/teacher/at-risk').then(setAtRisk);
+    setError(null);
+    Promise.all([
+      api.get<DashboardStats>('/teacher/dashboard').then(setStats),
+      api.get<AtRiskStudent[]>('/teacher/at-risk').then(setAtRisk),
+    ]).catch((err) => setError(err instanceof Error ? err.message : 'Could not load your dashboard.'));
   }, []);
 
-  const isLoading = !stats || !atRisk;
+  const isLoading = !error && (!stats || !atRisk);
 
   return (
     <div className="grid grid-cols-12 gap-6 select-none anim-fade-up">
@@ -76,13 +83,19 @@ export const TeacherDashboard: React.FC = () => {
             </Link>
           </div>
 
-          {isLoading ? (
+          {error ? (
+            <div className="flex flex-col items-center gap-2 py-8 text-center">
+              <AlertTriangle size={22} className="text-amber-500" strokeWidth={1.5} />
+              <p className="text-[12px] font-semibold text-slate-600">Couldn't load this dashboard.</p>
+              <p className="text-[11px] text-slate-400">{error}</p>
+            </div>
+          ) : isLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="animate-spin text-slate-300" /></div>
-          ) : atRisk.length === 0 ? (
+          ) : atRisk!.length === 0 ? (
             <p className="text-xs text-slate-400 py-6 text-center">No students flagged right now — nice work.</p>
           ) : (
             <div className="flex flex-col gap-3 font-sans text-xs">
-              {atRisk.map((stud) => (
+              {atRisk!.map((stud) => (
                 <div key={stud.id} className="p-3.5 bg-red-50/30 border border-red-100/50 rounded-2xl flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <span className="text-2xl bg-white w-10 h-10 rounded-xl flex items-center justify-center border border-slate-100 select-none">

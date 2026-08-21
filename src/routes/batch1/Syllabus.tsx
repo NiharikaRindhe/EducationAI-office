@@ -51,6 +51,10 @@ export const Batch1Syllabus: React.FC = () => {
   const [chapters, setChapters] = useState<CurriculumChapter[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeSubject, setActiveSubject] = useState<string>('');
+  // A failed fetch used to leave `chapters` as `[]`, which rendered the exact
+  // same "your teacher hasn't opened any chapters yet" EmptyState as a real
+  // empty class — held separately so a genuine API failure looks different.
+  const [loadError, setLoadError] = useState(false);
 
   const theme = getClassTheme(currentClass);
 
@@ -64,7 +68,11 @@ export const Batch1Syllabus: React.FC = () => {
         setActiveSubject(subjects.includes('Mathematics') ? 'Mathematics' : (subjects[0] ?? ''));
         setLoading(false);
       })
-      .catch(() => { if (!cancelled) setLoading(false); });
+      .catch(() => {
+        if (cancelled) return;
+        setLoadError(true);
+        setLoading(false);
+      });
     return () => { cancelled = true; };
   }, []);
 
@@ -155,7 +163,14 @@ export const Batch1Syllabus: React.FC = () => {
       )}
 
       {/* The trail */}
-      {trail.length === 0 ? (
+      {loadError ? (
+        <EmptyState
+          emoji="😅"
+          title="Uh-oh, the map won't load!"
+          body="Something went wrong. Ask a grown-up to try again."
+          action={{ label: 'Go and play', to: '/batch1/games' }}
+        />
+      ) : trail.length === 0 ? (
         <EmptyState
           emoji={theme.mascot}
           title="Nothing on the map yet!"

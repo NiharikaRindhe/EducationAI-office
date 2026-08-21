@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Zap, Flame, Award, BookOpen, FileText, Star } from 'lucide-react';
+import { Loader2, Zap, Flame, Award, BookOpen, FileText, Star, AlertTriangle } from 'lucide-react';
 import { api } from '../../lib/api';
 
 type Accent = 'amber' | 'indigo' | 'sky';
@@ -91,6 +91,11 @@ export const ProfileCard: React.FC<{
   const [avatarPicker, setAvatarPicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
+  // Held separately from "still loading" (profile === null) on purpose — a
+  // fetch failure used to leave profile null forever, which rendered the same
+  // spinner as a request that just hasn't returned yet.
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // The badge count is not part of the profile payload, so it comes from the
@@ -100,7 +105,10 @@ export const ProfileCard: React.FC<{
       api.get<ProfileApiResponse>('/student/profile'),
       api.get<{ earned: boolean }[]>('/student/badges'),
     ]).then(([prof, badges]) => {
-      if (prof.status !== 'fulfilled') return;
+      if (prof.status !== 'fulfilled') {
+        setError(prof.reason instanceof Error ? prof.reason.message : 'Could not load your profile.');
+        return;
+      }
       const earned = badges.status === 'fulfilled' ? badges.value.filter((b) => b.earned).length : 0;
       setProfile(toProfileData(prof.value, earned));
     });
@@ -109,14 +117,28 @@ export const ProfileCard: React.FC<{
   const handleAvatarSelect = async (emoji: string) => {
     if (!profile) return;
     setSaving(true);
+    setAvatarError(false);
     try {
       await api.patch('/student/profile/avatar', { avatar: emoji });
       setProfile(p => p ? { ...p, avatar: emoji } : p);
       setAvatarPicker(false);
       setSavedMsg(true);
       setTimeout(() => setSavedMsg(false), 2500);
-    } catch { /* silent */ } finally { setSaving(false); }
+    } catch {
+      setAvatarError(true);
+      setTimeout(() => setAvatarError(false), 3000);
+    } finally { setSaving(false); }
   };
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center gap-2 py-16 text-center">
+        <AlertTriangle size={28} className="text-amber-500" strokeWidth={1.5} />
+        <p className="text-[13px] font-semibold text-slate-700">Your profile could not be loaded.</p>
+        <p className="text-[12px] text-slate-400">{error}</p>
+      </div>
+    );
+  }
 
   if (!profile) {
     return <div className="flex justify-center py-16"><Loader2 className={`animate-spin ${a.text}`} /></div>;
@@ -240,6 +262,11 @@ export const ProfileCard: React.FC<{
               ))}
             </div>
             {saving && <p className={`text-center text-xs font-bold mt-3 ${a.text}`}>Saving…</p>}
+            {avatarError && (
+              <p className="flex items-center justify-center gap-1.5 text-center text-xs font-bold mt-3 text-rose-600">
+                <AlertTriangle size={12} /> Could not save your avatar. Try again.
+              </p>
+            )}
           </div>
         </div>
       )}

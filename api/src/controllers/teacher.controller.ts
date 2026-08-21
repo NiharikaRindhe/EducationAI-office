@@ -30,10 +30,10 @@ export async function listStudentsController(req: Request, res: Response, next: 
 
 export async function studentDrillDownController(req: Request, res: Response, next: NextFunction) {
   try {
-    const { teacherId } = requireContext(req);
+    const { teacherId, schoolId } = requireContext(req);
     const { id } = req.params;
     if (!id) throw new ApiError('VALIDATION_ERROR', 'Missing student id');
-    res.json(await teacherService.getStudentDrillDown(teacherId, id));
+    res.json(await teacherService.getStudentDrillDown(teacherId, schoolId, id));
   } catch (err) {
     next(err);
   }

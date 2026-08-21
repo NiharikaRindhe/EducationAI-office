@@ -125,7 +125,7 @@ function starsForPhonicsPop(mistakes: number): number {
 /* ───────────────────────── Main Component ───────────────────────── */
 
 export const Batch1Games: React.FC = () => {
-  const { currentClass, incrementXP } = useApp();
+  const { currentClass } = useApp();
   const { refreshUser } = useAuth();
   const [searchParams] = useSearchParams();
 
@@ -142,6 +142,12 @@ export const Batch1Games: React.FC = () => {
 
   /* ── XP float animation ── */
   const [xpFloat, setXpFloat] = useState<{ amount: number; key: number } | null>(null);
+
+  /* ── Save-failed banner. A failed attempt used to be masked with a
+     fabricated local star/XP grant — the child believed it was saved when
+     it never reached the server. Now a failure is shown honestly, with a
+     one-tap retry that resubmits the exact same result. ── */
+  const [saveError, setSaveError] = useState<{ gameId: string; stars: number; score: number } | null>(null);
 
   /* Chrome variant */
   const isPreReader = currentClass <= 2;
@@ -197,6 +203,9 @@ export const Batch1Games: React.FC = () => {
           { stars, score },
         );
 
+        /* A retry just succeeded — drop the banner. */
+        setSaveError(null);
+
         /* Show XP float; the award is server-side, so pull the fresh
            profile rather than double-counting with a local bump. */
         if (res.xpGained > 0) {
@@ -216,17 +225,16 @@ export const Batch1Games: React.FC = () => {
             g.gameId === gameId ? { ...g, stars: Math.max(g.stars, stars), bestScore: res.attempt.best_score } : g,
           ),
         );
-      } catch {
-        /* Silently fall back – still update local XP */
-        incrementXP(stars * 5);
-        setXpFloat({ amount: stars * 5, key: Date.now() });
-        setTimeout(() => setXpFloat(null), 1600);
-        setGames((prev) =>
-          prev.map((g) => (g.gameId === gameId ? { ...g, stars: Math.max(g.stars, stars) } : g)),
-        );
+      } catch (err) {
+        /* The attempt never reached the server — no stars, no XP, no
+           badges. Fabricating a local "success" here would tell the child
+           their progress was saved when it wasn't. Show the real thing and
+           let them retry with one tap. */
+        console.error('Failed to save game attempt:', err);
+        setSaveError({ gameId, stars, score });
       }
     },
-    [incrementXP, refreshUser],
+    [refreshUser],
   );
 
   /* ───────────── Gallery View ───────────── */
@@ -662,6 +670,24 @@ export const Batch1Games: React.FC = () => {
           style={{ background: '#FFC400', color: '#7A5200', boxShadow: '0 4px 0 #D79E00' }}
         >
           +{xpFloat.amount} ⭐
+        </div>
+      )}
+
+      {/* Honest failure state — replaces the old fabricated local "success". */}
+      {saveError && (
+        <div
+          className="fixed top-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 font-display font-black text-sm px-4 py-3"
+          style={{ borderRadius: T.radius.sm, background: '#FFF0F0', color: '#B42318', border: '2px solid #FFC9C9', boxShadow: '0 4px 0 #F3B4B4' }}
+        >
+          <Pic emoji="😕" size={26} />
+          <span>Couldn't save — try again!</span>
+          <Button
+            tone="quiet"
+            onClick={() => void submitAttempt(saveError.gameId, saveError.stars, saveError.score)}
+            className="text-sm px-4"
+          >
+            Retry
+          </Button>
         </div>
       )}
 

@@ -167,6 +167,13 @@ export const ExamTaking: React.FC<{ accent: Accent; examId: string; onExit: () =
   const [isDone, setIsDone] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const submittingRef = useRef(false);
+  // Question ids whose most recent save attempt failed — the header used to
+  // claim "answers save automatically" unconditionally even while a save was
+  // silently failing, and finish() would mark the exam done regardless of
+  // whether every answer had actually reached the server.
+  const [unsavedIds, setUnsavedIds] = useState<Set<string>>(new Set());
+  const answersRef = useRef(answers);
+  answersRef.current = answers;
 
   // Load (or resume) the paper.
   useEffect(() => {
@@ -196,6 +203,19 @@ export const ExamTaking: React.FC<{ accent: Accent; examId: string; onExit: () =
     submittingRef.current = true;
     setIsSubmitting(true);
     try {
+      // Best-effort final flush: give every currently-unsaved answer one more
+      // attempt to reach the server before submitting, rather than silently
+      // submitting whatever happened to be saved already.
+      if (unsavedIds.size > 0) {
+        await Promise.all(
+          [...unsavedIds].map((questionId) => {
+            const current = answersRef.current[questionId];
+            return current
+              ? api.put(`/student/exam-submissions/${paper.examSubmissionId}/answer`, { questionId, ...current }).catch(() => {})
+              : Promise.resolve();
+          }),
+        );
+      }
       if (!auto) await api.post(`/student/exam-submissions/${paper.examSubmissionId}/submit`);
       setIsDone(true);
     } catch (err) {
@@ -205,7 +225,7 @@ export const ExamTaking: React.FC<{ accent: Accent; examId: string; onExit: () =
     } finally {
       setIsSubmitting(false);
     }
-  }, [paper]);
+  }, [paper, unsavedIds]);
 
   // Countdown from startedAt + duration; auto-submit at zero.
   useEffect(() => {
@@ -249,8 +269,31 @@ export const ExamTaking: React.FC<{ accent: Accent; examId: string; onExit: () =
     setAnswers((prev) => ({ ...prev, [questionId]: { ...prev[questionId], ...patch } }));
     try {
       await api.put(`/student/exam-submissions/${paper.examSubmissionId}/answer`, { questionId, ...patch });
-    } catch { /* autosave failures are retried on the next change; the submit still carries the state */ }
+      setUnsavedIds((prev) => {
+        if (!prev.has(questionId)) return prev;
+        const next = new Set(prev);
+        next.delete(questionId);
+        return next;
+      });
+    } catch {
+      setUnsavedIds((prev) => new Set(prev).add(questionId));
+    }
   };
+
+  // Actually retries — a fixed interval re-attempts every answer currently
+  // marked unsaved, using its latest value, until each one confirms saved.
+  useEffect(() => {
+    if (!paper || isDone) return;
+    const interval = window.setInterval(() => {
+      for (const questionId of unsavedIds) {
+        const current = answersRef.current[questionId];
+        if (!current) continue;
+        void save(questionId, current);
+      }
+    }, 5000);
+    return () => window.clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paper, isDone, unsavedIds]);
 
   const answeredCount = useMemo(
     () => (paper?.questions ?? []).filter((q) => {
@@ -295,7 +338,12 @@ export const ExamTaking: React.FC<{ accent: Accent; examId: string; onExit: () =
       <div className="sticky top-0 z-10 bg-white border border-slate-100 rounded-3xl px-6 py-4 shadow-sm flex items-center justify-between gap-4">
         <div className="min-w-0">
           <h2 className="font-display font-bold text-slate-800 truncate">{paper.exam.title}</h2>
-          <p className="text-[11px] text-slate-400">{answeredCount}/{paper.questions.length} answered · answers save automatically</p>
+          <p className={`text-[11px] ${unsavedIds.size > 0 ? 'text-rose-500 font-semibold' : 'text-slate-400'}`}>
+            {answeredCount}/{paper.questions.length} answered
+            {unsavedIds.size > 0
+              ? ` · ${unsavedIds.size} answer${unsavedIds.size > 1 ? 's' : ''} not saved yet — check your connection`
+              : ' · answers saved'}
+          </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           {switchWarnings > 0 && (

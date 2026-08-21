@@ -37,6 +37,12 @@ interface SchoolSummary {
   totalXp: number;
 }
 
+interface SectionRow {
+  id: string;
+  class_num: number;
+  section_label: string;
+}
+
 const BASE = '/school-admin/students/directory';
 
 const inputCls =
@@ -98,6 +104,24 @@ export const SchoolAdminStudents: React.FC = () => {
   }, []);
 
   useEffect(() => { void loadSummary(); }, [loadSummary]);
+
+  // The school's real sections — a class can have any free-text section label
+  // (see ClassesSections.tsx), not just A-D, so this feeds every section
+  // dropdown below instead of a hardcoded list.
+  const [sections, setSections] = useState<SectionRow[]>([]);
+  useEffect(() => {
+    api.get<SectionRow[]>('/school-admin/class-sections').then(setSections).catch(() => setSections([]));
+  }, []);
+  const sectionsForClass = useCallback(
+    (classNum: number) => sections.filter((s) => s.class_num === classNum).map((s) => s.section_label),
+    [sections],
+  );
+  // Once real sections load, make sure the pre-selected default ("A") is
+  // actually a valid section for Class 1 rather than an assumption.
+  useEffect(() => {
+    const valid = sectionsForClass(newClass);
+    if (valid.length > 0 && !valid.includes(newSection)) setNewSection(valid[0]);
+  }, [sections]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refreshAll = useCallback(() => {
     dir.reload();
@@ -598,14 +622,24 @@ export const SchoolAdminStudents: React.FC = () => {
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className={labelCls}>Class</label>
-                  <select value={newClass} onChange={(e) => setNewClass(Number(e.target.value))} className={inputCls}>
+                  <select
+                    value={newClass}
+                    onChange={(e) => {
+                      const c = Number(e.target.value);
+                      setNewClass(c);
+                      setNewSection(sectionsForClass(c)[0] ?? '');
+                    }}
+                    className={inputCls}
+                  >
                     {Array.from({ length: 10 }, (_, i) => i + 1).map((c) => <option key={c} value={c}>Class {c}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className={labelCls}>Section</label>
-                  <select value={newSection} onChange={(e) => setNewSection(e.target.value)} className={inputCls}>
-                    {['A', 'B', 'C', 'D'].map((s) => <option key={s} value={s}>Section {s}</option>)}
+                  <select value={newSection} onChange={(e) => setNewSection(e.target.value)} className={inputCls} disabled={sectionsForClass(newClass).length === 0}>
+                    {sectionsForClass(newClass).length === 0
+                      ? <option value="">No sections yet</option>
+                      : sectionsForClass(newClass).map((s) => <option key={s} value={s}>Section {s}</option>)}
                   </select>
                 </div>
                 <div>

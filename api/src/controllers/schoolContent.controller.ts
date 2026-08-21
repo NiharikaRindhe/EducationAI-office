@@ -82,11 +82,12 @@ export async function retrySchoolIngestionJobController(req: Request, res: Respo
 
 export async function deleteSchoolIngestionJobController(req: Request, res: Response, next: NextFunction) {
   try {
+    if (!req.user) throw new ApiError('UNAUTHORIZED', 'Not authenticated');
     const schoolId = requireSchoolId(req);
     const { id } = req.params;
     if (!id) throw new ApiError('VALIDATION_ERROR', 'Missing job id');
     await contentService.requireJobOwnedBySchool(id, schoolId);
-    await contentService.deleteIngestionJob(id);
+    await contentService.deleteIngestionJob(id, req.user.id);
     res.status(204).end();
   } catch (err) {
     next(err);

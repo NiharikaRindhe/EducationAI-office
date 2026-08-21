@@ -167,17 +167,21 @@ export async function getPrincipalUsageReport(schoolId: string) {
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
   const sevenDaysAgoStr = sevenDaysAgo.toISOString().slice(0, 10);
 
-  const { data: activeLogs, error: logErr } = await supabaseAdmin
-    .from('streak_logs')
-    .select('student_id')
-    .gte('logged_date', sevenDaysAgoStr)
-    .lte('logged_date', todayStr);
+  // Filtered server-side via the school's own student ids rather than pulling
+  // every school's streak_logs into Node and intersecting in JS afterward.
+  const schoolStudentIds = studentList.map((s) => s.id);
+  const { data: activeLogs, error: logErr } = schoolStudentIds.length
+    ? await supabaseAdmin
+        .from('streak_logs')
+        .select('student_id')
+        .gte('logged_date', sevenDaysAgoStr)
+        .lte('logged_date', todayStr)
+        .in('student_id', schoolStudentIds)
+    : { data: [], error: null };
 
   if (logErr) throw new ApiError('INTERNAL_ERROR', 'Failed to fetch active logs', logErr.message);
 
-  const studentIds = new Set(studentList.map((s) => s.id));
-  const activeStudentIds = new Set(activeLogs?.map((l) => l.student_id));
-  const weeklyActiveCount = [...activeStudentIds].filter((id) => studentIds.has(id)).length;
+  const weeklyActiveCount = new Set(activeLogs?.map((l) => l.student_id)).size;
 
   // 3. Sessions Held Per Teacher
   const { data: sessions, error: sesErr } = await supabaseAdmin

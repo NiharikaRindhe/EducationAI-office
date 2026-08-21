@@ -7,6 +7,7 @@ import {
   modelSettingKey,
   featureSettingKey,
 } from '../lib/platformSettings.js';
+import { writeAuditLog } from './auditLog.service.js';
 import { env } from '../lib/env.js';
 
 function envDefaultForTier(tier: (typeof AI_TIERS)[number]): string {
@@ -52,6 +53,17 @@ export async function updateAiSettings(input: UpdateAiSettingsInput, updatedBy: 
 
   if (writes.length === 0) throw new ApiError('VALIDATION_ERROR', 'No settings provided to update');
   await Promise.all(writes);
+
+  // Platform-wide model/tier switching affects every school's AI-backed
+  // features at once — the single widest-blast-radius write in this console.
+  await writeAuditLog({
+    schoolId: null,
+    actorId: updatedBy,
+    action: 'ai_settings.updated',
+    entity: 'ai_settings',
+    metadata: { models: input.models ?? {}, enabled: input.enabled ?? {} },
+  });
+
   return getAiSettings();
 }
 

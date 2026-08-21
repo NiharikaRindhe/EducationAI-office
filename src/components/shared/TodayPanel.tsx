@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Radio, Hand, Loader2, ArrowRight, ClipboardList, FileEdit, MonitorSmartphone, Ban, CalendarClock } from 'lucide-react';
+import { Radio, Hand, Loader2, ArrowRight, ClipboardList, FileEdit, MonitorSmartphone, Ban, CalendarClock, AlertTriangle } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 
 // The first real answer to "what should I do this period?" — surfaces the
@@ -78,6 +78,11 @@ export const TodayPanel: React.FC<{ accent: Accent; tasksHref: string; examsHref
   const [tasks, setTasks] = useState<TaskAssignment[] | null>(null);
   const [exams, setExams] = useState<ExamListItem[] | null>(null);
   const [periods, setPeriods] = useState<Occurrence[] | null>(null);
+  // Held separately from "still loading" (tasks/exams === null) on purpose —
+  // a fetch failure used to leave the data null forever, which rendered the
+  // exact same spinner as a request that just hasn't returned yet.
+  const [tasksError, setTasksError] = useState<string | null>(null);
+  const [examsError, setExamsError] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
 
   const pollSession = useCallback(async () => {
@@ -95,12 +100,16 @@ export const TodayPanel: React.FC<{ accent: Accent; tasksHref: string; examsHref
     void (async () => {
       try {
         setTasks(await api.get<TaskAssignment[]>('/student/tasks'));
-      } catch { /* Today panel degrades quietly — the full Tasks page still works */ }
+      } catch (err) {
+        setTasksError(err instanceof Error ? err.message : 'Could not load tasks.');
+      }
     })();
     void (async () => {
       try {
         setExams(await api.get<ExamListItem[]>('/student/exams'));
-      } catch { /* same */ }
+      } catch (err) {
+        setExamsError(err instanceof Error ? err.message : 'Could not load exams.');
+      }
     })();
     void (async () => {
       try {
@@ -279,7 +288,11 @@ export const TodayPanel: React.FC<{ accent: Accent; tasksHref: string; examsHref
               View All <ArrowRight size={12} />
             </Link>
           </div>
-          {tasks === null ? (
+          {tasksError ? (
+            <p className="flex items-start gap-1.5 text-[11px] font-semibold text-rose-600">
+              <AlertTriangle size={12} className="shrink-0 mt-0.5" /> {tasksError}
+            </p>
+          ) : tasks === null ? (
             <Loader2 size={14} className={`animate-spin ${a.spinner}`} />
           ) : pendingTasks.length === 0 ? (
             <p className="text-xs text-slate-400">All caught up — no pending tasks 🎉</p>
@@ -305,7 +318,11 @@ export const TodayPanel: React.FC<{ accent: Accent; tasksHref: string; examsHref
               View All <ArrowRight size={12} />
             </Link>
           </div>
-          {exams === null ? (
+          {examsError ? (
+            <p className="flex items-start gap-1.5 text-[11px] font-semibold text-rose-600">
+              <AlertTriangle size={12} className="shrink-0 mt-0.5" /> {examsError}
+            </p>
+          ) : exams === null ? (
             <Loader2 size={14} className={`animate-spin ${a.spinner}`} />
           ) : openExams.length === 0 ? (
             <p className="text-xs text-slate-400">Nothing open right now.</p>

@@ -169,7 +169,7 @@ export async function listStudentsForTeacher(
   return data;
 }
 
-export async function getStudentDrillDown(teacherId: string, studentId: string) {
+export async function getStudentDrillDown(teacherId: string, schoolId: string, studentId: string) {
   const { data, error } = await supabaseAdmin
     .from('user_profiles')
     .select(
@@ -179,12 +179,13 @@ export async function getStudentDrillDown(teacherId: string, studentId: string) 
        student_badges(badge_id, earned_at, badges(name, icon))`,
     )
     .eq('id', studentId)
+    .eq('school_id', schoolId) // reject cross-school lookups outright — section labels (e.g. "7A") repeat across schools
     .single();
 
   if (error || !data) throw new ApiError('NOT_FOUND', 'Student not found');
 
   const sp = Array.isArray(data.student_profiles) ? data.student_profiles[0] : data.student_profiles;
-  const scope = await getTeachingScope(teacherId, data.school_id as string);
+  const scope = await getTeachingScope(teacherId, schoolId); // the teacher's own school, never derived from the student row
 
   const inScope =
     sp &&

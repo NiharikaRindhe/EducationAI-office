@@ -77,9 +77,10 @@ export async function addGlobalQuestionController(req: Request, res: Response, n
 
 export async function deleteGlobalQuestionController(req: Request, res: Response, next: NextFunction) {
   try {
+    if (!req.user) throw new ApiError('UNAUTHORIZED', 'Not authenticated');
     const { id } = req.params;
     if (!id) throw new ApiError('VALIDATION_ERROR', 'Missing question id');
-    const result = await contentService.deleteGlobalQuestion(id);
+    const result = await contentService.deleteGlobalQuestion(id, req.user.id);
     res.json(result);
   } catch (err) {
     next(err);
@@ -201,9 +202,10 @@ export async function uploadNcertPdfController(req: Request, res: Response, next
 
 export async function deleteIngestionJobController(req: Request, res: Response, next: NextFunction) {
   try {
+    if (!req.user) throw new ApiError('UNAUTHORIZED', 'Not authenticated');
     const { id } = req.params;
     if (!id) throw new ApiError('VALIDATION_ERROR', 'Missing job id');
-    await contentService.deleteIngestionJob(id);
+    await contentService.deleteIngestionJob(id, req.user.id);
     res.status(204).end();
   } catch (err) {
     next(err);
