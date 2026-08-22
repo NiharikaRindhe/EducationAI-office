@@ -34,7 +34,7 @@ export function isMailerConfigured(): boolean {
 export function sendMail(to: string, subject: string, html: string, text: string): void {
   if (!transporter) return;
   void transporter
-    .sendMail({ from: env.smtpFrom, to, subject, html, text })
+    .sendMail({ from: env.smtpFrom, replyTo: env.smtpReplyTo || env.smtpFrom, to, subject, html, text })
     .then(() => logger.info({ to, subject }, 'Email sent'))
     .catch((err) => logger.warn({ err, to, subject }, 'Failed to send email'));
 }
@@ -66,14 +66,14 @@ export function sendSchoolAdminWelcomeEmail(params: SchoolAdminWelcomeParams): v
 
           <!-- Header -->
           <tr>
-            <td style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:32px 40px;">
+            <td style="background-color:#0f172a;padding:32px 40px;">
               <table role="presentation" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td style="background-color:#ffffff;border-radius:10px;width:40px;height:40px;text-align:center;vertical-align:middle;font-size:20px;font-weight:800;color:#4f46e5;font-family:Arial,sans-serif;">E</td>
+                  <td style="background-color:#ffffff;border-radius:10px;width:40px;height:40px;text-align:center;vertical-align:middle;font-size:20px;font-weight:800;color:#0f172a;font-family:Arial,sans-serif;">E</td>
                   <td style="padding-left:12px;color:#ffffff;font-size:20px;font-weight:700;">EduAI</td>
                 </tr>
               </table>
-              <p style="color:#c7d2fe;font-size:13px;margin:16px 0 0;">School Administration Portal</p>
+              <p style="color:#94a3b8;font-size:13px;margin:16px 0 0;">School Administration Portal</p>
             </td>
           </tr>
 
@@ -113,7 +113,7 @@ export function sendSchoolAdminWelcomeEmail(params: SchoolAdminWelcomeParams): v
               <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:28px 0 0;">
                 <tr>
                   <td align="center">
-                    <a href="${loginUrl}" style="display:inline-block;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;padding:13px 36px;border-radius:10px;">
+                    <a href="${loginUrl}" style="display:inline-block;background-color:#0f172a;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;padding:13px 36px;border-radius:10px;">
                       Sign in to your portal
                     </a>
                   </td>

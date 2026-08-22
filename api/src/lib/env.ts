@@ -76,6 +76,11 @@ export const env = {
   smtpUser: process.env.SMTP_USER ?? '',
   smtpPass: process.env.SMTP_PASS ?? '',
   smtpFrom: process.env.SMTP_FROM ?? 'EduAI <no-reply@eduai.local>',
+  // Where a school admin's "Reply" actually lands. Falls back to SMTP_FROM
+  // if unset, so this is opt-in — set it when the From address shouldn't
+  // also be the inbox that receives replies (e.g. a no-reply From with a
+  // monitored support address for replies).
+  smtpReplyTo: process.env.SMTP_REPLY_TO ?? '',
   // Public URL of the frontend, used for links inside emails.
   appUrl: process.env.APP_URL ?? process.env.FRONTEND_URL ?? 'http://localhost:5173',
 };
