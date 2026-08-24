@@ -353,6 +353,21 @@ export const SchoolAdminTeachers: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  // A blank starting point beats re-typing the column line from memory —
+  // one real example row so classes_taught's "6|7|8" separator is obvious
+  // without having to re-read the caption above the drop zone (item #86).
+  const downloadImportTemplate = () => {
+    const header = 'full_name,employee_id,specialization,classes_taught\n';
+    const example = 'Mrs. Gupta,EMP-104,Mathematics,"6|7|8"\n';
+    const blob = new Blob([header + example], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'teacher-import-template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="flex flex-col gap-5">
       <PortalPageHeader
@@ -681,6 +696,13 @@ export const SchoolAdminTeachers: React.FC = () => {
               <button onClick={() => setShowImport(false)} className="text-slate-400 hover:text-slate-600 p-1.5 cursor-pointer"><X size={17} /></button>
             </div>
             <div className="p-6 flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={downloadImportTemplate}
+                className="inline-flex w-fit items-center gap-1.5 self-start text-[12px] font-semibold text-slate-600 hover:text-slate-900 cursor-pointer"
+              >
+                <Download size={13} /> Download a blank template with the columns filled in
+              </button>
               <label className={`border-2 border-dashed rounded-lg px-4 py-10 flex flex-col items-center gap-2 cursor-pointer transition-colors ${isImporting ? 'border-slate-200 bg-slate-50' : 'border-slate-300 hover:border-slate-500 hover:bg-slate-50'}`}>
                 {isImporting ? <Loader2 size={24} className="animate-spin text-slate-400" /> : <UploadCloud size={24} className="text-slate-400" />}
                 <span className="text-[13px] font-medium text-slate-600">{isImporting ? 'Importing…' : 'Click to choose the file'}</span>

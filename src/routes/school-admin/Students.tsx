@@ -286,6 +286,18 @@ export const SchoolAdminStudents: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  // Same reasoning as the teacher import template: one real example row
+  // beats re-typing the column line from memory (item #83).
+  const downloadImportTemplate = () => {
+    const header = 'full_name,class_num,section,roll_number\n';
+    const example = 'Aarav Sharma,6,A,23\n';
+    const blob = new Blob([header + example], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'student-import-template.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const columns = useMemo<DataTableColumn<StudentDirectoryRow>[]>(() => [
     { key: 'name', header: 'Student', sortKey: 'name', render: (r) => <StudentNameCell row={r} /> },
     { key: 'class', header: 'Class', sortKey: 'class', render: (r) => <ClassCell row={r} /> },
@@ -583,6 +595,13 @@ export const SchoolAdminStudents: React.FC = () => {
               <button onClick={() => setShowImport(false)} className="p-1.5 text-slate-400 hover:text-slate-600 cursor-pointer"><X size={17} /></button>
             </div>
             <div className="flex flex-col gap-4 p-6">
+              <button
+                type="button"
+                onClick={downloadImportTemplate}
+                className="inline-flex w-fit items-center gap-1.5 text-[12px] font-semibold text-slate-600 hover:text-slate-900 cursor-pointer"
+              >
+                <Download size={13} /> Download a blank template with the columns filled in
+              </button>
               <div>
                 <label className={labelCls}>Import into one section (optional)</label>
                 <div className="flex items-center gap-3">

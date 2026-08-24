@@ -27,11 +27,6 @@ import {
   getAiCapacityController,
 } from '../controllers/aiConsole.controller.js';
 import {
-  superAdminListController,
-  superAdminExportController,
-  superAdminBulkSetActiveController,
-} from '../controllers/studentDirectory.controller.js';
-import {
   listGlobalQuestionBankController,
   addGlobalQuestionController,
   deleteGlobalQuestionController,
@@ -84,13 +79,16 @@ superAdminRouter.put('/schools/:id/entitlements', setSchoolEntitlementsControlle
 superAdminRouter.post('/schools/:id/logo', logoUpload.single('file'), uploadSchoolLogoController);
 superAdminRouter.delete('/schools/:id/logo', removeSchoolLogoController);
 
-// ── Audit log ───────────────────────────────────────────────
-// Cross-school student directory. Bulk writes stay school-scoped via
-// ?schoolId — see superAdminBulkSetActiveController.
-superAdminRouter.get('/students', superAdminListController);
-superAdminRouter.get('/students/export', superAdminExportController);
-superAdminRouter.post('/students/bulk/active', superAdminBulkSetActiveController);
+// Cross-school student directory (list/export/bulk-active) was intentionally
+// pulled from the UI over a data-compromise concern — a Super Admin could
+// browse/export every student across every school with no per-school
+// justification captured anywhere. The routes stayed live after that removal
+// (reachable by any valid Super Admin token, UI or not), which defeated the
+// point of removing the page. superAdminListController/ExportController/
+// BulkSetActiveController remain in studentDirectory.controller.ts —
+// reversible if a properly-scoped/audited version of this view comes back.
 
+// ── Audit log ───────────────────────────────────────────────
 superAdminRouter.get('/audit-log', listAuditLogsController);
 superAdminRouter.get('/audit-log/actions', listAuditActionsController);
 superAdminRouter.get('/audit-log/export', exportAuditLogsController);

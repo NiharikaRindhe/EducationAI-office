@@ -172,9 +172,15 @@ export function DataTable<T>({
             <div className="overflow-x-auto">
               <table className="portal-table w-full">
                 <thead>
-                  <tr className="bg-slate-50 text-left text-[11px] text-slate-500">
+                  {/* Row/text sizing here is intentionally a step up from the
+                      12px-13px density used elsewhere in the portal shell —
+                      this is the primary record a School Admin scans and acts
+                      on all day (item #82, UI testing pass Aug 24 2026), not a
+                      supporting stat card, so it earns the extra breathing
+                      room. */}
+                  <tr className="bg-slate-50 text-left text-[11.5px] text-slate-500">
                     {selectable && (
-                      <th className="w-10 px-4 py-3">
+                      <th className="w-10 px-4 py-3.5">
                         <input
                           ref={headerCheckboxRef}
                           type="checkbox"
@@ -188,7 +194,7 @@ export function DataTable<T>({
                     {columns.map((col) => (
                       <th
                         key={col.key}
-                        className={`px-4 py-3 whitespace-nowrap ${alignClass(col.align)} ${col.className ?? ''} ${col.hideOnMobile ? 'hidden md:table-cell' : ''}`}
+                        className={`px-4 py-3.5 whitespace-nowrap ${alignClass(col.align)} ${col.className ?? ''} ${col.hideOnMobile ? 'hidden md:table-cell' : ''}`}
                       >
                         {col.sortKey && onSortChange ? (
                           <button
@@ -218,7 +224,7 @@ export function DataTable<T>({
                         } ${onRowClick ? 'cursor-pointer' : ''}`}
                       >
                         {selectable && (
-                          <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                          <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                             <input
                               type="checkbox"
                               checked={isSelected}
@@ -231,7 +237,7 @@ export function DataTable<T>({
                         {columns.map((col) => (
                           <td
                             key={col.key}
-                            className={`px-4 py-2.5 text-[13px] text-slate-700 ${alignClass(col.align)} ${col.hideOnMobile ? 'hidden md:table-cell' : ''}`}
+                            className={`px-4 py-3 text-[13.5px] text-slate-700 ${alignClass(col.align)} ${col.hideOnMobile ? 'hidden md:table-cell' : ''}`}
                           >
                             {col.render(row)}
                           </td>

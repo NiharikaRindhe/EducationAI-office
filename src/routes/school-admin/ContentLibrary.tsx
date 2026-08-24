@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle, X, BookOpen, Database, Clock3, CircleAlert, Info, Sparkles } from 'lucide-react';
+import { AlertCircle, X, BookOpen, Database, Clock3, CircleAlert, Info } from 'lucide-react';
 import { api } from '../../lib/api';
 import { MetricCard, PortalPageHeader } from '../../components/shared/PortalPageHeader';
 import { BookUploader } from '../../components/shared/BookUploader';
 import { BookLibraryTable } from '../../components/shared/BookLibraryTable';
-import { AiQuestionGenerator } from '../../components/shared/AiQuestionGenerator';
 import { useBookLibrary } from '../../lib/bookLibrary';
 
 /**
@@ -27,8 +26,6 @@ export const SchoolAdminContentLibrary: React.FC = () => {
   const navigate = useNavigate();
   const lib = useBookLibrary({ basePath: '/school-admin' });
   const [subjects, setSubjects] = useState<SubjectRow[]>([]);
-  const [showGenerator, setShowGenerator] = useState(false);
-  const [generatorNotice, setGeneratorNotice] = useState('');
 
   useEffect(() => {
     void api.get<SubjectRow[]>('/school-admin/subjects').then(setSubjects).catch(() => { /* the form explains an empty list */ });
@@ -38,17 +35,6 @@ export const SchoolAdminContentLibrary: React.FC = () => {
     () => (classNum: number) => subjects.filter((s) => s.class_num === classNum).map((s) => s.subject),
     [subjects],
   );
-
-  /** Every class+subject this school runs — the generator's picker options. */
-  const generatorScope = useMemo(() => {
-    const byClass = new Map<number, string[]>();
-    for (const row of subjects) {
-      byClass.set(row.class_num, [...(byClass.get(row.class_num) ?? []), row.subject]);
-    }
-    return [...byClass.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([classNum, subjectList]) => ({ classNum, subjects: subjectList }));
-  }, [subjects]);
 
   // A failed job holds no storage and never reached the tutor, so it doesn't
   // burn a slot — matching how the server counts them.
@@ -127,48 +113,6 @@ export const SchoolAdminContentLibrary: React.FC = () => {
         heading="Your school's library"
         description="Only your students retrieve from these books. Status refreshes automatically."
       />
-
-      {/* The books uploaded above are exactly what generation reads from, so
-          the generator belongs on this page: a School Admin can seed the
-          question bank for a class straight after uploading its book, without
-          waiting for a teacher to do it. */}
-      <div className="portal-panel p-6 flex flex-col gap-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h3 className="flex items-center gap-2 text-[15px] font-semibold text-slate-800">
-              <Sparkles size={16} className="text-indigo-500" /> Generate questions from these books
-            </h3>
-            <p className="mt-0.5 text-[12px] text-slate-500">
-              Questions are drafted only from your indexed books, reviewed by you, then saved to the school question bank
-              where any teacher can pull them into an exam.
-            </p>
-          </div>
-          <button
-            onClick={() => setShowGenerator((v) => !v)}
-            className="shrink-0 rounded-lg bg-slate-900 px-3 py-2 text-[13px] font-semibold text-white transition hover:bg-slate-800 cursor-pointer"
-          >
-            {showGenerator ? 'Close' : 'Open generator'}
-          </button>
-        </div>
-
-        {showGenerator && (
-          generatorScope.length === 0 ? (
-            <p className="text-[12px] text-slate-400">
-              No class subjects are configured for your school yet, so there's nothing to generate against.
-            </p>
-          ) : (
-            <AiQuestionGenerator
-              portal="school-admin"
-              scope={generatorScope}
-              onSaved={({ saved }) => setGeneratorNotice(`${saved} question${saved === 1 ? '' : 's'} saved to your school question bank.`)}
-            />
-          )
-        )}
-
-        {generatorNotice && (
-          <p className="text-[12px] font-semibold text-emerald-700">{generatorNotice}</p>
-        )}
-      </div>
     </div>
   );
 };
