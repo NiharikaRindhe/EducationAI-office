@@ -1,5 +1,7 @@
 import { Router } from 'express';
-import { loginController, meController, pinLoginController, pinRosterController } from '../controllers/auth.controller.js';
+import {
+  loginController, meController, pinLoginController, pinRosterController, changePasswordController,
+} from '../controllers/auth.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 
@@ -12,7 +14,10 @@ const pinLimiter = rateLimit({
   keyFn: (req) => `pin:${req.ip}:${(req.body as { studentId?: string })?.studentId ?? ''}`,
 });
 
+const passwordChangeLimiter = rateLimit({ windowMs: 60_000, max: 5, keyFn: (req) => `password-change:${req.user?.id ?? req.ip}` });
+
 authRouter.post('/login', loginLimiter, loginController);
 authRouter.get('/pin-roster', pinRosterController);
 authRouter.post('/pin-login', pinLimiter, pinLoginController);
 authRouter.get('/me', requireAuth, meController);
+authRouter.patch('/password', requireAuth, passwordChangeLimiter, changePasswordController);

@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Search, X, RotateCcw, Trash2, Loader2, AlertTriangle, FileText, Building2, Globe2, CalendarClock,
+  Search, X, RotateCcw, Trash2, Loader2, Info, FileText, Building2, Globe2, CalendarClock,
 } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 import { DataTable, type DataTableColumn } from './DataTable';
@@ -60,12 +60,16 @@ const StatusCell: React.FC<{ job: BookJob }> = ({ job }) => {
         </span>
       )}
 
+      {/* Informational, not an error — the book is Ready and fully usable by
+          the tutor either way, just without chapter-level citations. Kept
+          neutral (not amber/warning-colored) so it doesn't read as a problem
+          that needs fixing (item #19, UI testing pass Aug 24 2026). */}
       {job.status === 'done' && job.chapters_detected === false && (
         <span
-          className="inline-flex items-center gap-1 text-[11px] text-amber-600"
+          className="inline-flex items-center gap-1 text-[11px] text-slate-400"
           title="This book's chapter headings weren't recognised, so answers retrieved from it can't be attributed to a chapter and citations are less precise. Re-upload it with a manual chapter map (page ranges) to fix this."
         >
-          <AlertTriangle size={11} className="shrink-0" /> No chapters detected
+          <Info size={11} className="shrink-0" /> No chapters detected
         </span>
       )}
 
@@ -230,7 +234,12 @@ export const BookLibraryTable: React.FC<Props> = ({
         </span>
       </div>
 
-      {lib.all.some((j) => j.status === 'queued') && (
+      {/* Developer-only reminder — a real admin can't run this command and
+          shouldn't see what reads as an alarming yellow error every time the
+          single-concurrency worker has more than one book queued at once
+          (item #17, UI testing pass Aug 24 2026). Still useful locally, so
+          gated to dev builds rather than deleted. */}
+      {import.meta.env.DEV && lib.all.some((j) => j.status === 'queued') && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[12.5px] leading-5 text-amber-900">
           A PDF is sitting on <span className="font-semibold">Queued</span>. Indexing only starts when the background worker is running
           — in the <code className="rounded bg-amber-100 px-1">api</code> folder run{' '}
@@ -297,13 +306,28 @@ export const BookLibraryTable: React.FC<Props> = ({
         {showKind && (
           <select
             value={lib.filters.kind}
-            onChange={(e) => lib.setFilters({ kind: e.target.value as BookFilters['kind'] })}
+            onChange={(e) => lib.setFilters({ kind: e.target.value as BookFilters['kind'], ...(e.target.value !== 'pyq' ? { pyqYear: '' } : {}) })}
             className={selectCls}
             aria-label="Filter by content type"
           >
             <option value="all">Books &amp; PYQs</option>
             <option value="book">Textbooks only</option>
             <option value="pyq">PYQ papers only</option>
+          </select>
+        )}
+
+        {/* PYQ-specific filter — a book has no exam year, so this only ever
+            narrows the PYQ set, not the whole library (item #18, UI testing
+            pass Aug 24 2026). */}
+        {showKind && lib.filters.kind === 'pyq' && lib.pyqYearsPresent.length > 0 && (
+          <select
+            value={lib.filters.pyqYear}
+            onChange={(e) => lib.setFilters({ pyqYear: e.target.value })}
+            className={selectCls}
+            aria-label="Filter by paper year"
+          >
+            <option value="">All years</option>
+            {lib.pyqYearsPresent.map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
         )}
 

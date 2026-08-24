@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 import { schoolLogoUrl } from '../../lib/assets';
+import { ContentUploadUsageTable, type UploadUsageRow } from '../../components/shared/ContentUploadUsageTable';
 
 interface SchoolProfile {
   id: string;
@@ -47,6 +48,7 @@ interface Detail {
     aiCallsLast30d: number;
   };
   enrollmentByClass: Record<number, number>;
+  contentUploadUsage: UploadUsageRow[];
   admins: AdminRow[];
 }
 
@@ -73,11 +75,18 @@ const inputCls =
   'w-full px-3 py-2 text-[13px] text-slate-800 bg-white border border-slate-300 rounded-lg outline-none transition-colors focus:border-slate-500 focus:ring-2 focus:ring-slate-100 placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-500';
 const labelCls = 'block text-[12px] font-medium text-slate-600 mb-1';
 
+// Every school currently gets the full platform — there is no tiered plan
+// where a per-school feature toggle would actually matter (item #10, UI
+// testing pass Aug 24 2026). Hidden rather than deleted: the entitlements
+// system underneath is untouched, so this is a one-line flip if tiered
+// plans ever ship.
+const FEATURES_TAB_ENABLED = false;
+
 export const SuperAdminSchoolDetail: React.FC = () => {
   const { schoolId } = useParams<{ schoolId: string }>();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState<'profile' | 'features' | 'admins' | 'usage'>('profile');
+  const [tab, setTab] = useState<'profile' | 'features' | 'admins' | 'usage' | 'content'>('profile');
 
   // Feature entitlements — what this school has actually bought.
   const [entitlements, setEntitlements] = useState<EntitlementsPayload | null>(null);
@@ -155,7 +164,7 @@ export const SuperAdminSchoolDetail: React.FC = () => {
   }, [schoolId]);
 
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { void loadEntitlements(); }, [loadEntitlements]);
+  useEffect(() => { if (FEATURES_TAB_ENABLED) void loadEntitlements(); }, [loadEntitlements]);
 
   const saveFeatures = async () => {
     if (!schoolId) return;
@@ -390,7 +399,8 @@ export const SuperAdminSchoolDetail: React.FC = () => {
           { id: 'features', label: 'Features' },
           { id: 'admins', label: `Admin accounts (${admins.length})` },
           { id: 'usage', label: 'Enrollment' },
-        ] as const).map((t) => (
+          { id: 'content', label: 'Content Uploads' },
+        ] as const).filter((t) => FEATURES_TAB_ENABLED || t.id !== 'features').map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
@@ -404,8 +414,9 @@ export const SuperAdminSchoolDetail: React.FC = () => {
       </div>
 
       {/* Features tab — every school buys the whole platform; this is where an
-          individual feature gets suspended for one school. */}
-      {tab === 'features' && (
+          individual feature gets suspended for one school. Hidden (not
+          deleted) behind FEATURES_TAB_ENABLED — see its definition above. */}
+      {tab === 'features' && FEATURES_TAB_ENABLED && (
         <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
             <div>
@@ -732,6 +743,23 @@ export const SuperAdminSchoolDetail: React.FC = () => {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Content Uploads tab — this school's own book/PYQ uploads against
+          its 3-per-(class,subject) quota (item #5/#7, UI testing pass
+          Aug 24 2026). A table, not a bar: the quota is per school, so a
+          single progress bar can't represent it honestly. */}
+      {tab === 'content' && (
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100">
+            <h2 className="text-[14px] font-semibold text-slate-800">Content upload usage</h2>
+            <p className="text-[12px] text-slate-400 mt-0.5">
+              This school's own uploads against its {detail.contentUploadUsage[0]?.limit ?? 3}-per-class-per-subject quota.
+              Platform-wide books (uploaded by the Super Admin) don't count against this.
+            </p>
+          </div>
+          <ContentUploadUsageTable rows={detail.contentUploadUsage} emptyHint="This school hasn't uploaded any of its own books or PYQs yet." />
         </div>
       )}
     </div>

@@ -79,10 +79,12 @@ export interface BookFilters {
   source: 'all' | 'platform' | 'school';
   /** Textbooks vs. previous-year question papers. */
   kind: 'all' | 'book' | 'pyq';
+  /** PYQ papers only — a book has no year, so this only ever narrows kind='pyq'. */
+  pyqYear: string;
 }
 
 export const EMPTY_BOOK_FILTERS: BookFilters = {
-  search: '', classNum: '', subject: '', status: 'all', source: 'all', kind: 'all',
+  search: '', classNum: '', subject: '', status: 'all', source: 'all', kind: 'all', pyqYear: '',
 };
 
 export type BookSortKey = 'book' | 'class' | 'subject' | 'status' | 'created';
@@ -97,6 +99,7 @@ function matches(job: BookJob, f: BookFilters): boolean {
   if (f.source === 'school' && !job.school_id) return false;
   if (f.kind === 'book' && job.is_pyq) return false;
   if (f.kind === 'pyq' && !job.is_pyq) return false;
+  if (f.pyqYear && String(job.pyq_year ?? '') !== f.pyqYear) return false;
   if (f.search) {
     const q = f.search.toLowerCase();
     const hay = `${job.book_title} ${job.original_filename} ${job.subject} ${job.schools?.name ?? ''}`.toLowerCase();
@@ -196,7 +199,7 @@ export function useBookLibrary({ basePath, pollMs = 5000 }: UseBookLibraryOption
 
   const hasActiveFilters =
     Boolean(filters.search) || Boolean(filters.classNum) || Boolean(filters.subject) ||
-    filters.status !== 'all' || filters.source !== 'all' || filters.kind !== 'all';
+    filters.status !== 'all' || filters.source !== 'all' || filters.kind !== 'all' || Boolean(filters.pyqYear);
 
   /** Subjects actually present in the library — a filter that can't return
    *  an empty result is a better filter than the full master list. */
@@ -205,10 +208,16 @@ export function useBookLibrary({ basePath, pollMs = 5000 }: UseBookLibraryOption
     [all],
   );
 
+  /** PYQ years actually present — same "can't return empty" reasoning. */
+  const pyqYearsPresent = React.useMemo(
+    () => [...new Set(all.filter((j) => j.is_pyq && j.pyq_year).map((j) => j.pyq_year as number))].sort((a, b) => b - a),
+    [all],
+  );
+
   return {
     isLoading: jobs === null,
     error, setError,
-    all, rows, filtered, counts, subjectsPresent,
+    all, rows, filtered, counts, subjectsPresent, pyqYearsPresent,
     filters, setFilters, resetFilters, hasActiveFilters,
     sortKey, sortDir, changeSort,
     page, setPage, pageSize, setPageSize,

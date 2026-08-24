@@ -134,6 +134,61 @@ async function releaseSlot(lease: Lease): Promise<void> {
   }
 }
 
+export interface SlotStatusRow {
+  /** Requests in flight toward the provider right now, platform-wide. */
+  inFlight: number;
+  /** Ceilings this tier is enforced against, at each scope. */
+  globalLimit: number;
+  perSchoolLimit: number;
+  perStudentLimit: number;
+  /** How long a lease survives before it is treated as abandoned. */
+  leaseTtlSec: number;
+  /** Where inFlight was read from — Redis is fleet-wide, 'local' is this
+   *  process only and therefore an undercount if several API replicas run. */
+  source: 'redis' | 'local';
+}
+
+/**
+ * Live snapshot of AI concurrency for the Super Admin AI Console (item #23,
+ * UI testing pass Aug 24 2026 — "API hitting").
+ *
+ * Returns the full limit picture, not just the global ceiling: the console
+ * renders this as a table, and "12 in flight" is meaningless without the
+ * per-school and per-student caps that sit underneath it. Read-only —
+ * ZCOUNT rather than the ZREMRANGEBYSCORE the acquire path uses, so
+ * checking status never evicts anyone else's live lease.
+ */
+export async function getSlotStatus(): Promise<Record<AiSlotKind, SlotStatusRow>> {
+  const now = Date.now();
+  const kinds: AiSlotKind[] = ['chat', 'vision'];
+  const redis = await getRedis();
+
+  const result = {} as Record<AiSlotKind, SlotStatusRow>;
+  for (const kind of kinds) {
+    const key = `ai:inflight:${kind}:global`;
+    const limits = limitsFor(kind);
+    let inFlight = pruneLocal(key, now).length;
+    let source: 'redis' | 'local' = 'local';
+    if (redis?.isOpen) {
+      try {
+        inFlight = await redis.zCount(key, now, '+inf');
+        source = 'redis';
+      } catch {
+        /* fall through to the local count already computed above */
+      }
+    }
+    result[kind] = {
+      inFlight,
+      globalLimit: limits.global,
+      perSchoolLimit: limits.school,
+      perStudentLimit: limits.student,
+      leaseTtlSec: Math.max(30, env.aiSlotTtlSec),
+      source,
+    };
+  }
+  return result;
+}
+
 /** Take a shared slot, run the tutor work, always release. Fail-fast if the fleet is full. */
 export async function withAiSlot<T>(
   opts: { kind: AiSlotKind; userId: string; schoolId: string | null },

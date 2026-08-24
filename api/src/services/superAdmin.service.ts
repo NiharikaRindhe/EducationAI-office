@@ -10,6 +10,7 @@ import {
   FEATURE_KEYS,
   type FeatureKey,
 } from '../lib/entitlements.js';
+import { getSchoolUploadUsage } from './superAdminContent.service.js';
 import type { CreateSchoolInput } from '../schemas/superAdmin.schema.js';
 
 /** The package whose contents equal the full feature catalogue. See createSchool. */
@@ -103,6 +104,7 @@ export async function createSchool(input: CreateSchoolInput, actorId: string) {
       schoolCode: school.code as string,
       email: input.admin.email,
       password,
+      audit: { schoolId: school.id as string, actorId, entityId: authUser.user.id },
     });
   }
 
@@ -166,7 +168,16 @@ interface SchoolStatsRow {
   staff: number;
   active_now: number;
   open_tickets: number;
+  last_activity_at: string | null;
 }
+
+/** A school counts as dormant once it's had zero logins for this long.
+ *  Deliberately longer than the 15-minute active_now window — this is a
+ *  "is anyone at this school using it at all" signal, not a live-now one. */
+const DORMANT_DAYS = 7;
+/** A ticket sitting open this long without being picked up is worth
+ *  surfacing on its own, independent of who it's assigned to. */
+const STALE_TICKET_HOURS = 48;
 
 /**
  * Platform overview.
@@ -178,13 +189,46 @@ interface SchoolStatsRow {
  * dashboard load. The response shape is unchanged.
  */
 export async function getOverview() {
-  const [{ data: schools, error: schoolsError }, { data: stats, error: statsError }] = await Promise.all([
+  const dormantSince = new Date(Date.now() - DORMANT_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const staleSince = new Date(Date.now() - STALE_TICKET_HOURS * 60 * 60 * 1000).toISOString();
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [
+    { data: schools, error: schoolsError },
+    { data: stats, error: statsError },
+    { count: escalatedTickets, error: escalatedError },
+    { count: staleTickets, error: staleError },
+    { count: ingestionQueued, error: ingestionQueuedError },
+    { count: ingestionErrors, error: ingestionErrorsError },
+  ] = await Promise.all([
     supabaseAdmin.from('schools').select('id, name, code, is_active, created_at').order('created_at', { ascending: false }),
     supabaseAdmin.rpc('platform_school_stats'),
+    supabaseAdmin
+      .from('support_tickets')
+      .select('id', { count: 'exact', head: true })
+      .eq('escalated_to_super', true)
+      .in('status', ['open', 'in_progress']),
+    supabaseAdmin
+      .from('support_tickets')
+      .select('id', { count: 'exact', head: true })
+      .in('status', ['open', 'in_progress'])
+      .lt('created_at', staleSince),
+    supabaseAdmin
+      .from('ncert_ingestion_jobs')
+      .select('id', { count: 'exact', head: true })
+      .in('status', ['queued', 'chunking', 'embedding']),
+    supabaseAdmin
+      .from('ncert_ingestion_jobs')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'error'),
   ]);
 
   if (schoolsError) throw new ApiError('INTERNAL_ERROR', 'Failed to load schools', schoolsError.message);
   if (statsError) throw new ApiError('INTERNAL_ERROR', 'Failed to load platform statistics', statsError.message);
+  if (escalatedError) throw new ApiError('INTERNAL_ERROR', 'Failed to load escalated tickets', escalatedError.message);
+  if (staleError) throw new ApiError('INTERNAL_ERROR', 'Failed to load stale tickets', staleError.message);
+  if (ingestionQueuedError) throw new ApiError('INTERNAL_ERROR', 'Failed to load ingestion backlog', ingestionQueuedError.message);
+  if (ingestionErrorsError) throw new ApiError('INTERNAL_ERROR', 'Failed to load ingestion errors', ingestionErrorsError.message);
 
   const byId = new Map<string, SchoolStatsRow>(
     ((stats ?? []) as SchoolStatsRow[]).map((r) => [r.school_id, r]),
@@ -203,16 +247,43 @@ export async function getOverview() {
       staffCount: Number(c?.staff ?? 0),
       activeNow: Number(c?.active_now ?? 0),
       openTickets: Number(c?.open_tickets ?? 0),
+      lastActivityAt: c?.last_activity_at ?? null,
     };
   });
+
+  const totalStudents = schoolRows.reduce((sum, s) => sum + s.studentCount, 0);
+  const totalTeachers = schoolRows.reduce((sum, s) => sum + s.teacherCount, 0);
+  const totalStaff = schoolRows.reduce((sum, s) => sum + s.staffCount, 0);
+
+  // Dormant/new only make sense for schools actually in service — a
+  // suspended school having "no activity" is expected, not a signal.
+  const dormantSchools = schoolRows
+    .filter((s) => s.isActive && (!s.lastActivityAt || s.lastActivityAt < dormantSince))
+    .map((s) => ({ id: s.id, name: s.name, code: s.code, lastActivityAt: s.lastActivityAt }));
+  const newSchoolsThisWeek = schoolRows.filter((s) => s.createdAt >= weekAgo).length;
 
   return {
     totalSchools: schoolRows.length,
     activeSchools: schoolRows.filter((s) => s.isActive).length,
-    totalStudents: schoolRows.reduce((sum, s) => sum + s.studentCount, 0),
-    totalTeachers: schoolRows.reduce((sum, s) => sum + s.teacherCount, 0),
+    totalStudents,
+    totalTeachers,
+    // Every account that can log in, across every school — students,
+    // teachers and staff (school admins/lab in-charges). Distinct from
+    // activeNow below, which is "online in the last 15 minutes".
+    totalUsers: totalStudents + totalTeachers + totalStaff,
+    totalActiveNow: schoolRows.reduce((sum, s) => sum + s.activeNow, 0),
     totalOpenTickets: schoolRows.reduce((sum, s) => sum + s.openTickets, 0),
     schools: schoolRows,
+    // Triage panel: what actually needs a Super Admin's attention today,
+    // as opposed to the totals above which are just a health snapshot.
+    attention: {
+      dormantSchools,
+      escalatedTickets: escalatedTickets ?? 0,
+      staleTickets: staleTickets ?? 0,
+      newSchoolsThisWeek,
+      ingestionQueued: ingestionQueued ?? 0,
+      ingestionErrors: ingestionErrors ?? 0,
+    },
   };
 }
 
@@ -263,7 +334,7 @@ export async function setSchoolActive(schoolId: string, isActive: boolean, actor
 export async function getSchoolDetail(schoolId: string) {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60_000).toISOString();
 
-  const [schoolRes, profilesRes, loginsRes, aiRes] = await Promise.all([
+  const [schoolRes, profilesRes, loginsRes, aiRes, contentUploadUsage] = await Promise.all([
     supabaseAdmin
       .from('schools')
       .select('id, name, code, address, city, state, pincode, board, plan, logo_path, contact_name, contact_email, contact_phone, is_active, created_at')
@@ -283,6 +354,10 @@ export async function getSchoolDetail(schoolId: string) {
       .select('id', { count: 'exact', head: true })
       .eq('school_id', schoolId)
       .gte('created_at', thirtyDaysAgo),
+    // This school's content-upload quota usage, per (class, subject) — a
+    // real table instead of the AI Console's unrelated concurrency bars
+    // (UI feedback Aug 24 2026, item #5/#7).
+    getSchoolUploadUsage(schoolId),
   ]);
 
   if (schoolRes.error || !schoolRes.data) throw new ApiError('NOT_FOUND', 'School not found');
@@ -316,6 +391,7 @@ export async function getSchoolDetail(schoolId: string) {
       aiCallsLast30d: aiRes.count ?? 0,
     },
     enrollmentByClass,
+    contentUploadUsage,
     admins: staff.map((a) => ({
       id: a.id,
       fullName: a.full_name,
@@ -493,6 +569,7 @@ export async function addSchoolAdmin(schoolId: string, input: { fullName: string
     schoolCode: school.code as string,
     email: input.email,
     password,
+    audit: { schoolId, actorId, entityId: authUser.user.id },
   });
 
   // Provisioning a new school_admin account is a privilege grant — attributable,

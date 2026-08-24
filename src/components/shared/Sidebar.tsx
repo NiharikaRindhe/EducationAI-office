@@ -46,8 +46,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const brandName = school?.name ?? logoText;
   // EduAI stays visible under the school's name — this is their portal, but
-  // it is not their product.
-  const brandSubtitle = school ? 'Powered by EduAI' : 'K-12 PORTAL';
+  // it is not their product. No subtitle at all once there's no school to
+  // attribute it to (item #35, UI testing pass Aug 24 2026 — the old
+  // "K-12 PORTAL" fallback read as unfinished placeholder copy).
+  const brandSubtitle = school ? 'Powered by EduAI' : '';
   const schoolLogoSrc = school?.logoPath ? schoolLogoUrl(school.logoPath) : null;
 
   const toggleSubnav = (label: string) => {
@@ -187,9 +189,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               {brandName}
             </span>
-            <span className="text-[10px] text-slate-400 font-label-caps tracking-wider block truncate mt-0.5">
-              {brandSubtitle}
-            </span>
+            {brandSubtitle && (
+              <span className="text-[10px] text-slate-400 font-label-caps tracking-wider block truncate mt-0.5">
+                {brandSubtitle}
+              </span>
+            )}
           </div>
         </Link>
 

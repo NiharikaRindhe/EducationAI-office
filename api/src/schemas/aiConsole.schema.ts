@@ -13,7 +13,7 @@ export const updateAiSettingsSchema = z.object({
 export type UpdateAiSettingsInput = z.infer<typeof updateAiSettingsSchema>;
 
 export const usageQuerySchema = z.object({
-  groupBy: z.enum(['day', 'school', 'tier']).default('day'),
+  groupBy: z.enum(['day', 'month', 'school', 'tier']).default('day'),
   days: z.coerce.number().int().min(1).max(365).default(30),
 });
 export type UsageQuery = z.infer<typeof usageQuerySchema>;

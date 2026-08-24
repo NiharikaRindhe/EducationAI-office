@@ -3,8 +3,10 @@ import { supabaseAdmin, supabaseAnon } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
 import { generatePassword } from '../lib/credentials.js';
 import { logger } from '../lib/logger.js';
+import { revokeUserSessions } from '../lib/sessions.js';
+import { writeAuditLog } from './auditLog.service.js';
 import type { LoginInput, PinLoginInput, PinRosterQuery } from '../schemas/auth.schema.js';
-import type { Role } from '../types/index.js';
+import type { AuthUser, Role } from '../types/index.js';
 
 /** Fire-and-forget — powers the School/Super Admin "active logins" panels.
  *  Never allowed to fail a login just because the log write hiccuped. */
@@ -266,4 +268,46 @@ export async function pinLogin({ schoolCode, studentId, pin }: PinLoginInput): P
     fullName: profile.full_name as string,
     redirectPath: redirectPathFor('student', sp.batch_id),
   };
+}
+
+/**
+ * Self-service password change (item #38/#75, UI testing pass Aug 24 2026 —
+ * the "Profile & Settings" the account dropdown now links to). Requires the
+ * current password rather than trusting the session alone: an access token
+ * left signed-in on a shared lab PC must not be enough on its own to lock
+ * the real owner out.
+ *
+ * On success every other session is revoked, same as an admin-triggered
+ * reset — the caller's own current tab included, so the frontend must send
+ * the user back through login with the new password.
+ */
+export async function changeOwnPassword(
+  user: AuthUser,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  if (!user.email) throw new ApiError('VALIDATION_ERROR', 'This account has no password-based login to change');
+
+  const { error: verifyError } = await supabaseAnon.auth.signInWithPassword({
+    email: user.email,
+    password: currentPassword,
+  });
+  if (verifyError) {
+    if (isCredentialRejection(verifyError)) {
+      throw new ApiError('UNAUTHORIZED', 'Current password is incorrect');
+    }
+    throw new ApiError('SERVICE_UNAVAILABLE', 'Could not verify your current password — please try again shortly.', verifyError.message);
+  }
+
+  const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, { password: newPassword });
+  if (updateError) throw new ApiError('INTERNAL_ERROR', 'Failed to update password', updateError.message);
+
+  await revokeUserSessions(user.id, 'password_self_changed', { actorId: user.id, schoolId: user.schoolId });
+  await writeAuditLog({
+    schoolId: user.schoolId,
+    actorId: user.id,
+    action: 'credential.self_changed',
+    entity: 'user_profile',
+    entityId: user.id,
+  });
 }

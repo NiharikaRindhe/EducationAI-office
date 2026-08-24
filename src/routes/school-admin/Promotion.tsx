@@ -5,6 +5,7 @@ import {
   ArrowLeft, GraduationCap, RotateCcw, UserPlus, Split,
 } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
+import { PortalPageHeader } from '../../components/shared/PortalPageHeader';
 
 /**
  * Academic-year rollover.
@@ -331,12 +332,15 @@ export const SchoolAdminPromotion: React.FC = () => {
   // ── Wizard ─────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-6 font-sans text-left max-w-3xl mx-auto anim-fade-up">
-      <div>
-        <h2 className="font-display font-extrabold text-xl text-slate-800">Academic year rollover</h2>
-        <p className="text-xs text-slate-400 font-medium mt-0.5">
-          {preview ? <>Moves every class up one level for <span className="font-bold">{preview.nextYear}</span>. Class 10 passes out; Class 1 empties for the new intake.</> : 'Loading…'}
-        </p>
-      </div>
+      <PortalPageHeader
+        eyebrow="Academic operations"
+        title="Academic Year Rollover"
+        description={
+          preview
+            ? `Moves every class up one level for ${preview.nextYear}. Class 10 passes out; Class 1 empties for the new intake.`
+            : 'Loading…'
+        }
+      />
 
       {errorMsg && (
         <div className="bg-rose-50 border border-rose-100 text-rose-800 rounded-2xl p-4 flex gap-2.5 text-xs font-bold">

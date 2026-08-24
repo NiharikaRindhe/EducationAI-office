@@ -6,6 +6,7 @@ import { BookUploader } from '../../components/shared/BookUploader';
 import { BookLibraryTable } from '../../components/shared/BookLibraryTable';
 import { PyqPaperUploader } from '../../components/shared/PyqPaperUploader';
 import { QuestionBankUploader, type ImportResult } from '../../components/shared/QuestionBankUploader';
+import { ContentUploadUsageTable, type UploadUsageRow } from '../../components/shared/ContentUploadUsageTable';
 import { useBookLibrary } from '../../lib/bookLibrary';
 
 interface QuestionItem {
@@ -35,10 +36,23 @@ interface ClassSubjectRow {
 const inputCls =
   'w-full px-3 py-2 text-[13px] text-slate-800 bg-white border border-slate-300 rounded-lg outline-none transition-colors focus:border-slate-500 focus:ring-2 focus:ring-slate-100 placeholder:text-slate-400';
 
+// Hidden, not deleted (item #14, UI testing pass Aug 24 2026) — the manual/
+// global question bank duplicates what AI generation from uploaded books
+// now covers. One-line flip back if it turns out to still be needed.
+const GLOBAL_QUESTION_BANK_TAB_ENABLED = false;
+
 export const SuperAdminContentPortal: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'library' | 'questions' | 'subjects'>('library');
   const [uploadMode, setUploadMode] = useState<'book' | 'pyq'>('book');
   const lib = useBookLibrary({ basePath: '/super-admin' });
+
+  // Every school's content-upload quota usage, across every class+subject —
+  // the "overall school info" table (item #7), separate from the AI
+  // Console's unrelated concurrency panel.
+  const [uploadUsage, setUploadUsage] = useState<UploadUsageRow[] | null>(null);
+  useEffect(() => {
+    api.get<UploadUsageRow[]>('/super-admin/content/upload-usage').then(setUploadUsage).catch(() => setUploadUsage([]));
+  }, []);
 
   // Class → Subject whitelist. Loaded on mount rather than only when the
   // Subjects tab opens, because the uploaders need it to offer the right
@@ -68,7 +82,7 @@ export const SuperAdminContentPortal: React.FC = () => {
   };
 
   useEffect(() => {
-    if (activeTab === 'questions') fetchQuestions();
+    if (GLOBAL_QUESTION_BANK_TAB_ENABLED && activeTab === 'questions') fetchQuestions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, classFilter, subjectFilter, pyqFilter]);
 
@@ -140,7 +154,7 @@ export const SuperAdminContentPortal: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <PortalPageHeader
         eyebrow="Knowledge operations"
         title="Content intelligence hub"
@@ -160,34 +174,30 @@ export const SuperAdminContentPortal: React.FC = () => {
         </div>
       </PortalPageHeader>
 
-      {/* Tabs */}
-      <div className="inline-flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-        {([
-          { id: 'library', label: 'Book Library' },
-          { id: 'questions', label: 'Global Question Bank' },
-          { id: 'subjects', label: 'Class Subjects' },
-        ] as const).map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`whitespace-nowrap rounded-lg px-4 py-2 text-[13px] font-semibold transition-colors cursor-pointer ${
-              activeTab === tab.id ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Tabs — the upload-mode toggle sits on the same row as the main tabs
+          (only while Library is open) rather than stacked below with its own
+          gap, which was taking up far more vertical space than two rows of
+          small pill buttons need. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="inline-flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+          {([
+            { id: 'library', label: 'Book Library' },
+            { id: 'questions', label: 'Global Question Bank' },
+            { id: 'subjects', label: 'Class Subjects' },
+          ] as const).filter((tab) => GLOBAL_QUESTION_BANK_TAB_ENABLED || tab.id !== 'questions').map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition-colors cursor-pointer ${
+                activeTab === tab.id ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-      {activeTab === 'library' ? (
-        <div className="flex flex-col gap-5">
-          {lib.error && (
-            <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700">
-              <AlertCircle size={15} className="shrink-0" /> {lib.error}
-              <button onClick={() => lib.setError('')} className="ml-auto cursor-pointer"><X size={14} /></button>
-            </div>
-          )}
-
+        {activeTab === 'library' && (
           <div className="inline-flex w-fit gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
             {([
               { id: 'book', label: 'Upload textbook' },
@@ -196,7 +206,7 @@ export const SuperAdminContentPortal: React.FC = () => {
               <button
                 key={mode.id}
                 onClick={() => setUploadMode(mode.id)}
-                className={`whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors cursor-pointer ${
+                className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition-colors cursor-pointer ${
                   uploadMode === mode.id ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
                 }`}
               >
@@ -204,6 +214,17 @@ export const SuperAdminContentPortal: React.FC = () => {
               </button>
             ))}
           </div>
+        )}
+      </div>
+
+      {activeTab === 'library' ? (
+        <div className="flex flex-col gap-4">
+          {lib.error && (
+            <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700">
+              <AlertCircle size={15} className="shrink-0" /> {lib.error}
+              <button onClick={() => lib.setError('')} className="ml-auto cursor-pointer"><X size={14} /></button>
+            </div>
+          )}
 
           {uploadMode === 'book' ? (
             <BookUploader
@@ -239,8 +260,22 @@ export const SuperAdminContentPortal: React.FC = () => {
             heading="Platform library"
             description="Every book and previous year paper on the platform. Status refreshes automatically."
           />
+
+          {/* Per-school upload quota usage — a real table, not a bar, since
+              the 3-per-(class,subject) quota is per school, not a shared
+              platform-wide pool (item #5/#7). The same-shaped table also
+              appears on each School Detail page, scoped to just that school. */}
+          <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100">
+              <h2 className="text-[14px] font-semibold text-slate-800">School content-upload usage</h2>
+              <p className="text-[12px] text-slate-400 mt-0.5">
+                Every school's own uploads against its {uploadUsage?.[0]?.limit ?? 3}-per-class-per-subject quota. Platform-wide books uploaded above don't count against any school's quota.
+              </p>
+            </div>
+            <ContentUploadUsageTable rows={uploadUsage} showSchool />
+          </div>
         </div>
-      ) : activeTab === 'questions' ? (
+      ) : activeTab === 'questions' && GLOBAL_QUESTION_BANK_TAB_ENABLED ? (
         <div className="flex flex-col gap-5">
           {qError && (
             <div className="bg-rose-50 border border-rose-200 text-rose-700 text-[13px] rounded-lg px-4 py-3 flex items-center gap-2">

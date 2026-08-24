@@ -50,6 +50,7 @@ export async function createTicket(user: AuthUser, input: CreateTicketInput) {
  */
 interface TicketRow {
   id: string;
+  school_id: string | null;
   category: string;
   subject: string;
   body: string;
@@ -98,6 +99,9 @@ async function notifySuperAdminsOfTicket(ticket: TicketRow, raiser: AuthUser): P
       raisedByRole: ticket.raised_role,
       schoolName: school?.name ?? null,
       schoolCode: school?.code ?? null,
+      // Credited to whoever raised the ticket — that's what caused the mail,
+      // not the super admin receiving it (item #32, "Mails").
+      audit: { schoolId: ticket.school_id, actorId: raiser.id, entityId: ticket.id },
     });
   }
 }
@@ -123,6 +127,7 @@ export async function listTickets(user: AuthUser, filters: ListTicketsQuery) {
 
   if (filters.status) query = query.eq('status', filters.status);
   if (filters.category) query = query.eq('category', filters.category);
+  if (filters.raisedRole) query = query.eq('raised_role', filters.raisedRole);
 
   const { data, error } = await query;
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to list tickets', error.message);
@@ -197,6 +202,31 @@ export async function updateTicketStatus(user: AuthUser, ticketId: string, statu
 
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to update ticket status', error.message);
   return data;
+}
+
+/**
+ * Same status change applied to several tickets at once — the same issue
+ * reported by multiple people (item #29). Reuses updateTicketStatus per
+ * ticket rather than a single bulk UPDATE so every row still passes the
+ * same visibility + triage-permission checks; a School Admin can't use a
+ * batch request to slip a status change onto another school's ticket.
+ * Partial success is reported rather than all-or-nothing — one bad id in a
+ * batch of twenty shouldn't block the other nineteen.
+ */
+export async function bulkUpdateTicketStatus(user: AuthUser, ticketIds: string[], status: string) {
+  const succeeded: string[] = [];
+  const failed: { ticketId: string; reason: string }[] = [];
+
+  for (const ticketId of ticketIds) {
+    try {
+      await updateTicketStatus(user, ticketId, status);
+      succeeded.push(ticketId);
+    } catch (err) {
+      failed.push({ ticketId, reason: err instanceof ApiError ? err.message : 'Update failed' });
+    }
+  }
+
+  return { succeeded, failed };
 }
 
 export async function escalateTicket(user: AuthUser, ticketId: string) {

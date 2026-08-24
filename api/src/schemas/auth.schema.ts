@@ -24,6 +24,12 @@ export const pinLoginSchema = z.object({
   pin: z.string().regex(/^\d{4}$/, 'PIN must be exactly 4 digits'),
 });
 
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8, 'New password must be at least 8 characters'),
+});
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type PinRosterQuery = z.infer<typeof pinRosterQuerySchema>;
 export type PinLoginInput = z.infer<typeof pinLoginSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

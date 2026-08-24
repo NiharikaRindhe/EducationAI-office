@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import { env } from './env.js';
 import { logger } from './logger.js';
+import { writeAuditLog } from '../services/auditLog.service.js';
 
 // ─────────────────────────────────────────────────────────────
 //  TRANSACTIONAL MAIL — credential emails and similar one-offs.
@@ -30,13 +31,52 @@ export function isMailerConfigured(): boolean {
   return transporter !== null;
 }
 
-/** Fire-and-forget send. Never throws. */
-export function sendMail(to: string, subject: string, html: string, text: string): void {
-  if (!transporter) return;
+/**
+ * Who to credit a mail send to in the audit log (item #32, UI testing pass
+ * Aug 24 2026 — "Mails"), and what it was about. `actorId` is whoever's
+ * action caused the mail, not the recipient — a school admin being welcomed
+ * didn't cause their own welcome email, the Super Admin who onboarded the
+ * school did.
+ */
+export interface MailAuditContext {
+  action: string;
+  schoolId: string | null;
+  actorId: string;
+  entityId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/** Fire-and-forget send. Never throws — a dead SMTP server must not fail
+ *  whatever action triggered the mail. `audit`, when given, records the
+ *  outcome (sent/failed/skipped) so it's visible without reading server logs. */
+export function sendMail(to: string, subject: string, html: string, text: string, audit?: MailAuditContext): void {
+  const logOutcome = (outcome: 'sent' | 'failed' | 'skipped', extra?: Record<string, unknown>) => {
+    if (!audit) return;
+    void writeAuditLog({
+      schoolId: audit.schoolId,
+      actorId: audit.actorId,
+      action: `${audit.action}.${outcome}`,
+      entity: 'email',
+      entityId: audit.entityId,
+      metadata: { to, subject, ...audit.metadata, ...extra },
+    });
+  };
+
+  if (!transporter) {
+    logOutcome('skipped', { reason: 'SMTP not configured' });
+    return;
+  }
+
   void transporter
     .sendMail({ from: env.smtpFrom, replyTo: env.smtpReplyTo || env.smtpFrom, to, subject, html, text })
-    .then(() => logger.info({ to, subject }, 'Email sent'))
-    .catch((err) => logger.warn({ err, to, subject }, 'Failed to send email'));
+    .then(() => {
+      logger.info({ to, subject }, 'Email sent');
+      logOutcome('sent');
+    })
+    .catch((err) => {
+      logger.warn({ err, to, subject }, 'Failed to send email');
+      logOutcome('failed', { error: err instanceof Error ? err.message : String(err) });
+    });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -50,6 +90,8 @@ interface SchoolAdminWelcomeParams {
   schoolCode: string;
   email: string;
   password: string;
+  /** Who to credit this send to in the audit log, and which school it's for. */
+  audit?: { schoolId: string | null; actorId: string; entityId?: string };
 }
 
 /** Branded welcome mail for a newly created School Admin account. */
@@ -158,7 +200,19 @@ export function sendSchoolAdminWelcomeEmail(params: SchoolAdminWelcomeParams): v
     'For security, please change this password after your first sign-in.',
   ].join('\n');
 
-  sendMail(params.to, `Your EduAI admin account for ${params.schoolName}`, html, text);
+  sendMail(
+    params.to,
+    `Your EduAI admin account for ${params.schoolName}`,
+    html,
+    text,
+    params.audit && {
+      action: 'mail.school_admin_welcome',
+      schoolId: params.audit.schoolId,
+      actorId: params.audit.actorId,
+      entityId: params.audit.entityId,
+      metadata: { schoolName: params.schoolName, schoolCode: params.schoolCode },
+    },
+  );
 }
 
 interface TicketRaisedParams {
@@ -172,6 +226,9 @@ interface TicketRaisedParams {
   raisedByRole: string;
   schoolName: string | null;
   schoolCode: string | null;
+  /** Who to credit this send to in the audit log — the ticket's raiser, not
+   *  the Super Admin recipient, since raising the ticket is what caused it. */
+  audit?: { schoolId: string | null; actorId: string; entityId?: string };
 }
 
 const PRIORITY_COLOURS: Record<string, string> = {
@@ -278,5 +335,17 @@ export function sendTicketRaisedEmail(params: TicketRaisedParams): void {
     `Ticket reference: ${params.ticketId}`,
   ].join('\n');
 
-  sendMail(params.to, `[${params.priority.toUpperCase()}] ${origin}: ${params.subject}`, html, text);
+  sendMail(
+    params.to,
+    `[${params.priority.toUpperCase()}] ${origin}: ${params.subject}`,
+    html,
+    text,
+    params.audit && {
+      action: 'mail.ticket_raised',
+      schoolId: params.audit.schoolId,
+      actorId: params.audit.actorId,
+      entityId: params.audit.entityId,
+      metadata: { recipient: params.to, ticketId: params.ticketId },
+    },
+  );
 }

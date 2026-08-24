@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { LogOut } from 'lucide-react';
+import { LogOut, ChevronDown, User as UserIcon } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 
@@ -17,6 +17,11 @@ interface TopBarProps {
 const NO_XP_STRIP_PORTALS = new Set(['teacher', 'emerald', 'schoolAdmin', 'superAdmin', 'labIncharge']);
 const STUDENT_PORTALS = new Set(['amber', 'indigo', 'sky']);
 
+const ROLE_LABELS: Record<TopBarProps['batchColor'], string> = {
+  amber: 'Student', indigo: 'Student', sky: 'Student', slate: 'Student', emerald: 'Student',
+  teacher: 'Teacher', schoolAdmin: 'School Admin', superAdmin: 'Super Admin', labIncharge: 'Lab In-charge',
+};
+
 export const TopBar: React.FC<TopBarProps> = ({
   greeting,
   userName,
@@ -27,13 +32,28 @@ export const TopBar: React.FC<TopBarProps> = ({
   rightSlot
 }) => {
   const { studentXP, studentStreak } = useApp();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
+  // Profile + Setting in one small dropdown, rather than a bare "U" tile
+  // linking off to the portal's own dashboard (items #37/#38, UI testing
+  // pass Aug 24 2026). Only the real-auth portals (no userAvatar) get this —
+  // student portals already have a real emoji avatar and a real /profile page.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [menuOpen]);
 
   const themeColors = {
     amber: 'text-amber-600',
@@ -100,19 +120,51 @@ export const TopBar: React.FC<TopBarProps> = ({
         <div className="flex items-center gap-3">
           {/* Profile Circle / Avatar Link */}
           {userAvatar ? (
-            <Link 
+            <Link
               to={profileHref}
               className="w-10 h-10 rounded-xl hover:bg-slate-50 border border-slate-100 flex items-center justify-center text-xl shadow-xs hover:scale-105 transition-all select-none cursor-pointer"
             >
               {userAvatar}
             </Link>
           ) : (
-            <Link 
-              to={profileHref}
-              className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm shadow-xs transition-all cursor-pointer"
-            >
-              U
-            </Link>
+            <div className="relative" ref={menuRef}>
+              <button
+                type="button"
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-label="Profile and settings"
+                aria-expanded={menuOpen}
+                className={`flex items-center gap-1.5 h-10 pl-1 pr-2 rounded-xl border transition-all cursor-pointer ${
+                  menuOpen ? 'bg-slate-100 border-slate-300' : 'bg-slate-50 hover:bg-slate-100 border-slate-200'
+                }`}
+              >
+                <span className={`w-8 h-8 rounded-lg text-white flex items-center justify-center font-bold text-sm shrink-0 ${themeColors[batchColor].replace('text-', 'bg-')}`}>
+                  {(user?.full_name ?? '?').charAt(0).toUpperCase()}
+                </span>
+                <ChevronDown size={14} className={`text-slate-400 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {menuOpen && (
+                <div className="absolute right-0 top-[calc(100%+8px)] w-56 bg-white border border-slate-100 rounded-2xl shadow-lg py-2 z-50">
+                  <div className="px-4 py-2.5 border-b border-slate-50">
+                    <span className="block text-[13px] font-semibold text-slate-800 truncate">{user?.full_name ?? 'Account'}</span>
+                    <span className="block text-[11px] text-slate-400">{ROLE_LABELS[batchColor]}</span>
+                  </div>
+                  <Link
+                    to={profileHref}
+                    onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    <UserIcon size={14} /> Profile &amp; Settings
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                  >
+                    <LogOut size={14} /> Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

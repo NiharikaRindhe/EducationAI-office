@@ -1,7 +1,10 @@
 import type { Request, Response, NextFunction } from 'express';
 import * as ticketService from '../services/ticket.service.js';
 import { ApiError } from '../lib/errors.js';
-import { createTicketSchema, listTicketsQuerySchema, updateTicketStatusSchema, addTicketMessageSchema } from '../schemas/ticket.schema.js';
+import {
+  createTicketSchema, listTicketsQuerySchema, updateTicketStatusSchema, addTicketMessageSchema,
+  bulkUpdateTicketStatusSchema,
+} from '../schemas/ticket.schema.js';
 
 function requireUser(req: Request) {
   if (!req.user) throw new ApiError('UNAUTHORIZED', 'Not authenticated');
@@ -63,6 +66,17 @@ export async function updateTicketStatusController(req: Request, res: Response, 
     const { status } = updateTicketStatusSchema.parse(req.body);
     const ticket = await ticketService.updateTicketStatus(user, id, status);
     res.json(ticket);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function bulkUpdateTicketStatusController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = requireUser(req);
+    const { ticketIds, status } = bulkUpdateTicketStatusSchema.parse(req.body);
+    const result = await ticketService.bulkUpdateTicketStatus(user, ticketIds, status);
+    res.json(result);
   } catch (err) {
     next(err);
   }

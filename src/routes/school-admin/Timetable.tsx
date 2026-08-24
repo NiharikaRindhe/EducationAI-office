@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { Loader2, AlertCircle, X, Trash2, Plus, FlaskConical, AlertTriangle, UploadCloud } from 'lucide-react';
+import { Loader2, AlertCircle, X, Trash2, Plus, FlaskConical, AlertTriangle, UploadCloud, Pencil } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 import { buildTeacherLabels } from '../../lib/teacherLabel';
 
@@ -359,9 +359,12 @@ export const SchoolAdminTimetable: React.FC = () => {
         </div>
       )}
 
+      {/* Labs is no longer its own nav page (item #58) — the lab field on a
+          period is optional, so an empty list is informational, not a
+          blocker, and shouldn't point at a page that isn't there anymore. */}
       {labs.length === 0 && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-[13px] rounded-lg px-4 py-3 flex items-center gap-2">
-          <FlaskConical size={15} /> No labs registered yet — add one under Labs before scheduling lab periods.
+        <div className="bg-slate-50 border border-slate-200 text-slate-600 text-[13px] rounded-lg px-4 py-3 flex items-center gap-2">
+          <FlaskConical size={15} className="text-slate-400" /> No computer labs on file for your school — periods can still be scheduled without one.
         </div>
       )}
 
@@ -392,9 +395,11 @@ export const SchoolAdminTimetable: React.FC = () => {
                           {slot ? (
                             <button
                               onClick={() => openCell(d.num, periodNo)}
-                              className="w-full text-left bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 rounded-lg px-2.5 py-2 transition-colors cursor-pointer"
+                              title="Edit this period"
+                              className="group relative w-full text-left bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 rounded-lg px-2.5 py-2 transition-colors cursor-pointer"
                             >
-                              <span className="block text-[12px] font-semibold text-indigo-900 truncate">{slot.subject}</span>
+                              <Pencil size={11} className="absolute top-1.5 right-1.5 text-indigo-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                              <span className="block text-[12px] font-semibold text-indigo-900 truncate pr-3">{slot.subject}</span>
                               <span className="block text-[10px] text-indigo-500 truncate">{slot.teacherName ?? 'No teacher'}</span>
                               <span className="block text-[10px] text-indigo-500 truncate">{slot.labName ?? 'No lab'}</span>
                             </button>

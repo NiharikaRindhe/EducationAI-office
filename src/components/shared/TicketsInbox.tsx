@@ -1,17 +1,18 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Loader2, AlertCircle, Plus, ArrowLeft, ArrowUpCircle, Send, X } from 'lucide-react';
+import { Loader2, AlertCircle, Plus, ArrowLeft, ArrowUpCircle, Send, X, CheckSquare, Square } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 
 type Category = 'account' | 'content' | 'technical' | 'ai' | 'other';
 type Status = 'open' | 'in_progress' | 'resolved' | 'closed';
 type Priority = 'low' | 'normal' | 'high' | 'urgent';
+type RaisedRole = 'student' | 'teacher' | 'school_admin' | 'lab_incharge' | 'super_admin';
 
 interface Ticket {
   id: string;
   school_id: string | null;
   raised_by: string;
-  raised_role: string;
+  raised_role: RaisedRole;
   category: Category;
   subject: string;
   body: string;
@@ -64,6 +65,24 @@ const CATEGORY_LABELS: Record<Category, string> = {
   other: 'Other',
 };
 
+const ROLE_LABELS: Record<RaisedRole, string> = {
+  student: 'Student',
+  teacher: 'Teacher',
+  school_admin: 'School Admin',
+  lab_incharge: 'Lab In-charge',
+  super_admin: 'Super Admin',
+};
+
+/** Only roles that actually raise support tickets in practice — a viewer
+ *  filtering "who raised this" doesn't need super_admin as an option. */
+const RAISED_ROLE_FILTER_OPTIONS: RaisedRole[] = ['school_admin', 'teacher', 'student', 'lab_incharge'];
+
+/** How often the list (and an open ticket) re-fetch on their own, so a
+ *  status change made by someone else in another session — a School Admin
+ *  and the Super Admin both looking at the same escalated ticket, say —
+ *  shows up without a manual reload (item #28, "sync...properly"). */
+const TICKET_POLL_MS = 15000;
+
 interface TicketsInboxProps {
   accentColor: 'rose' | 'slate' | 'indigo' | 'sky' | 'amber';
   /** Show status-change controls (school admin and super admin manage; a teacher/student only reads + replies). */
@@ -92,6 +111,9 @@ export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTria
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
   const [statusFilter, setStatusFilter] = useState<Status | ''>('');
+  const [roleFilter, setRoleFilter] = useState<RaisedRole | ''>('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState<Status | null>(null);
   // ?schoolId= lets a caller land straight on one school's queue — the Super
   // Admin overview links its per-school open-ticket count here, and the default
   // inbox ("escalated + mine") would otherwise hide exactly those tickets.
@@ -117,22 +139,30 @@ export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTria
   const [isReplying, setIsReplying] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-  const load = useCallback(async () => {
-    setIsLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true);
     setError('');
     try {
       const query: Record<string, string> = {};
       if (statusFilter) query.status = statusFilter;
       if (schoolFilter) query.schoolId = schoolFilter;
+      if (roleFilter) query.raisedRole = roleFilter;
       setTickets(await api.get<Ticket[]>('/tickets', query));
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : 'Failed to load tickets');
+      // A background poll failing silently is fine — the last good list
+      // stays on screen rather than flashing an error every 15s.
+      if (!silent) setError(err instanceof ApiClientError ? err.message : 'Failed to load tickets');
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
-  }, [statusFilter, schoolFilter]);
+  }, [statusFilter, schoolFilter, roleFilter]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => void load(true), TICKET_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [load]);
 
   useEffect(() => {
     if (showSchoolFilter) {
@@ -156,17 +186,27 @@ export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTria
     if (fromUrl) setSchoolFilter(fromUrl);
   }, [searchParams, showSchoolFilter]);
 
-  const openTicket = async (id: string) => {
-    setIsDetailLoading(true);
-    setError('');
+  const openTicket = async (id: string, silent = false) => {
+    if (!silent) setIsDetailLoading(true);
+    if (!silent) setError('');
     try {
       setSelected(await api.get<TicketDetail>(`/tickets/${id}`));
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : 'Failed to load ticket');
+      if (!silent) setError(err instanceof ApiClientError ? err.message : 'Failed to load ticket');
     } finally {
-      setIsDetailLoading(false);
+      if (!silent) setIsDetailLoading(false);
     }
   };
+
+  // Keep an open ticket's status/messages in sync while someone else (a
+  // School Admin and the Super Admin can both be looking at the same
+  // escalated ticket) is triaging it in another session — item #28.
+  useEffect(() => {
+    if (!selected) return;
+    const id = window.setInterval(() => void openTicket(selected.id, true), TICKET_POLL_MS);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.id]);
 
   const handleRaise = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -218,6 +258,35 @@ export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTria
       setError(err instanceof ApiClientError ? err.message : 'Failed to update status');
     } finally {
       setIsUpdatingStatus(false);
+    }
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkStatus = async (status: Status) => {
+    if (selectedIds.size === 0) return;
+    setBulkBusy(status);
+    setError('');
+    try {
+      const result = await api.patch<{ succeeded: string[]; failed: { ticketId: string; reason: string }[] }>(
+        '/tickets/bulk/status',
+        { ticketIds: [...selectedIds], status },
+      );
+      if (result.failed.length > 0) {
+        setError(`${result.succeeded.length} updated, ${result.failed.length} failed: ${result.failed[0]?.reason ?? ''}`);
+      }
+      setSelectedIds(new Set());
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Bulk update failed');
+    } finally {
+      setBulkBusy(null);
     }
   };
 
@@ -412,7 +481,7 @@ export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTria
           </form>
         )}
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as Status | '')}
@@ -423,6 +492,21 @@ export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTria
               <option key={s} value={s}>{STATUS_LABELS[s]}</option>
             ))}
           </select>
+          {/* Who raised it — School Admin vs Teacher vs Student (item #25).
+              Only useful to the roles that triage across other people's
+              tickets in the first place. */}
+          {canTriage && (
+            <select
+              value={roleFilter}
+              onChange={(e) => { setRoleFilter(e.target.value as RaisedRole | ''); setSelectedIds(new Set()); }}
+              className="text-[11px] font-bold border border-slate-200 rounded-xl px-3 py-2 outline-none cursor-pointer"
+            >
+              <option value="">All roles</option>
+              {RAISED_ROLE_FILTER_OPTIONS.map((r) => (
+                <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+              ))}
+            </select>
+          )}
           {showSchoolFilter && (
             <select
               value={schoolFilter}
@@ -436,6 +520,29 @@ export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTria
             </select>
           )}
         </div>
+
+        {/* Same issue, several tickets — set them all at once (item #29). */}
+        {canTriage && selectedIds.size > 0 && (
+          <div className="flex items-center gap-2 flex-wrap bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5">
+            <span className="text-[11px] font-bold text-slate-500">{selectedIds.size} selected</span>
+            {(Object.keys(STATUS_LABELS) as Status[]).map((s) => (
+              <button
+                key={s}
+                onClick={() => void handleBulkStatus(s)}
+                disabled={bulkBusy !== null}
+                className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-slate-400 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {bulkBusy === s ? <Loader2 size={11} className="animate-spin" /> : null} Mark {STATUS_LABELS[s]}
+              </button>
+            ))}
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="ml-auto text-[11px] font-semibold text-slate-400 hover:text-slate-600 cursor-pointer"
+            >
+              Clear
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
@@ -446,23 +553,40 @@ export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTria
         ) : (
           <div className="flex flex-col gap-2">
             {tickets.map((t) => (
-              <button
+              <div
                 key={t.id}
-                onClick={() => void openTicket(t.id)}
-                className="flex items-center justify-between gap-4 p-4 rounded-2xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition-all text-left cursor-pointer"
+                className="flex items-center gap-3 p-4 rounded-2xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition-all"
               >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_STYLES[t.status]}`}>{STATUS_LABELS[t.status]}</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${accent.chip}`}>{CATEGORY_LABELS[t.category]}</span>
-                    {t.escalated_to_super && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-600">Escalated</span>}
+                {canTriage && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); toggleSelected(t.id); }}
+                    aria-label={selectedIds.has(t.id) ? 'Deselect ticket' : 'Select ticket'}
+                    className="shrink-0 cursor-pointer text-slate-300 hover:text-slate-500"
+                  >
+                    {selectedIds.has(t.id) ? <CheckSquare size={16} className={accent.text} /> : <Square size={16} />}
+                  </button>
+                )}
+                <button
+                  onClick={() => void openTicket(t.id)}
+                  className="flex-1 min-w-0 flex items-center justify-between gap-4 text-left cursor-pointer"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_STYLES[t.status]}`}>{STATUS_LABELS[t.status]}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${accent.chip}`}>{CATEGORY_LABELS[t.category]}</span>
+                      {canTriage && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">{ROLE_LABELS[t.raised_role]}</span>
+                      )}
+                      {t.escalated_to_super && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-600">Escalated</span>}
+                    </div>
+                    <span className="font-semibold text-sm text-slate-800 block truncate">{t.subject}</span>
+                    <span className="text-[11px] text-slate-400">
+                      {t.raiser?.full_name ?? 'Unknown'} {showSchoolFilter && t.schools ? `· ${t.schools.name}` : ''} · {new Date(t.created_at).toLocaleDateString()}
+                    </span>
                   </div>
-                  <span className="font-semibold text-sm text-slate-800 block truncate">{t.subject}</span>
-                  <span className="text-[11px] text-slate-400">
-                    {t.raiser?.full_name ?? 'Unknown'} {showSchoolFilter && t.schools ? `· ${t.schools.name}` : ''} · {new Date(t.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-              </button>
+                </button>
+              </div>
             ))}
           </div>
         )}

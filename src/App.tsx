@@ -88,7 +88,7 @@ import { SuperAdminTickets } from './routes/super-admin/Tickets';
 import { SuperAdminSchoolDetail } from './routes/super-admin/SchoolDetail';
 import { SuperAdminSchoolOnboarding } from './routes/super-admin/SchoolOnboarding';
 import { SuperAdminAuditLog } from './routes/super-admin/AuditLog';
-import { SuperAdminStudents } from './routes/super-admin/Students';
+import { AccountSettings } from './components/shared/AccountSettings';
 
 // Import Teacher Pages
 import { TeacherLayout } from './routes/teacher/Layout';
@@ -109,15 +109,14 @@ import { SchoolAdminDashboard } from './routes/school-admin/Dashboard';
 import { SchoolAdminClassesSections } from './routes/school-admin/ClassesSections';
 import { SchoolAdminStudents } from './routes/school-admin/Students';
 import { SchoolAdminTeachers } from './routes/school-admin/Teachers';
-import { SchoolAdminLabIncharges } from './routes/school-admin/LabIncharges';
-import { SchoolAdminLabs } from './routes/school-admin/Labs';
 import { SchoolAdminTimetable } from './routes/school-admin/Timetable';
-import { SchoolAdminFeatureToggles } from './routes/school-admin/FeatureToggles';
-import { SchoolAdminPrincipalReport } from './routes/school-admin/PrincipalReport';
 import { SchoolAdminPromotion } from './routes/school-admin/Promotion';
 import { SchoolAdminTickets } from './routes/school-admin/Tickets';
 import { SchoolAdminContentLibrary } from './routes/school-admin/ContentLibrary';
-import { SchoolAdminBranding } from './routes/school-admin/Branding';
+// Labs, Lab In-charges, Feature Toggles, Branding and Principal Report are
+// hidden + route-blocked (see Layout.tsx's *_ENABLED flags, UI testing pass
+// Aug 24 2026, items #58/#65/#66/#67/#68) — components kept on disk,
+// reversible, just not imported while off.
 
 // Import Lab In-charge Pages
 import { LabInchargeLayout } from './routes/lab-incharge/Layout';
@@ -267,15 +266,17 @@ function App() {
               <Route path="classes" element={<SchoolAdminClassesSections />} />
               <Route path="students" element={<SchoolAdminStudents />} />
               <Route path="teachers" element={<SchoolAdminTeachers />} />
-              <Route path="lab-incharges" element={<SchoolAdminLabIncharges />} />
-              <Route path="labs" element={<SchoolAdminLabs />} />
+              {/* Removed from nav — items #58/#65/#66/#67/#68. Routes blocked, not deleted. */}
+              <Route path="lab-incharges" element={<Navigate to="/school-admin/dashboard" replace />} />
+              <Route path="labs" element={<Navigate to="/school-admin/dashboard" replace />} />
+              <Route path="feature-toggles" element={<Navigate to="/school-admin/dashboard" replace />} />
+              <Route path="branding" element={<Navigate to="/school-admin/profile" replace />} />
+              <Route path="principal-report" element={<Navigate to="/school-admin/dashboard" replace />} />
               <Route path="timetable" element={<SchoolAdminTimetable />} />
               <Route path="content" element={<SchoolAdminContentLibrary />} />
-              <Route path="feature-toggles" element={<SchoolAdminFeatureToggles />} />
-              <Route path="branding" element={<SchoolAdminBranding />} />
-              <Route path="principal-report" element={<SchoolAdminPrincipalReport />} />
               <Route path="promotion" element={<SchoolAdminPromotion />} />
               <Route path="tickets" element={<SchoolAdminTickets />} />
+              <Route path="profile" element={<AccountSettings />} />
             </Route>
 
             {/* Super Admin Portal Routes */}
@@ -294,11 +295,16 @@ function App() {
               {/* Declared before :schoolId so "new" isn't captured as an id. */}
               <Route path="schools/new" element={<SuperAdminSchoolOnboarding />} />
               <Route path="schools/:schoolId" element={<SuperAdminSchoolDetail />} />
-              <Route path="students" element={<SuperAdminStudents />} />
+              {/* Removed from the nav and blocked as a direct URL too — a Super
+                  Admin browsing student data cross-school was judged a real
+                  privacy risk, not just clutter (UI feedback Aug 24 2026).
+                  SuperAdminStudents.tsx is left unused rather than deleted. */}
+              <Route path="students" element={<Navigate to="/super-admin/overview" replace />} />
               <Route path="content" element={<SuperAdminContentPortal />} />
               <Route path="ai-console" element={<SuperAdminAiConsole />} />
               <Route path="tickets" element={<SuperAdminTickets />} />
               <Route path="audit-log" element={<SuperAdminAuditLog />} />
+              <Route path="profile" element={<AccountSettings />} />
             </Route>
 
             {/* Lab In-charge Portal Routes */}

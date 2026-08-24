@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { loginSchema, pinLoginSchema, pinRosterQuerySchema } from '../schemas/auth.schema.js';
+import { loginSchema, pinLoginSchema, pinRosterQuerySchema, changePasswordSchema } from '../schemas/auth.schema.js';
 import * as authService from '../services/auth.service.js';
 import { ApiError } from '../lib/errors.js';
 import { supabaseAdmin } from '../lib/supabase.js';
@@ -50,6 +50,17 @@ export async function pinLoginController(req: Request, res: Response, next: Next
   }
 }
 
+export async function changePasswordController(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.user) throw new ApiError('UNAUTHORIZED', 'Not authenticated');
+    const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
+    await authService.changeOwnPassword(req.user, currentPassword, newPassword);
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function meController(req: Request, res: Response, next: NextFunction) {
   try {
     if (!req.user) throw new ApiError('UNAUTHORIZED', 'Not authenticated');
@@ -80,6 +91,7 @@ export async function meController(req: Request, res: Response, next: NextFuncti
 
     res.json({
       ...data,
+      email: req.user.email,
       features,
       school: schoolRow
         ? { name: schoolRow.name, code: schoolRow.code, logoPath: schoolRow.logo_path }

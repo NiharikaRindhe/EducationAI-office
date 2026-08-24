@@ -37,6 +37,7 @@ export interface AuthUser {
   role: Role;
   school_id: string | null;
   full_name: string;
+  email: string | null;
   student_profiles: StudentProfile | null;
   features: FeatureKey[];
   school: AuthSchool | null;

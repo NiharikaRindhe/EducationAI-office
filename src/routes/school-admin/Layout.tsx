@@ -3,6 +3,17 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar, NavItem } from '../../components/shared/Sidebar';
 import { TopBar } from '../../components/shared/TopBar';
 
+// Kept intact and reversible, just off the nav and blocked at the route level
+// in App.tsx (see the comment there for the sheet items behind each one):
+// Labs (#58), Lab In-charges (#65), Feature Toggles (#66 — same "every school
+// gets every feature" call as Super Admin's #10), School Branding (#67 — its
+// logo upload moved into Profile & Settings), Principal Report (#68).
+const LABS_ENABLED = false;
+const LAB_INCHARGES_ENABLED = false;
+const FEATURE_TOGGLES_ENABLED = false;
+const BRANDING_ENABLED = false;
+const PRINCIPAL_REPORT_ENABLED = false;
+
 export const SchoolAdminLayout: React.FC = () => {
   const location = useLocation();
 
@@ -11,28 +22,29 @@ export const SchoolAdminLayout: React.FC = () => {
     { href: '/school-admin/classes', label: 'Classes & Sections', iconName: 'view_module' },
     { href: '/school-admin/students', label: 'Students', iconName: 'groups' },
     { href: '/school-admin/teachers', label: 'Teachers', iconName: 'school' },
-    { href: '/school-admin/labs', label: 'Labs', iconName: 'science' },
+    LABS_ENABLED ? { href: '/school-admin/labs', label: 'Labs', iconName: 'science' } : null,
     { href: '/school-admin/timetable', label: 'Timetable', iconName: 'calendar_month' },
     { href: '/school-admin/content', label: 'Content Library', iconName: 'menu_book' },
-    { href: '/school-admin/lab-incharges', label: 'Lab In-charges', iconName: 'support_agent' },
-    { href: '/school-admin/feature-toggles', label: 'Feature Toggles', iconName: 'toggle_on' },
-    { href: '/school-admin/branding', label: 'School Branding', iconName: 'image' },
-    { href: '/school-admin/principal-report', label: 'Principal Report', iconName: 'summarize' },
-    { href: '/school-admin/promotion', label: 'Promotion Wizard', iconName: 'trending_up' },
+    LAB_INCHARGES_ENABLED ? { href: '/school-admin/lab-incharges', label: 'Lab In-charges', iconName: 'support_agent' } : null,
+    FEATURE_TOGGLES_ENABLED ? { href: '/school-admin/feature-toggles', label: 'Feature Toggles', iconName: 'toggle_on' } : null,
+    BRANDING_ENABLED ? { href: '/school-admin/branding', label: 'School Branding', iconName: 'image' } : null,
+    PRINCIPAL_REPORT_ENABLED ? { href: '/school-admin/principal-report', label: 'Principal Report', iconName: 'summarize' } : null,
+    // Renamed from "Promotion Wizard" — same academic-year rollover flow,
+    // named for what it actually does (item #69).
+    { href: '/school-admin/promotion', label: 'Academic Year Rollover', iconName: 'trending_up' },
     { href: '/school-admin/tickets', label: 'Support Tickets', iconName: 'confirmation_number' },
-  ];
+  ].filter((item): item is NavItem => item !== null);
 
   const getHeaderDetails = () => {
     const path = location.pathname;
     if (path.includes('/classes')) return { title: 'Classes & Sections', sub: 'Define sections, assign class teachers and subject teachers.' };
     if (path.includes('/students')) return { title: 'Students', sub: 'Import students, print login slips, manage accounts.' };
     if (path.includes('/teachers')) return { title: 'Teachers', sub: 'Add teachers, reset passwords, then map them to sections on the Classes page.' };
-    if (path.includes('/labs')) return { title: 'Labs', sub: 'Register your computer labs — the timetable schedules sections into these.' };
     if (path.includes('/timetable')) return { title: 'Timetable', sub: 'Build the weekly lab-period grid per section.' };
     if (path.includes('/content')) return { title: 'Content Library', sub: "Upload supplementary books for your school's own AI tutor." };
-    if (path.includes('/lab-incharges')) return { title: 'Lab In-charges', sub: 'Add lab in-charges who can reset logins without touching grades.' };
     if (path.includes('/tickets')) return { title: 'Support Tickets', sub: 'Resolve reported issues, or escalate to the Super Admin.' };
-    if (path.includes('/branding')) return { title: 'School Branding', sub: 'Upload your school logo — it appears for every teacher and student.' };
+    if (path.includes('/promotion')) return { title: 'Academic Year Rollover', sub: 'Promote every class, pass out Class 10, and open the new intake — once per academic year.' };
+    if (path.includes('/profile')) return { title: 'Profile & Settings', sub: 'Your account, password and school branding.' };
     return { title: 'School Admin', sub: 'Set up and manage your school on EduAI.' };
   };
 
@@ -42,7 +54,7 @@ export const SchoolAdminLayout: React.FC = () => {
     <div className="min-h-screen flex bg-slate-50/50">
       <Sidebar navItems={navItems} batchColor="schoolAdmin" logoText="EduAI" />
       <div className="flex-1 flex flex-col min-w-0">
-        <TopBar greeting="Welcome," subtitle={header.sub} batchColor="schoolAdmin" profileHref="/school-admin/dashboard" />
+        <TopBar greeting="Welcome," subtitle={header.sub} batchColor="schoolAdmin" profileHref="/school-admin/profile" />
         <main className="flex-1 p-8 overflow-y-auto max-w-7xl w-full mx-auto">
           <Outlet />
         </main>

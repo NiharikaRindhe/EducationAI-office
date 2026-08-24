@@ -9,6 +9,7 @@ import {
 } from '../lib/platformSettings.js';
 import { writeAuditLog } from './auditLog.service.js';
 import { env } from '../lib/env.js';
+import { getSlotStatus } from '../lib/aiSlots.js';
 
 function envDefaultForTier(tier: (typeof AI_TIERS)[number]): string {
   switch (tier) {
@@ -105,6 +106,9 @@ export async function getAiUsage(query: UsageQuery) {
     if (query.groupBy === 'day') {
       key = r.created_at.slice(0, 10);
       label = key;
+    } else if (query.groupBy === 'month') {
+      key = r.created_at.slice(0, 7);
+      label = key;
     } else if (query.groupBy === 'school') {
       key = r.school_id ?? 'none';
       label = r.schools?.name ?? 'Unattributed';
@@ -124,4 +128,11 @@ export async function getAiUsage(query: UsageQuery) {
     totals,
     series: Array.from(groups.values()).sort((a, b) => a.key.localeCompare(b.key)),
   };
+}
+
+/** Live concurrency toward the upstream AI provider, right now — how hard
+ *  the platform is currently hitting its own shared rate limits (item #23,
+ *  "API hitting"). Distinct from ai_usage_log above, which is historical. */
+export async function getAiCapacity() {
+  return getSlotStatus();
 }

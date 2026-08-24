@@ -292,8 +292,11 @@ export async function listIngestionJobs(
 /** School Admin's own-upload quota, per (class, subject) — keeps their
  *  supplementary library small and curated; more than a couple of competing
  *  books for one subject muddies retrieval instead of improving it. A failed
- *  upload doesn't count against the quota (it never produced usable content). */
-export const SCHOOL_UPLOAD_LIMIT_PER_SUBJECT = 2;
+ *  upload doesn't count against the quota (it never produced usable content).
+ *  Raised 2 -> 3 (Aug 24 2026 UI testing pass, item #64) — still per
+ *  (class, subject), not a flat per-class pool: that axis is what keeps RAG
+ *  retrieval scoped and prevents one subject's uploads crowding out another's. */
+export const SCHOOL_UPLOAD_LIMIT_PER_SUBJECT = 3;
 
 export async function countSchoolUploads(schoolId: string, classNum: number, subject: string) {
   const { count, error } = await supabaseAdmin
@@ -305,6 +308,71 @@ export async function countSchoolUploads(schoolId: string, classNum: number, sub
     .neq('status', 'error');
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to count uploaded books', error.message);
   return count ?? 0;
+}
+
+export interface SchoolUploadUsageRow {
+  schoolId: string;
+  schoolName: string;
+  schoolCode: string;
+  classNum: number;
+  subject: string;
+  used: number;
+  limit: number;
+}
+
+interface UploadUsageJobRow {
+  school_id: string;
+  class_num: number;
+  subject: string;
+  schools: { name: string; code: string } | { name: string; code: string }[] | null;
+}
+
+/**
+ * Every school's own-upload usage against SCHOOL_UPLOAD_LIMIT_PER_SUBJECT,
+ * broken down by (class, subject) — the real quota unit. Powers the Content
+ * Portal's cross-school table and the School Detail page's per-school
+ * breakdown (UI feedback Aug 24 2026, item #5/#7) — this is a completely
+ * separate thing from the AI Console's "Live Capacity" panel, which tracks
+ * concurrent AI requests, not upload counts; don't conflate the two again.
+ *
+ * Pass `schoolId` to scope to one school (School Detail page); omit it for
+ * the platform-wide table (Content Portal). Only (class, subject) pairs with
+ * at least one upload are returned — an empty combination isn't worth a row.
+ */
+export async function getSchoolUploadUsage(schoolId?: string): Promise<SchoolUploadUsageRow[]> {
+  let query = supabaseAdmin
+    .from('ncert_ingestion_jobs')
+    .select('school_id, class_num, subject, schools(name, code)')
+    .not('school_id', 'is', null)
+    .neq('status', 'error');
+  if (schoolId) query = query.eq('school_id', schoolId);
+
+  const { data, error } = await query;
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to load upload usage', error.message);
+
+  const byKey = new Map<string, SchoolUploadUsageRow>();
+  for (const row of (data ?? []) as unknown as UploadUsageJobRow[]) {
+    const key = `${row.school_id}:${row.class_num}:${row.subject}`;
+    const existing = byKey.get(key);
+    if (existing) {
+      existing.used += 1;
+      continue;
+    }
+    const school = Array.isArray(row.schools) ? row.schools[0] : row.schools;
+    byKey.set(key, {
+      schoolId: row.school_id,
+      schoolName: school?.name ?? 'Unknown school',
+      schoolCode: school?.code ?? '',
+      classNum: row.class_num,
+      subject: row.subject,
+      used: 1,
+      limit: SCHOOL_UPLOAD_LIMIT_PER_SUBJECT,
+    });
+  }
+
+  return [...byKey.values()].sort(
+    (a, b) => a.schoolName.localeCompare(b.schoolName) || a.classNum - b.classNum || a.subject.localeCompare(b.subject),
+  );
 }
 
 /** Validates + queues a School Admin's own PDF upload: subject must be

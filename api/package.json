@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "seed:super-admin": "tsx scripts/seedSuperAdmin.ts",
     "seed:school-admin": "tsx scripts/seedSchoolAdmin.ts",
+    "seed:test-roster": "tsx scripts/seedTestRoster.ts",
     "assets:upload-lab": "tsx scripts/uploadLabAssets.ts",
     "test": "vitest run",
     "test:security": "vitest run tests/security.test.ts",

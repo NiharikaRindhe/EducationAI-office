@@ -24,6 +24,7 @@ import {
   getAiSettingsController,
   updateAiSettingsController,
   getAiUsageController,
+  getAiCapacityController,
 } from '../controllers/aiConsole.controller.js';
 import {
   superAdminListController,
@@ -36,6 +37,7 @@ import {
   deleteGlobalQuestionController,
   bulkImportGlobalQuestionsController,
   listIngestionJobsController,
+  getUploadUsageController,
   uploadNcertPdfController,
   updateIngestionJobStatusController,
   retryIngestionJobController,
@@ -97,6 +99,7 @@ superAdminRouter.get('/audit-log/export', exportAuditLogsController);
 superAdminRouter.get('/ai/settings', getAiSettingsController);
 superAdminRouter.patch('/ai/settings', updateAiSettingsController);
 superAdminRouter.get('/ai/usage', getAiUsageController);
+superAdminRouter.get('/ai/capacity', getAiCapacityController);
 
 // ── Class → Subject whitelist ──────────────────────────────────
 superAdminRouter.get('/class-subjects', listClassSubjectsController);
@@ -115,6 +118,7 @@ superAdminRouter.post(
 
 // ── NCERT ingestion ──────────────────────────────────────────
 superAdminRouter.get('/ncert/jobs', listIngestionJobsController);
+superAdminRouter.get('/content/upload-usage', getUploadUsageController);
 superAdminRouter.post('/ncert/upload', upload.single('file'), uploadNcertPdfController);
 // Called by the pipeline worker to report stage progress
 superAdminRouter.patch('/ncert/jobs/:id/status', updateIngestionJobStatusController);

@@ -117,6 +117,16 @@ export async function listIngestionJobsController(req: Request, res: Response, n
   }
 }
 
+export async function getUploadUsageController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const schoolId = typeof req.query.schoolId === 'string' ? req.query.schoolId : undefined;
+    const rows = await contentService.getSchoolUploadUsage(schoolId);
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function uploadNcertPdfController(req: Request, res: Response, next: NextFunction) {
   try {
     if (!req.user) throw new ApiError('UNAUTHORIZED', 'Not authenticated');

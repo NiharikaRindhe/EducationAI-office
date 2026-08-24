@@ -21,7 +21,7 @@ interface SubjectRow {
 }
 
 // Must match SCHOOL_UPLOAD_LIMIT_PER_SUBJECT in api/src/services/superAdminContent.service.ts
-const UPLOAD_LIMIT_PER_SUBJECT = 2;
+const UPLOAD_LIMIT_PER_SUBJECT = 3;
 
 export const SchoolAdminContentLibrary: React.FC = () => {
   const navigate = useNavigate();

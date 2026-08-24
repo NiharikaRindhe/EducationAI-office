@@ -32,3 +32,12 @@ export async function getAiUsageController(req: Request, res: Response, next: Ne
     next(err);
   }
 }
+
+export async function getAiCapacityController(_req: Request, res: Response, next: NextFunction) {
+  try {
+    const capacity = await aiConsoleService.getAiCapacity();
+    res.json(capacity);
+  } catch (err) {
+    next(err);
+  }
+}
