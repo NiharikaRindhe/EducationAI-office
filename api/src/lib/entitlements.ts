@@ -24,6 +24,7 @@ export const FEATURE_KEYS = [
   'pyq_hub',
   'reports_analytics',
   'school_content_upload',
+  'pdf_simulator',
 ] as const;
 
 export type FeatureKey = (typeof FEATURE_KEYS)[number];

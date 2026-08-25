@@ -22,7 +22,8 @@ export type FeatureKey =
   | 'leaderboard'
   | 'pyq_hub'
   | 'reports_analytics'
-  | 'school_content_upload';
+  | 'school_content_upload'
+  | 'pdf_simulator';
 
 /** The signed-in user's school, for branding the portal. Null for
  *  super_admin, who belongs to no school and keeps EduAI's own identity. */
