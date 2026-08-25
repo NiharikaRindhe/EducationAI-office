@@ -16,6 +16,13 @@
     "jsx": "react-jsx",
     "allowJs": true,
     "checkJs": false,
+    // Mirrors the '@sim/shared' alias in vite.config.ts — see that file's
+    // comment for why the PDF simulator's catalog lives under api/.
+    "baseUrl": ".",
+    "paths": {
+      "@sim/shared": ["./api/src/lib/simShared"],
+      "@sim/shared/*": ["./api/src/lib/simShared/*"]
+    },
 
     /* Linting */
     "noUnusedLocals": false,

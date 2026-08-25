@@ -1,0 +1,63 @@
+// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
+export {
+  TEMPLATE_IDS,
+  TEMPLATE_CATALOG,
+  PARAM_SCHEMAS,
+  isTemplateId,
+  parseTemplateParams,
+  randomizeTemplateParams,
+  allowedTemplateIdList,
+  allowedTemplatePrompt,
+  getSim,
+  runSim,
+  type TemplateId,
+  type ParamDef,
+  type ParamOption,
+  type TemplateDefinition,
+  type ParamMetaMap,
+  type SimDomain,
+  type ClassBand,
+} from './catalog.js'
+
+export { bindTemplate, createTemplateSpec, type BindResult } from './bind.js'
+export { matchTemplateFromText, matchKnownTemplateId, type TemplateMatch } from './match.js'
+export {
+  CITATION_RE,
+  citationValues,
+  maskCitations,
+  quantityValues,
+  dropCitationParams,
+} from './citations.js'
+export {
+  solveProjectile,
+  analyticFlatRange,
+  solveCollision1d,
+  pendulumPeriod,
+  rampAcceleration,
+  buoyancyResult,
+  shmPeriod,
+  snellTheta2,
+  lensImageDistance,
+  ohmCurrent,
+  pressure,
+  liquidPressure,
+  seriesReq,
+  parallelReq,
+  heatEnergy,
+  echoTime,
+  workFs,
+  mirrorImage,
+  thinPrismDeviation,
+} from './physics.js'
+export {
+  motionGraphs,
+  apTerm,
+  apSum,
+  complement,
+  supplement,
+  tangentLength,
+  sectorArea,
+  segmentArea,
+  sectionPoint,
+} from './math.js'
+export type { SimFile, SimRunResult } from './contract.js'
