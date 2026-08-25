@@ -46,3 +46,6 @@ backups/
 
 # Reference source the Chemistry Lab was ported from — not app code.
 EducationAI-Games-master/
+
+# Reference source the PDF Simulator was ported from — not app code.
+pdf-simulation-master/
