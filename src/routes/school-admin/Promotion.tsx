@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom';
 import {
   Loader2, AlertTriangle, ChevronRight, CheckCircle, Download, Search,
   ArrowLeft, GraduationCap, RotateCcw, UserPlus, Split,
+  Users, ArrowUpRight, LogOut, SplitSquareHorizontal,
 } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
-import { PortalPageHeader } from '../../components/shared/PortalPageHeader';
+import { MetricCard, PortalPageHeader } from '../../components/shared/PortalPageHeader';
 
 /**
  * Academic-year rollover.
@@ -209,7 +210,7 @@ export const SchoolAdminPromotion: React.FC = () => {
   // ── Completed ──────────────────────────────────────────────
   if (execResult) {
     return (
-      <div className="flex flex-col gap-6 font-sans text-left max-w-3xl mx-auto anim-fade-up">
+      <div className="flex flex-col gap-6 font-sans text-left max-w-4xl mx-auto anim-fade-up">
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {
             body { background: white !important; color: black !important; }
@@ -331,7 +332,7 @@ export const SchoolAdminPromotion: React.FC = () => {
 
   // ── Wizard ─────────────────────────────────────────────────
   return (
-    <div className="flex flex-col gap-6 font-sans text-left max-w-3xl mx-auto anim-fade-up">
+    <div className="flex flex-col gap-5 font-sans text-left anim-fade-up">
       <PortalPageHeader
         eyebrow="Academic operations"
         title="Academic Year Rollover"
@@ -340,7 +341,24 @@ export const SchoolAdminPromotion: React.FC = () => {
             ? `Moves every class up one level for ${preview.nextYear}. Class 10 passes out; Class 1 empties for the new intake.`
             : 'Loading…'
         }
-      />
+      >
+        {preview && (
+          <div className="portal-metrics-grid">
+            <MetricCard label="Active roster" value={preview.eligibleCount} hint="students affected" icon={<Users size={18} />} />
+            <MetricCard label="Moving up a class" value={preview.eligibleCount - preview.class10Count} hint="Classes 1–9" icon={<ArrowUpRight size={18} />} tone="indigo" />
+            <MetricCard label="Class 10 leavers" value={preview.class10Count} hint="pass out this run" icon={<LogOut size={18} />} tone="rose" />
+            <MetricCard
+              label="Section decisions"
+              value={preview.sectionDecisionsNeeded}
+              hint={preview.sectionDecisionsNeeded > 0 ? 'need your input' : 'all sections line up'}
+              icon={<SplitSquareHorizontal size={18} />}
+              tone={preview.sectionDecisionsNeeded > 0 ? 'amber' : 'emerald'}
+            />
+          </div>
+        )}
+      </PortalPageHeader>
+
+      <div className="flex flex-col gap-5 max-w-4xl w-full mx-auto">
 
       {errorMsg && (
         <div className="bg-rose-50 border border-rose-100 text-rose-800 rounded-2xl p-4 flex gap-2.5 text-xs font-bold">
@@ -630,6 +648,7 @@ export const SchoolAdminPromotion: React.FC = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

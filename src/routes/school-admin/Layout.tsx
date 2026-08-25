@@ -29,9 +29,11 @@ export const SchoolAdminLayout: React.FC = () => {
     FEATURE_TOGGLES_ENABLED ? { href: '/school-admin/feature-toggles', label: 'Feature Toggles', iconName: 'toggle_on' } : null,
     BRANDING_ENABLED ? { href: '/school-admin/branding', label: 'School Branding', iconName: 'image' } : null,
     PRINCIPAL_REPORT_ENABLED ? { href: '/school-admin/principal-report', label: 'Principal Report', iconName: 'summarize' } : null,
-    // Renamed from "Promotion Wizard" — same academic-year rollover flow,
-    // named for what it actually does (item #69).
-    { href: '/school-admin/promotion', label: 'Academic Year Rollover', iconName: 'trending_up' },
+    // Sheet item #69 restored (Aug 25 2026, user request) — the only feature
+    // that actually handles new Class 1 intake / mid-school promotion /
+    // Class 10 pass-out, so hiding it left no way to run a real academic
+    // year rollover at all. Route unblocked in App.tsx to match.
+    { href: '/school-admin/promotion', label: 'Academic Year Rollover', iconName: 'event_upcoming' },
     { href: '/school-admin/tickets', label: 'Support Tickets', iconName: 'confirmation_number' },
   ].filter((item): item is NavItem => item !== null);
 

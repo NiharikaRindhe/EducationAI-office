@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { Loader2, Plus, AlertCircle, Users, TriangleAlert } from 'lucide-react';
+import { Loader2, Plus, AlertCircle, Users, TriangleAlert, LayoutGrid, UserCheck, UserRoundX, BookOpenCheck } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 import { buildTeacherLabels, duplicateTeacherNames } from '../../lib/teacherLabel';
+import { MetricCard, PortalPageHeader } from '../../components/shared/PortalPageHeader';
 
 interface SectionRow {
   id: string;
@@ -93,6 +94,17 @@ export const SchoolAdminClassesSections: React.FC = () => {
 
   const classesWithSections = useMemo(() => [...sectionsByClass.keys()].sort((a, b) => a - b), [sectionsByClass]);
 
+  // All sections in one flat, sortable list (Class, then Section) rather than
+  // one card-grid per class — a class with a single section no longer wastes
+  // two empty grid columns next to it.
+  const allSectionsSorted = useMemo(
+    () => [...sections].sort((a, b) => a.class_num - b.class_num || a.section_label.localeCompare(b.section_label)),
+    [sections],
+  );
+  const totalStudents = useMemo(() => sections.reduce((sum, s) => sum + s.studentCount, 0), [sections]);
+  const assignedTeacherCount = useMemo(() => sections.filter((s) => s.class_teacher_id).length, [sections]);
+  const totalMappedSubjects = assignments.length;
+
   const assignmentByCell = useMemo(() => {
     const map = new Map<string, AssignmentRow>();
     for (const a of assignments) map.set(`${a.class_section_id}|${a.subject}`, a);
@@ -163,7 +175,26 @@ export const SchoolAdminClassesSections: React.FC = () => {
   const matrixSubjects = matrixClass !== null ? subjects.filter((s) => s.class_num === matrixClass).map((s) => s.subject) : [];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
+      <PortalPageHeader
+        eyebrow="Academic structure"
+        title="Classes & Sections"
+        description="Define which sections each class has this academic year, assign class teachers, then map subject teachers below. Sections are also registered automatically when you import students."
+      >
+        <div className="portal-metrics-grid">
+          <MetricCard label="Sections" value={sections.length} hint={`across ${classesWithSections.length} classes`} icon={<LayoutGrid size={18} />} />
+          <MetricCard label="Students placed" value={totalStudents} hint="in an active section" icon={<Users size={18} />} tone="sky" />
+          <MetricCard
+            label="Class teachers"
+            value={`${assignedTeacherCount}/${sections.length}`}
+            hint={sections.length - assignedTeacherCount > 0 ? `${sections.length - assignedTeacherCount} unassigned` : 'all assigned'}
+            icon={assignedTeacherCount === sections.length && sections.length > 0 ? <UserCheck size={18} /> : <UserRoundX size={18} />}
+            tone={sections.length > 0 && assignedTeacherCount === sections.length ? 'emerald' : 'amber'}
+          />
+          <MetricCard label="Subject mappings" value={totalMappedSubjects} hint="teacher ↔ section ↔ subject" icon={<BookOpenCheck size={18} />} tone="indigo" />
+        </div>
+      </PortalPageHeader>
+
       {error && (
         <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium rounded-xl px-4 py-3 flex items-center gap-2">
           <AlertCircle size={14} /> {error}
@@ -171,69 +202,78 @@ export const SchoolAdminClassesSections: React.FC = () => {
       )}
 
       {/* Add section */}
-      <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm flex flex-col gap-4">
-        <div>
-          <h2 className="font-display font-bold text-lg text-slate-800">Classes &amp; Sections</h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Define which sections each class has this academic year. Sections are also registered automatically when you import students.
-          </p>
-        </div>
-        <form onSubmit={handleAddSection} className="flex items-center gap-3">
+      <div className="portal-toolbar">
+        <span className="text-[12px] font-semibold text-slate-600 shrink-0">Add a section</span>
+        <form onSubmit={handleAddSection} className="flex items-center gap-2.5">
           <select value={newClass} onChange={(e) => setNewClass(Number(e.target.value))}
-            className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs outline-none">
+            className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-[13px] outline-none cursor-pointer focus:border-slate-500">
             {Array.from({ length: 10 }, (_, i) => i + 1).map((c) => <option key={c} value={c}>Class {c}</option>)}
           </select>
           <input required value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Section (e.g. A)" maxLength={4}
-            className="w-36 px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-rose-400 uppercase" />
+            className="w-32 px-3 py-2 bg-white border border-slate-200 rounded-lg text-[13px] outline-none focus:border-slate-500 uppercase" />
           <button type="submit" disabled={isAdding}
-            className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl px-4 py-2.5 transition-all cursor-pointer">
+            className="flex items-center gap-1.5 bg-slate-950 hover:bg-slate-800 disabled:opacity-50 text-white font-semibold text-[13px] rounded-lg px-3.5 py-2 transition-all cursor-pointer">
             {isAdding ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Add Section
           </button>
         </form>
+        <div className="ml-auto rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
+          {sections.length} section{sections.length === 1 ? '' : 's'}
+        </div>
       </div>
 
-      {/* Sections grouped by class, with class-teacher assignment */}
-      <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+      {/* All sections, one dense table — Class + Section, students, class teacher */}
+      <div className="portal-panel">
         {isLoading ? (
-          <div className="flex justify-center py-8"><Loader2 className="animate-spin text-rose-400" /></div>
-        ) : classesWithSections.length === 0 ? (
-          <p className="text-xs text-slate-400 text-center py-8">No sections yet — add one above, or import students and sections will appear automatically.</p>
+          <div className="flex justify-center py-16"><Loader2 className="animate-spin text-slate-400" /></div>
+        ) : allSectionsSorted.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-16 text-slate-400">
+            <LayoutGrid size={28} strokeWidth={1.5} />
+            <p className="text-[13px]">No sections yet — add one above, or import students and sections will appear automatically.</p>
+          </div>
         ) : (
-          <div className="flex flex-col gap-5">
-            {classesWithSections.map((classNum) => (
-              <div key={classNum}>
-                <h3 className="font-display font-bold text-sm text-slate-700 mb-2">Class {classNum}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                  {sectionsByClass.get(classNum)!.map((section) => (
-                    <div key={section.id} className="border border-slate-100 rounded-2xl p-4 flex flex-col gap-2 bg-slate-50/50">
-                      <div className="flex items-center justify-between">
-                        <span className="font-display font-bold text-slate-800">
-                          {classNum}-{section.section_label}
-                        </span>
-                        <span className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
-                          <Users size={11} /> {section.studentCount} student{section.studentCount === 1 ? '' : 's'}
-                        </span>
-                      </div>
-                      <label className="text-[9px] font-label-caps text-slate-400 tracking-wider mt-1">CLASS TEACHER</label>
+          <div className="overflow-x-auto">
+            <table className="portal-table w-full">
+              <thead>
+                <tr className="bg-slate-50 text-left text-[11px] text-slate-500">
+                  <th className="px-4 py-3 uppercase tracking-wider font-semibold whitespace-nowrap">Class &amp; Section</th>
+                  <th className="px-4 py-3 uppercase tracking-wider font-semibold whitespace-nowrap">Students</th>
+                  <th className="px-4 py-3 uppercase tracking-wider font-semibold whitespace-nowrap w-72">Class Teacher</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allSectionsSorted.map((section) => (
+                  <tr key={section.id} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
+                    <td className="px-4 py-2.5 text-[13px] font-semibold text-slate-800 whitespace-nowrap">
+                      Class {section.class_num}
+                      <span className="ml-1.5 inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-bold text-slate-500">
+                        {section.section_label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-[13px] text-slate-600 tabular-nums">
+                      <span className="inline-flex items-center gap-1"><Users size={12} className="text-slate-400" /> {section.studentCount}</span>
+                    </td>
+                    <td className="px-4 py-2.5">
                       <select
                         value={section.class_teacher_id ?? ''}
                         onChange={(e) => void handleClassTeacherChange(section.id, e.target.value)}
-                        className="px-2.5 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-rose-400"
+                        className={`w-full max-w-64 px-2.5 py-1.5 border rounded-lg outline-none text-[13px] focus:border-slate-500 cursor-pointer ${
+                          section.class_teacher_id ? 'bg-white border-slate-200 text-slate-700' : 'bg-amber-50/60 border-amber-200 text-amber-800'
+                        }`}
                       >
                         <option value="">— Not assigned —</option>
                         {teachers.map((t) => <option key={t.id} value={t.id}>{teacherLabels.get(t.id) ?? t.full_name}</option>)}
                       </select>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
 
       {/* Subject-teacher matrix */}
-      <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm flex flex-col gap-4">
+      <div className="portal-panel p-6 flex flex-col gap-4">
         <div>
           <h2 className="font-display font-bold text-lg text-slate-800">Subject Teachers</h2>
           <p className="text-xs text-slate-400 mt-0.5">
