@@ -1,11 +1,11 @@
 import React from 'react';
 import {
-  Search, X, RotateCcw, Trash2, Loader2, Info, FileText, Building2, Globe2, CalendarClock,
+  Search, X, RotateCcw, Trash2, Loader2, Info, FileText, Building2, Globe2, CalendarClock, Sparkles, Ban,
 } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 import { DataTable, type DataTableColumn } from './DataTable';
 import {
-  STATUS_META, jobProgress, formatUploadedAt,
+  STATUS_META, SIM_STATUS_META, jobProgress, formatUploadedAt,
   type BookJob, type BookFilters, type BookLibrary,
 } from '../../lib/bookLibrary';
 
@@ -24,6 +24,10 @@ interface Props {
   showSource?: boolean;
   /** Super Admin: adds the textbook-vs-PYQ filter. */
   showKind?: boolean;
+  /** Super Admin only — enable/disable/retry live under superAdminRouter,
+   *  not schoolAdminRouter, so this column never renders in the School
+   *  Admin's ContentLibrary. */
+  showSimulations?: boolean;
   heading?: string;
   description?: string;
 }
@@ -82,14 +86,96 @@ const StatusCell: React.FC<{ job: BookJob }> = ({ job }) => {
   );
 };
 
+interface SimulationsCellProps {
+  job: BookJob;
+  busy: boolean;
+  onEnable: (job: BookJob) => void;
+  onDisable: (job: BookJob) => void;
+  onRetry: (job: BookJob) => void;
+}
+
+/** sim_status is a separate column from Indexing status above — a book can
+ *  be RAG-ready with simulations off, on, still working, or failed,
+ *  entirely independently of its chunking/embedding progress. */
+const SimulationsCell: React.FC<SimulationsCellProps> = ({ job, busy, onEnable, onDisable, onRetry }) => {
+  const status = job.sim_status ?? 'disabled';
+  const meta = SIM_STATUS_META[status];
+  const canEnable = status === 'disabled' && job.status === 'done';
+  const canDisable = status === 'ready' || status === 'error' || status === 'queued';
+  const canRetry = status === 'error';
+
+  return (
+    <div className="flex min-w-[150px] flex-col gap-1.5">
+      <div className="flex items-center gap-2">
+        <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ring-1 ring-inset ${meta.chip}`} title={meta.hint}>
+          {status === 'running' && <Loader2 size={10} className="animate-spin" />}
+          {meta.label}
+        </span>
+        {status !== 'disabled' && status !== 'ready' && job.sim_pages_total ? (
+          <span className="text-[11px] tabular-nums text-slate-400">
+            {job.sim_pages_done ?? 0}/{job.sim_pages_total}
+          </span>
+        ) : status === 'ready' ? (
+          <span className="text-[11px] tabular-nums text-slate-400">{job.sim_pages_done ?? 0} pages</span>
+        ) : null}
+      </div>
+
+      {status === 'error' && job.sim_error && (
+        <span className="line-clamp-2 max-w-[200px] text-[11px] leading-4 text-rose-500" title={job.sim_error}>
+          {job.sim_error}
+        </span>
+      )}
+
+      <div className="flex items-center gap-1">
+        {canEnable && (
+          <button
+            onClick={() => onEnable(job)}
+            disabled={busy}
+            title="Generate interactive simulations for this book"
+            className="inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-semibold text-indigo-600 transition-colors hover:bg-indigo-50 disabled:opacity-50"
+          >
+            {busy ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />} Enable
+          </button>
+        )}
+        {!canEnable && status === 'disabled' && (
+          <span className="text-[11px] text-slate-300" title="Simulations need the book's RAG indexing to finish first">
+            Waiting on indexing
+          </span>
+        )}
+        {canRetry && (
+          <button
+            onClick={() => onRetry(job)}
+            disabled={busy}
+            title="Retry generating simulations"
+            className="inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-semibold text-slate-500 transition-colors hover:bg-slate-100 disabled:opacity-50"
+          >
+            {busy ? <Loader2 size={11} className="animate-spin" /> : <RotateCcw size={11} />} Retry
+          </button>
+        )}
+        {canDisable && (
+          <button
+            onClick={() => onDisable(job)}
+            disabled={busy}
+            title="Turn off and clear this book's simulations"
+            className="inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-semibold text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
+          >
+            {busy ? <Loader2 size={11} className="animate-spin" /> : <Ban size={11} />} Disable
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export const BookLibraryTable: React.FC<Props> = ({
-  lib, showSource = false, showKind = false,
+  lib, showSource = false, showKind = false, showSimulations = false,
   heading = 'Book library',
   description = 'Status refreshes automatically every few seconds.',
 }) => {
   const [retryingId, setRetryingId] = React.useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<BookJob | null>(null);
   const [deleting, setDeleting] = React.useState(false);
+  const [simActionId, setSimActionId] = React.useState<string | null>(null);
 
   const { setError, reload, basePath } = lib;
 
@@ -102,6 +188,42 @@ export const BookLibraryTable: React.FC<Props> = ({
       setError(err instanceof ApiClientError ? err.message : 'Could not re-process this book');
     } finally {
       setRetryingId(null);
+    }
+  }, [basePath, reload, setError]);
+
+  const handleEnableSimulations = React.useCallback(async (job: BookJob) => {
+    setSimActionId(job.id);
+    try {
+      await api.post(`${basePath}/ncert/jobs/${job.id}/simulations`);
+      await reload();
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Could not enable simulations for this book');
+    } finally {
+      setSimActionId(null);
+    }
+  }, [basePath, reload, setError]);
+
+  const handleDisableSimulations = React.useCallback(async (job: BookJob) => {
+    setSimActionId(job.id);
+    try {
+      await api.delete(`${basePath}/ncert/jobs/${job.id}/simulations`);
+      await reload();
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Could not disable simulations for this book');
+    } finally {
+      setSimActionId(null);
+    }
+  }, [basePath, reload, setError]);
+
+  const handleRetrySimulations = React.useCallback(async (job: BookJob) => {
+    setSimActionId(job.id);
+    try {
+      await api.post(`${basePath}/ncert/jobs/${job.id}/simulations/retry`);
+      await reload();
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Could not retry simulations for this book');
+    } finally {
+      setSimActionId(null);
     }
   }, [basePath, reload, setError]);
 
@@ -178,8 +300,24 @@ export const BookLibraryTable: React.FC<Props> = ({
       });
     }
 
+    cols.push({ key: 'status', header: 'Indexing status', sortKey: 'status', render: (job) => <StatusCell job={job} /> });
+
+    if (showSimulations) {
+      cols.push({
+        key: 'simulations', header: 'Simulations', hideOnMobile: true,
+        render: (job) => (
+          <SimulationsCell
+            job={job}
+            busy={simActionId === job.id}
+            onEnable={(j) => void handleEnableSimulations(j)}
+            onDisable={(j) => void handleDisableSimulations(j)}
+            onRetry={(j) => void handleRetrySimulations(j)}
+          />
+        ),
+      });
+    }
+
     cols.push(
-      { key: 'status', header: 'Indexing status', sortKey: 'status', render: (job) => <StatusCell job={job} /> },
       {
         key: 'created', header: 'Uploaded', sortKey: 'created', hideOnMobile: true,
         render: (job) => <span className="whitespace-nowrap text-slate-500">{formatUploadedAt(job.created_at)}</span>,
@@ -215,7 +353,7 @@ export const BookLibraryTable: React.FC<Props> = ({
     );
 
     return cols;
-  }, [showSource, retryingId, handleRetry]);
+  }, [showSource, showSimulations, retryingId, handleRetry, simActionId, handleEnableSimulations, handleDisableSimulations, handleRetrySimulations]);
 
   const classesPresent = React.useMemo(
     () => [...new Set(lib.all.map((j) => j.class_num))].sort((a, b) => a - b),

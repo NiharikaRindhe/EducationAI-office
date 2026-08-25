@@ -257,6 +257,7 @@ export const SuperAdminContentPortal: React.FC = () => {
             lib={lib}
             showSource
             showKind
+            showSimulations
             heading="Platform library"
             description="Every book and previous year paper on the platform. Status refreshes automatically."
           />

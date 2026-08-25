@@ -12,6 +12,12 @@ import { api, ApiClientError } from './api';
 
 export type JobStatus = 'queued' | 'chunking' | 'embedding' | 'done' | 'error';
 
+/** PDF simulator lifecycle — decoupled from JobStatus above on purpose:
+ *  a book reaching 'done' (RAG-ready) and its simulations reaching 'ready'
+ *  are two different pipelines that must not block each other. See
+ *  migration 20250101000186_pdf_simulator.sql. */
+export type SimStatus = 'disabled' | 'queued' | 'running' | 'ready' | 'error';
+
 export interface BookJob {
   id: string;
   class_num: number;
@@ -33,6 +39,10 @@ export interface BookJob {
   is_pyq?: boolean;
   pyq_year?: number | null;
   pyq_source?: string | null;
+  sim_status?: SimStatus;
+  sim_pages_total?: number | null;
+  sim_pages_done?: number;
+  sim_error?: string | null;
 }
 
 /** Must match the multer ceiling in api/src/routes/{super,school}Admin.routes.ts. */
@@ -61,6 +71,16 @@ export const STATUS_META: Record<JobStatus, {
 };
 
 export const PIPELINE_STEPS = ['Queued', 'Extract', 'Index', 'Ready'] as const;
+
+/** A separate indicator, not a fifth pipeline step — sim_status is its own
+ *  column, checked independently of the RAG rail above. */
+export const SIM_STATUS_META: Record<SimStatus, { label: string; hint: string; chip: string }> = {
+  disabled: { label: 'Off',      hint: 'Simulations are not enabled for this book',            chip: 'bg-slate-100 text-slate-500 ring-slate-200' },
+  queued:   { label: 'Queued',   hint: 'Waiting for the simulating worker to pick it up',       chip: 'bg-slate-100 text-slate-600 ring-slate-200' },
+  running:  { label: 'Working',  hint: 'Classifying pages into simulations',                    chip: 'bg-amber-50 text-amber-700 ring-amber-200' },
+  ready:    { label: 'Ready',    hint: 'Students can see simulations from this book',            chip: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+  error:    { label: 'Failed',   hint: 'The simulating pass stopped — retry to try again',       chip: 'bg-rose-50 text-rose-700 ring-rose-200' },
+};
 
 /** A single 0-100 number for the row's progress bar. */
 export function jobProgress(job: BookJob): number {
