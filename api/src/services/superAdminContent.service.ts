@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
+import { logger } from '../lib/logger.js';
 import { tryEmbedText } from '../lib/ai.js';
 import { extractPdf, parseChapterMap } from '../lib/pdfExtract.js';
 import { requireWhitelistedSubject } from '../lib/classSubjects.js';
@@ -277,7 +278,7 @@ export async function listIngestionJobs(
     // schools(name): only resolves for a school-uploaded job (school_id set) —
     // lets the Super Admin's merged view tell "platform" and school uploads
     // apart, since both now live in the same table.
-    .select('id, class_num, subject, book_title, original_filename, status, total_pages, chunks_created, chunks_embedded, error_message, chapters_detected, uploaded_by, school_id, is_pyq, pyq_year, pyq_source, created_at, updated_at, schools(name)');
+    .select('id, class_num, subject, book_title, original_filename, status, total_pages, chunks_created, chunks_embedded, error_message, chapters_detected, uploaded_by, school_id, is_pyq, pyq_year, pyq_source, sim_status, sim_pages_total, sim_pages_done, sim_error, created_at, updated_at, schools(name)');
 
   if (filters.classNum !== undefined) query = query.eq('class_num', filters.classNum);
   if (filters.subject) query = query.eq('subject', filters.subject);
@@ -626,6 +627,21 @@ export async function runIngestionPipeline(jobId: string) {
     const chaptersDetected = extracted.chunks.length > 0 && extracted.chunks.some((c) => c.chapterNum !== null);
 
     await updateIngestionJobStatus(jobId, { status: 'done', chunksEmbedded: embedded, chaptersDetected });
+
+    // Auto-queue simulations for the platform library only — a school's own
+    // upload needs a Super Admin to opt in (enableSimulations below), so an
+    // arbitrary school PDF can't quietly burn LLM budget. Scoped to Maths/
+    // Science: the sim template catalog only covers STEM. Never blocks RAG
+    // readiness above — this is a separate queue (sim_status), picked up by
+    // the sim worker on its own schedule.
+    if (!job.school_id && job.class_num >= 5 && job.class_num <= 10 && ['Mathematics', 'Science'].includes(job.subject)) {
+      const { error: queueError } = await supabaseAdmin
+        .from('ncert_ingestion_jobs')
+        .update({ sim_status: 'queued' })
+        .eq('id', jobId)
+        .eq('sim_status', 'disabled'); // don't re-queue a book already simulated/simulating/errored
+      if (queueError) logger.warn({ error: queueError.message, jobId }, '[ingest] failed to auto-queue simulations');
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await updateIngestionJobStatus(jobId, { status: 'error', errorMessage: message }).catch(() => {});
@@ -640,13 +656,16 @@ export async function runIngestionPipeline(jobId: string) {
 export async function deleteIngestionJob(jobId: string, actorId: string) {
   const { data: job, error: jobError } = await supabaseAdmin
     .from('ncert_ingestion_jobs')
-    .select('id, class_num, subject, book_title, storage_path, status, school_id')
+    .select('id, class_num, subject, book_title, storage_path, status, sim_status, school_id')
     .eq('id', jobId)
     .maybeSingle();
   if (jobError) throw new ApiError('INTERNAL_ERROR', 'Failed to load ingestion job', jobError.message);
   if (!job) throw new ApiError('NOT_FOUND', 'Ingestion job not found');
   if (job.status === 'chunking' || job.status === 'embedding') {
     throw new ApiError('VALIDATION_ERROR', 'Cannot delete a job that is currently being processed');
+  }
+  if (job.sim_status === 'running') {
+    throw new ApiError('VALIDATION_ERROR', 'Cannot delete a book while its simulations are being generated');
   }
 
   // school_id is part of the match — see the matching comment in
@@ -699,7 +718,7 @@ export async function deleteIngestionJob(jobId: string, actorId: string) {
 export async function retryIngestionJob(jobId: string) {
   const { data: job } = await supabaseAdmin
     .from('ncert_ingestion_jobs')
-    .select('id, status, storage_path')
+    .select('id, status, sim_status, storage_path')
     .eq('id', jobId)
     .maybeSingle();
   if (!job) throw new ApiError('NOT_FOUND', 'Ingestion job not found');
@@ -707,5 +726,97 @@ export async function retryIngestionJob(jobId: string) {
   if (job.status === 'chunking' || job.status === 'embedding') {
     throw new ApiError('VALIDATION_ERROR', 'Job is currently being processed');
   }
+  if (job.sim_status === 'running') {
+    throw new ApiError('VALIDATION_ERROR', 'Cannot retry while its simulations are being generated');
+  }
   return updateIngestionJobStatus(jobId, { status: 'queued', errorMessage: '' });
+}
+
+// ─────────────────────────────────────────────────────────────
+//  PDF SIMULATOR — Super Admin controls.
+//
+//  Platform books (school_id IS NULL) for classes 5-10 Maths/Science are
+//  auto-queued at the end of runIngestionPipeline above; these three
+//  functions are the manual override — enabling a school's own upload
+//  (never automatic, see the auto-queue comment for why), disabling a
+//  book's simulations, and retrying a failed pass.
+// ─────────────────────────────────────────────────────────────
+
+async function requireIngestionJob(jobId: string) {
+  const { data: job, error } = await supabaseAdmin
+    .from('ncert_ingestion_jobs')
+    .select('id, status, sim_status, class_num, subject')
+    .eq('id', jobId)
+    .maybeSingle();
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to load ingestion job', error.message);
+  if (!job) throw new ApiError('NOT_FOUND', 'Ingestion job not found');
+  return job;
+}
+
+export async function enableSimulations(jobId: string, actorId: string) {
+  const job = await requireIngestionJob(jobId);
+  if (job.status !== 'done') {
+    throw new ApiError('VALIDATION_ERROR', 'The book must finish indexing (RAG) before simulations can run on it');
+  }
+  if (job.sim_status === 'running') {
+    throw new ApiError('VALIDATION_ERROR', 'Simulations are already being generated for this book');
+  }
+
+  const { error } = await supabaseAdmin
+    .from('ncert_ingestion_jobs')
+    .update({ sim_status: 'queued', sim_error: null })
+    .eq('id', jobId);
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to enable simulations', error.message);
+
+  await writeAuditLog({
+    schoolId: null,
+    actorId,
+    action: 'ingestion_job.simulations_enabled',
+    entity: 'ncert_ingestion_job',
+    entityId: jobId,
+  });
+  return { enabled: true };
+}
+
+/** Turns simulations off and clears everything generated for this book —
+ *  cascades via sim_annotations/sim_pages' FK to ncert_ingestion_jobs, so
+ *  this is a plain status flip plus an explicit annotations/pages wipe
+ *  (the row itself isn't deleted, only its simulation content). */
+export async function disableSimulations(jobId: string, actorId: string) {
+  await requireIngestionJob(jobId);
+
+  await supabaseAdmin.from('sim_annotations').delete().eq('job_id', jobId);
+  await supabaseAdmin.from('sim_pages').delete().eq('job_id', jobId);
+  const { error } = await supabaseAdmin
+    .from('ncert_ingestion_jobs')
+    .update({ sim_status: 'disabled', sim_pages_total: null, sim_pages_done: 0, sim_error: null })
+    .eq('id', jobId);
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to disable simulations', error.message);
+
+  await writeAuditLog({
+    schoolId: null,
+    actorId,
+    action: 'ingestion_job.simulations_disabled',
+    entity: 'ncert_ingestion_job',
+    entityId: jobId,
+  });
+  return { disabled: true };
+}
+
+/** Re-queues a failed simulating pass. Same idempotent re-run as the
+ *  worker's own delete-then-insert, so this is safe to call repeatedly. */
+export async function retrySimulations(jobId: string) {
+  const job = await requireIngestionJob(jobId);
+  if (job.sim_status === 'running') {
+    throw new ApiError('VALIDATION_ERROR', 'Simulations are already being generated for this book');
+  }
+  if (job.sim_status === 'disabled') {
+    throw new ApiError('VALIDATION_ERROR', 'Enable simulations for this book first');
+  }
+  const { error } = await supabaseAdmin
+    .from('ncert_ingestion_jobs')
+    .update({ sim_status: 'queued', sim_error: null })
+    .eq('id', jobId);
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to retry simulations', error.message);
+  return { retried: true };
 }

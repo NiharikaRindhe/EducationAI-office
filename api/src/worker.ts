@@ -4,6 +4,7 @@ import { logger } from './lib/logger.js';
 import { startStreakResetJob } from './jobs/streakReset.job.js';
 import { startLeaderboardRecomputeJob } from './jobs/leaderboardRecompute.job.js';
 import { startIngestionWorker, stopIngestionWorker } from './jobs/ingestionWorker.job.js';
+import { startSimWorker, stopSimWorker } from './jobs/simWorker.job.js';
 import { startExamSweeper, stopExamSweeper } from './jobs/examSweeper.job.js';
 
 // ─────────────────────────────────────────────────────────────
@@ -36,6 +37,9 @@ import { startExamSweeper, stopExamSweeper } from './jobs/examSweeper.job.js';
 startStreakResetJob();
 startLeaderboardRecomputeJob();
 startIngestionWorker();
+// Its own decoupled queue (sim_status, not status) — see simWorker.job.ts's
+// header comment for why this never blocks RAG readiness.
+startSimWorker();
 startExamSweeper();
 
 // Minimal health endpoint so Docker/orchestrators can tell a live worker from
@@ -61,6 +65,7 @@ async function shutdown(signal: string) {
   healthServer.close();
   stopExamSweeper();
   await stopIngestionWorker();
+  await stopSimWorker();
   logger.info('Worker stopped cleanly');
   process.exit(0);
 }

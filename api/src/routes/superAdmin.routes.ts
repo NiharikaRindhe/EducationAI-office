@@ -15,6 +15,8 @@ import {
   exportAuditLogsController,
   getSchoolEntitlementsController,
   setSchoolEntitlementsController,
+  deleteSchoolController,
+  supportLookupController,
 } from '../controllers/superAdmin.controller.js';
 import {
   uploadSchoolLogoController,
@@ -37,6 +39,9 @@ import {
   updateIngestionJobStatusController,
   retryIngestionJobController,
   deleteIngestionJobController,
+  enableSimulationsController,
+  disableSimulationsController,
+  retrySimulationsController,
 } from '../controllers/superAdminContent.controller.js';
 import {
   listClassSubjectsController,
@@ -62,12 +67,16 @@ superAdminRouter.use(requireAuth, requireRole('super_admin'));
 // ── Overview ────────────────────────────────────────────────
 superAdminRouter.get('/overview', getOverviewController);
 
+// Narrow, audited lookup for ticket solving (sheet item #2).
+superAdminRouter.get('/support/lookup', supportLookupController);
+
 // ── Schools ─────────────────────────────────────────────────
 superAdminRouter.get('/schools', listSchoolsController);
 superAdminRouter.post('/schools', createSchoolController);
 superAdminRouter.get('/schools/:id', getSchoolDetailController);
 superAdminRouter.patch('/schools/:id', updateSchoolController);
 superAdminRouter.patch('/schools/:id/active', setSchoolActiveController);
+superAdminRouter.delete('/schools/:id', deleteSchoolController);
 superAdminRouter.post('/schools/:id/admins', addSchoolAdminController);
 superAdminRouter.post('/schools/:id/admins/:userId/reset-password', resetSchoolAdminPasswordController);
 
@@ -123,4 +132,11 @@ superAdminRouter.patch('/ncert/jobs/:id/status', updateIngestionJobStatusControl
 // Re-queue a failed/finished job — the worker re-runs it idempotently
 superAdminRouter.post('/ncert/jobs/:id/retry', retryIngestionJobController);
 superAdminRouter.delete('/ncert/jobs/:id', deleteIngestionJobController);
+
+// PDF simulator — platform books auto-queue at ingest (see the auto-queue
+// comment in superAdminContent.service.ts); these are the manual override
+// for a school's own upload, or for disabling/retrying a book's sims.
+superAdminRouter.post('/ncert/jobs/:id/simulations', enableSimulationsController);
+superAdminRouter.delete('/ncert/jobs/:id/simulations', disableSimulationsController);
+superAdminRouter.post('/ncert/jobs/:id/simulations/retry', retrySimulationsController);
 

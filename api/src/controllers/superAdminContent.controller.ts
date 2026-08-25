@@ -232,6 +232,38 @@ export async function retryIngestionJobController(req: Request, res: Response, n
   }
 }
 
+export async function enableSimulationsController(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.user) throw new ApiError('UNAUTHORIZED', 'Not authenticated');
+    const { id } = req.params;
+    if (!id) throw new ApiError('VALIDATION_ERROR', 'Missing job id');
+    res.json(await contentService.enableSimulations(id, req.user.id));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function disableSimulationsController(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.user) throw new ApiError('UNAUTHORIZED', 'Not authenticated');
+    const { id } = req.params;
+    if (!id) throw new ApiError('VALIDATION_ERROR', 'Missing job id');
+    res.json(await contentService.disableSimulations(id, req.user.id));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function retrySimulationsController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    if (!id) throw new ApiError('VALIDATION_ERROR', 'Missing job id');
+    res.json(await contentService.retrySimulations(id));
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function updateIngestionJobStatusController(req: Request, res: Response, next: NextFunction) {
   try {
     const { id } = req.params;

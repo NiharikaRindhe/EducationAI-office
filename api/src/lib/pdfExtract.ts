@@ -351,6 +351,80 @@ export async function extractPdf(pdfBuffer: Buffer, opts: ExtractOptions = {}): 
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+//  PER-PAGE TEXT — the PDF simulator's ingestion input.
+//
+//  Ported contract from pdf-simulation-master/server/src/services/pdf/
+//  extract.ts (`extractPdfStructure`, pdfjs-based there): one entry per
+//  page, in order, no gaps — { pageNumber, text, wordCount }. Nothing
+//  downstream (page ingestion, chat/explain grounding) reads coordinates,
+//  so this reuses extractPageContent()'s already-sorted, already
+//  Private-Use-Area-stripped line list rather than pulling in pdfjs-dist
+//  as a second PDF library on the server.
+// ─────────────────────────────────────────────────────────────
+
+export interface ExtractedPage {
+  pageNumber: number;
+  text: string;
+  wordCount: number;
+}
+
+/** Hyphenation repair across a line break ("accele-\nration" ->
+ *  "acceleration") plus whitespace collapse — the same normalization
+ *  upstream's normalizePageText() did, kept minimal since this text is
+ *  read by an LLM, not re-parsed structurally. */
+function joinLinesToPageText(lines: PageLine[]): string {
+  const joined = lines.map((l) => l.text).join('\n');
+  return joined
+    .replace(/(\p{L})-\n(\p{L})/gu, '$1$2')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+export function countWords(text: string): number {
+  const trimmed = text.trim();
+  return trimmed ? trimmed.split(/\s+/).length : 0;
+}
+
+/** A page below this word count (cover, blank, table-of-contents entry,
+ *  copyright page) is not worth spending an LLM classification call on —
+ *  ported threshold from pdf-simulation-master's shouldClassify(). */
+export function shouldClassify(pageText: string, minWords = 100): boolean {
+  return Boolean(pageText) && countWords(pageText) >= minWords;
+}
+
+/** One row per page, text only — the simulating pass's extraction stage.
+ *  Independent of extractPdf() above: no chunking, no chapter tagging, no
+ *  figures. A page that fails to extract still gets a row (empty text)
+ *  so page numbers stay contiguous for the caller's sim_pages upsert. */
+export async function extractPageTexts(pdfBuffer: Buffer): Promise<ExtractedPage[]> {
+  const doc = mupdf.Document.openDocument(pdfBuffer, 'application/pdf');
+  try {
+    const totalPages = doc.countPages();
+    const pages: ExtractedPage[] = [];
+
+    for (let i = 0; i < totalPages; i++) {
+      const pageNum = i + 1;
+      const page = doc.loadPage(i);
+      try {
+        const { lines } = extractPageContent(page);
+        const text = joinLinesToPageText(lines);
+        pages.push({ pageNumber: pageNum, text, wordCount: countWords(text) });
+      } catch (err) {
+        logger.warn({ err, pageNum }, '[pdf-extract] failed to extract page text for simulating — leaving it blank');
+        pages.push({ pageNumber: pageNum, text: '', wordCount: 0 });
+      } finally {
+        page.destroy();
+      }
+    }
+
+    return pages;
+  } finally {
+    doc.destroy();
+  }
+}
+
 /** Parses + validates the optional chapter-map JSON typed into the upload form. */
 export function parseChapterMap(raw: unknown): ChapterMapEntry[] | undefined {
   if (raw === undefined || raw === null || raw === '') return undefined;

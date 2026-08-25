@@ -48,6 +48,20 @@ import {
 import { listGamesForStudentController, submitGameAttemptController } from '../controllers/games.controller.js';
 import { craftCompoundController, freeReactController } from '../controllers/chemistryLab.controller.js';
 import { getMyStudentTimetableController, getMyStudentOccurrencesController } from '../controllers/timetable.controller.js';
+import {
+  listBooksController,
+  getPdfUrlController,
+  getAnnotationsController,
+  chatController,
+  explainController,
+  explainSelectionController,
+  generateController,
+  simBriefController,
+  listNotesController as listSimNotesController,
+  createNoteController as createSimNoteController,
+  updateNoteController as updateSimNoteController,
+  deleteNoteController as deleteSimNoteController,
+} from '../controllers/sim.controller.js';
 
 export const studentRouter = Router();
 
@@ -119,3 +133,30 @@ studentRouter.patch('/chat/sessions/:id', requireFeature('ai_tutor'), renameSess
 studentRouter.delete('/chat/sessions/:id', requireFeature('ai_tutor'), deleteSessionController);
 studentRouter.get('/chat/sessions/:id/history', requireFeature('ai_tutor'), getHistoryController);
 studentRouter.post('/chat/sessions/:id/message', requireFeature('ai_tutor'), chatLimiter, sendMessageController);
+
+// ─── PDF Simulator ──────────────────────────────────────────
+// Ported from pdf-simulation-master — see api/src/services/sim*.service.ts
+// for the porting notes. Every AI-calling endpoint is rate-limited per
+// student, same reasoning as chemistryLimiter above: these cost real money
+// per call and a single student's lab-period usage must not blow the
+// school's AI budget. Book access itself (class/subject/school scope) is
+// enforced inside simAccess.service.ts's requireReadableBook, not here.
+const simChatLimiter = rateLimit({ windowMs: 60 * 60_000, max: 60, keyFn: (req) => `sim-chat:${req.user!.id}` });
+const simExplainLimiter = rateLimit({ windowMs: 60 * 60_000, max: 60, keyFn: (req) => `sim-explain:${req.user!.id}` });
+const simGenerateLimiter = rateLimit({ windowMs: 60 * 60_000, max: 20, keyFn: (req) => `sim-generate:${req.user!.id}` });
+
+studentRouter.get('/sim/books', requireFeature('pdf_simulator'), listBooksController);
+studentRouter.get('/sim/books/:jobId/pdf-url', requireFeature('pdf_simulator'), getPdfUrlController);
+studentRouter.get('/sim/books/:jobId/annotations', requireFeature('pdf_simulator'), getAnnotationsController);
+studentRouter.post('/sim/chat', requireFeature('pdf_simulator'), simChatLimiter, chatController);
+studentRouter.post('/sim/explain', requireFeature('pdf_simulator'), simExplainLimiter, explainController);
+studentRouter.post('/sim/explain-selection', requireFeature('pdf_simulator'), simExplainLimiter, explainSelectionController);
+studentRouter.post('/sim/generate', requireFeature('pdf_simulator'), simGenerateLimiter, generateController);
+// No LLM call — reads a stored/derived brief. Ungated by the rate limiter,
+// gated by the feature flag like every other sim route.
+studentRouter.post('/sim/sim-brief', requireFeature('pdf_simulator'), simBriefController);
+
+studentRouter.get('/sim/notes/:jobId', requireFeature('pdf_simulator'), listSimNotesController);
+studentRouter.post('/sim/notes', requireFeature('pdf_simulator'), createSimNoteController);
+studentRouter.patch('/sim/notes/:noteId', requireFeature('pdf_simulator'), updateSimNoteController);
+studentRouter.delete('/sim/notes/:noteId', requireFeature('pdf_simulator'), deleteSimNoteController);
