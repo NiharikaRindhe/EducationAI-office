@@ -17,8 +17,9 @@
     "allowJs": true,
     "checkJs": false,
     // Mirrors the '@sim/shared' alias in vite.config.ts — see that file's
-    // comment for why the PDF simulator's catalog lives under api/.
-    "baseUrl": ".",
+    // comment for why the PDF simulator's catalog lives under api/. No
+    // baseUrl: paths without it resolve relative to this tsconfig file
+    // (TS 4.1+), and baseUrl itself is deprecated as of TS 5.9.
     "paths": {
       "@sim/shared": ["./api/src/lib/simShared"],
       "@sim/shared/*": ["./api/src/lib/simShared/*"]
@@ -30,5 +31,12 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // The ported PDF-simulator reader carries one vitest unit test
+  // (sim/__tests__/evalSpec.test.ts) from upstream; the frontend has no
+  // test runner of its own yet (Playwright covers e2e only — see
+  // package.json), so vitest isn't a resolvable module here and this
+  // would otherwise block `tsc -b`. Left in place, not deleted: it runs
+  // for free the day this project adds a frontend vitest config.
+  "exclude": ["src/routes/shared/reader/**/*.test.ts"]
 }

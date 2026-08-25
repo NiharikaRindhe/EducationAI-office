@@ -18,8 +18,6 @@ import { NotFound } from './routes/public/NotFound';
 import { Batch1Layout } from './routes/batch1/Layout';
 import { Batch1Home } from './routes/batch1/Home';
 import { Batch1Stories } from './routes/batch1/Stories';
-import { Batch1Quizzes } from './routes/batch1/Quizzes';
-import { Batch1Tasks } from './routes/batch1/Tasks';
 import { Batch1Games } from './routes/batch1/Games';
 import { Batch1MyStuff } from './routes/batch1/MyStuff';
 import { Batch1Syllabus } from './routes/batch1/Syllabus';
@@ -27,26 +25,24 @@ import { Batch1Syllabus } from './routes/batch1/Syllabus';
 // Import Batch 2 Pages
 import { Batch2Layout } from './routes/batch2/Layout';
 import { Batch2Home } from './routes/batch2/Home';
-import { Batch2Subjects } from './routes/batch2/Subjects';
 import { Batch2Chat } from './routes/batch2/Chat';
 import { Batch2Exams } from './routes/batch2/Exams';
-import { Batch2Tasks } from './routes/batch2/Tasks';
-import { Batch2Help } from './routes/batch2/Help';
 import { Batch2Activities } from './routes/batch2/Activities';
 import {
-  Batch2Notes,
-  Batch2Pyq,
-  Batch2DailyChallenges,
   Batch2Streak,
-  Batch2Badges,
   Batch2Profile
 } from './routes/batch2/MinorPages';
+
+// PDF Simulator reader — mounted under both batch2 (Class 5-8) and batch3
+// (Class 9-10), same component either way. Lazy-loaded so its ~4k lines of
+// ported UI (and reader.css) stay out of the main bundle for students who
+// never open it. See src/routes/shared/reader/ for the port itself.
+const ReaderLibrary = lazy(() => import('./routes/shared/reader/routes/ReaderLibrary').then((m) => ({ default: m.ReaderLibrary })));
+const ReaderBookPage = lazy(() => import('./routes/shared/reader/routes/ReaderBookPage').then((m) => ({ default: m.ReaderBookPage })));
 
 // Import Batch 3 Pages
 import { Batch3Layout } from './routes/batch3/Layout';
 import { Batch3Home } from './routes/batch3/Home';
-import { Batch3BoardPrep } from './routes/batch3/BoardPrep';
-import { Batch3ConceptMap } from './routes/batch3/ConceptMap';
 import { Batch3ScienceLabs } from './routes/batch3/ScienceLabs';
 /* Class 9-10 science labs — ported from EducationAI-Games-master. They render
    inside Batch3Layout so the dashboard sidebar/topbar stay in place; the
@@ -64,15 +60,9 @@ const PhysicsHub = lazy(() => import('./routes/batch3/labs/Physics/PhysicsHub/Ph
 const PhysicsLab = lazy(() => import('./routes/batch3/labs/Physics/PhysicsLab'));
 const FrictionSimulator = lazy(() => import('./routes/batch3/labs/Physics/FrictionSimulator/FrictionSimulator'));
 const SoundWaveTank = lazy(() => import('./routes/batch3/labs/Physics/SoundWave/SoundWaveTank'));
-import { Batch3Pomodoro } from './routes/batch3/Pomodoro';
-import { Batch3Tasks } from './routes/batch3/Tasks';
-import { Batch3Help } from './routes/batch3/Help';
 import {
-  Batch3Subjects,
   Batch3Chat,
-  Batch3DailyChallenges,
   Batch3Exams,
-  Batch3Notes,
   Batch3Pyq,
   Batch3Streak,
   Batch3Profile
@@ -88,6 +78,7 @@ import { SuperAdminTickets } from './routes/super-admin/Tickets';
 import { SuperAdminSchoolDetail } from './routes/super-admin/SchoolDetail';
 import { SuperAdminSchoolOnboarding } from './routes/super-admin/SchoolOnboarding';
 import { SuperAdminAuditLog } from './routes/super-admin/AuditLog';
+import { SuperAdminSupportLookup } from './routes/super-admin/SupportLookup';
 import { AccountSettings } from './components/shared/AccountSettings';
 
 // Import Teacher Pages
@@ -96,11 +87,8 @@ import { TeacherDashboard } from './routes/teacher/Dashboard';
 import { TeacherLiveSession } from './routes/teacher/LiveSession';
 import { TeacherTimetable } from './routes/teacher/Timetable';
 import { TeacherStudents } from './routes/teacher/Students';
-import { TeacherAssignTasks } from './routes/teacher/AssignTasks';
 import { TeacherCreateExam } from './routes/teacher/CreateExam';
 import { TeacherExamReview } from './routes/teacher/ExamReview';
-import { TeacherReports } from './routes/teacher/Reports';
-import { TeacherQuestionBank } from './routes/teacher/QuestionBank';
 import { TeacherTickets } from './routes/teacher/Tickets';
 
 // Import School Admin Pages
@@ -110,7 +98,6 @@ import { SchoolAdminClassesSections } from './routes/school-admin/ClassesSection
 import { SchoolAdminStudents } from './routes/school-admin/Students';
 import { SchoolAdminTeachers } from './routes/school-admin/Teachers';
 import { SchoolAdminTimetable } from './routes/school-admin/Timetable';
-import { SchoolAdminPromotion } from './routes/school-admin/Promotion';
 import { SchoolAdminTickets } from './routes/school-admin/Tickets';
 import { SchoolAdminContentLibrary } from './routes/school-admin/ContentLibrary';
 // Labs, Lab In-charges, Feature Toggles, Branding and Principal Report are
@@ -156,8 +143,8 @@ function App() {
               <Route index element={<Navigate to="/batch1/home" replace />} />
               <Route path="home" element={<Batch1Home />} />
               <Route path="stories" element={<Batch1Stories />} />
-              <Route path="exams" element={<Batch1Quizzes />} />
-              <Route path="tasks" element={<Batch1Tasks />} />
+              <Route path="exams" element={<Navigate to="/batch1/home" replace />} />
+              <Route path="tasks" element={<Navigate to="/batch1/home" replace />} />
               <Route path="games" element={<Batch1Games />} />
               <Route path="my-stuff" element={<Batch1MyStuff />} />
               <Route path="syllabus" element={<Batch1Syllabus />} />
@@ -174,18 +161,20 @@ function App() {
             >
               <Route index element={<Navigate to="/batch2/home" replace />} />
               <Route path="home" element={<Batch2Home />} />
-              <Route path="subjects" element={<Batch2Subjects />} />
+              <Route path="subjects" element={<Navigate to="/batch2/home" replace />} />
               <Route path="activities" element={<Batch2Activities />} />
               <Route path="chat" element={<Batch2Chat />} />
               <Route path="exams" element={<Batch2Exams />} />
-              <Route path="tasks" element={<Batch2Tasks />} />
-              <Route path="notes" element={<Batch2Notes />} />
-              <Route path="pyq" element={<Batch2Pyq />} />
-              <Route path="daily-challenges" element={<Batch2DailyChallenges />} />
+              <Route path="tasks" element={<Navigate to="/batch2/home" replace />} />
+              <Route path="notes" element={<Navigate to="/batch2/home" replace />} />
+              <Route path="pyq" element={<Navigate to="/batch2/home" replace />} />
+              <Route path="daily-challenges" element={<Navigate to="/batch2/home" replace />} />
               <Route path="streak" element={<Batch2Streak />} />
-              <Route path="badges" element={<Batch2Badges />} />
+              <Route path="badges" element={<Navigate to="/batch2/home" replace />} />
               <Route path="profile" element={<Batch2Profile />} />
-              <Route path="help" element={<Batch2Help />} />
+              <Route path="help" element={<Navigate to="/batch2/home" replace />} />
+              <Route path="reader" element={<ReaderLibrary />} />
+              <Route path="reader/:bookId" element={<ReaderBookPage />} />
             </Route>
 
             {/* Student Batch 3 (Class 9-10) Dashboard Routes */}
@@ -199,19 +188,21 @@ function App() {
             >
               <Route index element={<Navigate to="/batch3/home" replace />} />
               <Route path="home" element={<Batch3Home />} />
-              <Route path="board-prep" element={<Batch3BoardPrep />} />
-              <Route path="concept-map" element={<Batch3ConceptMap />} />
-              <Route path="pomodoro" element={<Batch3Pomodoro />} />
-              <Route path="subjects" element={<Batch3Subjects />} />
+              <Route path="board-prep" element={<Navigate to="/batch3/home" replace />} />
+              <Route path="concept-map" element={<Navigate to="/batch3/home" replace />} />
+              <Route path="pomodoro" element={<Navigate to="/batch3/home" replace />} />
+              <Route path="subjects" element={<Navigate to="/batch3/home" replace />} />
               <Route path="chat" element={<Batch3Chat />} />
-              <Route path="daily-challenges" element={<Batch3DailyChallenges />} />
+              <Route path="daily-challenges" element={<Navigate to="/batch3/home" replace />} />
               <Route path="exams" element={<Batch3Exams />} />
-              <Route path="tasks" element={<Batch3Tasks />} />
-              <Route path="notes" element={<Batch3Notes />} />
+              <Route path="tasks" element={<Navigate to="/batch3/home" replace />} />
+              <Route path="notes" element={<Navigate to="/batch3/home" replace />} />
               <Route path="pyq" element={<Batch3Pyq />} />
               <Route path="streak" element={<Batch3Streak />} />
               <Route path="profile" element={<Batch3Profile />} />
-              <Route path="help" element={<Batch3Help />} />
+              <Route path="help" element={<Navigate to="/batch3/home" replace />} />
+              <Route path="reader" element={<ReaderLibrary />} />
+              <Route path="reader/:bookId" element={<ReaderBookPage />} />
 
               {/* Class 9-10 science labs. Rendered inside this layout so the
                   dashboard sidebar/topbar stay put; Batch3Layout gives lab
@@ -244,11 +235,11 @@ function App() {
               <Route path="live-session" element={<TeacherLiveSession />} />
               <Route path="timetable" element={<TeacherTimetable />} />
               <Route path="students" element={<TeacherStudents />} />
-              <Route path="assign-tasks" element={<TeacherAssignTasks />} />
+              <Route path="assign-tasks" element={<Navigate to="/teacher/dashboard" replace />} />
               <Route path="create-exam" element={<TeacherCreateExam />} />
               <Route path="exams/:examId/review" element={<TeacherExamReview />} />
-              <Route path="reports" element={<TeacherReports />} />
-              <Route path="question-bank" element={<TeacherQuestionBank />} />
+              <Route path="reports" element={<Navigate to="/teacher/dashboard" replace />} />
+              <Route path="question-bank" element={<Navigate to="/teacher/dashboard" replace />} />
               <Route path="tickets" element={<TeacherTickets />} />
             </Route>
 
@@ -274,7 +265,7 @@ function App() {
               <Route path="principal-report" element={<Navigate to="/school-admin/dashboard" replace />} />
               <Route path="timetable" element={<SchoolAdminTimetable />} />
               <Route path="content" element={<SchoolAdminContentLibrary />} />
-              <Route path="promotion" element={<SchoolAdminPromotion />} />
+              <Route path="promotion" element={<Navigate to="/school-admin/dashboard" replace />} />
               <Route path="tickets" element={<SchoolAdminTickets />} />
               <Route path="profile" element={<AccountSettings />} />
             </Route>
@@ -303,6 +294,7 @@ function App() {
               <Route path="content" element={<SuperAdminContentPortal />} />
               <Route path="ai-console" element={<SuperAdminAiConsole />} />
               <Route path="tickets" element={<SuperAdminTickets />} />
+              <Route path="support" element={<SuperAdminSupportLookup />} />
               <Route path="audit-log" element={<SuperAdminAuditLog />} />
               <Route path="profile" element={<AccountSettings />} />
             </Route>

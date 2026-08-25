@@ -488,6 +488,25 @@
   font-family: var(--font-mono) !important;
 }
 
+/* ── Embedded PDF simulator reader ─────────────────────────────
+   Same reasoning as .lab-embed above, adapted to how reader.css sizes
+   itself: it isn't Tailwind-utility-classed, its own top-level rule
+   (.reader-layout) hardcodes `height: calc(100vh - 57px); width: 100vw`
+   because upstream expected to own the full browser viewport under its
+   own 57px top navbar (App.tsx — not ported, see reader.css's header
+   comment). Overridden here to fill the portal's content area instead;
+   reader.css already tokenizes its own fonts via --font-sans/--font-mono
+   (no inline hardcoded font-family to fight), so no !important cascade
+   is needed the way the labs' Tailwind classes required. */
+.reader-embed {
+  height: 100%;
+  min-height: 0;
+}
+.reader-embed .reader-layout {
+  height: 100%;
+  width: 100%;
+}
+
 /* Base custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
