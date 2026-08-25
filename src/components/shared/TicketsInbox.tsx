@@ -96,9 +96,11 @@ interface TicketsInboxProps {
   /** Pre-fills and opens the "raise a ticket" form on mount — e.g. arriving
    *  from the Content Library after hitting the per-subject upload limit. */
   initialDraft?: { category: Category; subject: string; body: string };
+  /** Sheet item #73 — School Admin tickets hide Status; Super Admin still triages it. */
+  hideStatus?: boolean;
 }
 
-export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTriage, canEscalate, showSchoolFilter, fixedSchool, initialDraft }) => {
+export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTriage, canEscalate, showSchoolFilter, fixedSchool, initialDraft, hideStatus = false }) => {
   const ACCENTS = {
     rose: { btn: 'bg-rose-600 hover:bg-rose-700', text: 'text-rose-600', ring: 'focus:border-rose-400', chip: 'bg-rose-50 text-rose-600' },
     slate: { btn: 'bg-slate-800 hover:bg-slate-900', text: 'text-slate-800', ring: 'focus:border-slate-400', chip: 'bg-slate-100 text-slate-700' },
@@ -341,6 +343,14 @@ export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTria
 
             {canTriage && (
               <div className="flex items-center gap-2 shrink-0">
+                {showSchoolFilter && selected.school_id && (
+                  <a
+                    href={`/super-admin/support?schoolId=${selected.school_id}&ticketId=${selected.id}`}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl"
+                  >
+                    Look up school
+                  </a>
+                )}
                 {canEscalate && !selected.escalated_to_super && (
                   <button
                     onClick={() => void handleEscalate()}
@@ -350,6 +360,7 @@ export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTria
                     <ArrowUpCircle size={13} /> Escalate
                   </button>
                 )}
+                {!hideStatus && (
                 <select
                   value={selected.status}
                   onChange={(e) => void handleStatusChange(e.target.value as Status)}
@@ -360,6 +371,7 @@ export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTria
                     <option key={s} value={s}>{STATUS_LABELS[s]}</option>
                   ))}
                 </select>
+                )}
               </div>
             )}
           </div>
@@ -482,6 +494,7 @@ export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTria
         )}
 
         <div className="flex items-center gap-3 flex-wrap">
+          {!hideStatus && (
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as Status | '')}
@@ -492,6 +505,7 @@ export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTria
               <option key={s} value={s}>{STATUS_LABELS[s]}</option>
             ))}
           </select>
+          )}
           {/* Who raised it — School Admin vs Teacher vs Student (item #25).
               Only useful to the roles that triage across other people's
               tickets in the first place. */}
@@ -522,7 +536,7 @@ export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTria
         </div>
 
         {/* Same issue, several tickets — set them all at once (item #29). */}
-        {canTriage && selectedIds.size > 0 && (
+        {canTriage && !hideStatus && selectedIds.size > 0 && (
           <div className="flex items-center gap-2 flex-wrap bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5">
             <span className="text-[11px] font-bold text-slate-500">{selectedIds.size} selected</span>
             {(Object.keys(STATUS_LABELS) as Status[]).map((s) => (
@@ -557,7 +571,7 @@ export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTria
                 key={t.id}
                 className="flex items-center gap-3 p-4 rounded-2xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition-all"
               >
-                {canTriage && (
+                {canTriage && !hideStatus && (
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); toggleSelected(t.id); }}
@@ -573,7 +587,9 @@ export const TicketsInbox: React.FC<TicketsInboxProps> = ({ accentColor, canTria
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1">
+                      {!hideStatus && (
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_STYLES[t.status]}`}>{STATUS_LABELS[t.status]}</span>
+                      )}
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${accent.chip}`}>{CATEGORY_LABELS[t.category]}</span>
                       {canTriage && (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">{ROLE_LABELS[t.raised_role]}</span>

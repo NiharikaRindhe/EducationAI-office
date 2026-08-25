@@ -3,7 +3,6 @@ import { Heart } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../lib/api';
 import { getClassTheme } from './theme';
-import { LiveClassCard } from './LiveClassCard';
 import { ActionTile, Pic, T, type TileMeter } from './ui';
 
 /**
@@ -58,9 +57,7 @@ interface Door {
 
 const DOORS: Door[] = [
   { emoji: '🎮', artKey: 'nav-games', label: 'Games', subtitle: 'Play and have fun', href: '/batch1/games', accent: '#3FA84B', meterKey: 'games' },
-  { emoji: '📖', artKey: 'nav-stories', label: 'Stories', subtitle: 'Read and enjoy', href: '/batch1/stories', accent: '#3B7DDE' },
-  { emoji: '⭐', artKey: 'nav-quizzes', label: 'Quiz Time', subtitle: 'Test what you know', href: '/batch1/exams', accent: '#E0900A', badge: 'exams', meterKey: 'exams' },
-  { emoji: '✅', artKey: 'nav-tasks', label: 'My Work', subtitle: 'See your homework', href: '/batch1/tasks', accent: '#DE4F8B', badge: 'tasks', meterKey: 'tasks' },
+  { emoji: '📖', artKey: 'nav-stories', label: 'Research', subtitle: 'Read and learn', href: '/batch1/stories', accent: '#3B7DDE' },
   { emoji: '🏆', artKey: 'nav-trophies', label: 'My Trophies', subtitle: 'Badges you earned', href: '/batch1/my-stuff', accent: '#7C4FE0', meterKey: 'badges' },
 ];
 
@@ -68,7 +65,7 @@ const DOORS: Door[] = [
  *  says something true — how many stories are here — instead of a bar that
  *  would always read empty on a fresh load. Matches `storiesData.length` in
  *  Stories.tsx; update together if a story is added or removed. */
-const STORIES_CAPTION = '4 stories waiting';
+const STORIES_CAPTION = '6 stories waiting';
 
 interface GameListItem { stars: number }
 interface TaskAssignment { status: 'not_started' | 'in_progress' | 'in_review' | 'completed' }
@@ -128,18 +125,8 @@ export const Batch1Home: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex flex-col gap-5 anim-fade-up flex-1">
-      <LiveClassCard />
-
-      {/* One row of five on a lab monitor, folding to 3+2 then 2x3 as the
-          screen narrows. Portrait tiles: a 3-column grid stretched across a
-          full-width page produced 520px-wide letterboxes.
-
-          `content-center` matters on the fixed 1680x1050 screens these labs
-          run: the row would otherwise pin to the top and leave a 300px band of
-          empty sky between the doors and the hill. Centring splits that space
-          above and below so the screen reads as composed rather than unfinished. */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-5">
+    <div className="flex flex-col gap-5 anim-fade-up flex-1 justify-center">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 max-w-4xl mx-auto w-full">
         {DOORS.map((d) => (
           <ActionTile
             key={d.href}
@@ -151,7 +138,7 @@ export const Batch1Home: React.FC = () => {
             accent={d.accent}
             badge={d.badge ? counts[d.badge] : undefined}
             meter={d.meterKey ? meters[d.meterKey] : undefined}
-            caption={d.label === 'Stories' ? STORIES_CAPTION : undefined}
+            caption={d.label === 'Research' ? STORIES_CAPTION : undefined}
           />
         ))}
       </div>

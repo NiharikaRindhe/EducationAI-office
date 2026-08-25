@@ -3,7 +3,7 @@ import { supabaseAdmin, supabaseAnon } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
 import { generatePassword } from '../lib/credentials.js';
 import { logger } from '../lib/logger.js';
-import { revokeUserSessions } from '../lib/sessions.js';
+import { revokeUserSessions, revokeOtherUserSessions } from '../lib/sessions.js';
 import { writeAuditLog } from './auditLog.service.js';
 import type { LoginInput, PinLoginInput, PinRosterQuery } from '../schemas/auth.schema.js';
 import type { AuthUser, Role } from '../types/index.js';
@@ -136,6 +136,15 @@ export async function login({ email, password }: LoginInput): Promise<LoginResul
 
   recordLoginEvent(authData.user.id, profile.school_id as string | null, profile.role as Role, 'password');
 
+  // One account, one live session — a classmate who learned the password
+  // cannot keep using the first machine after the real owner signs in
+  // (sheet items #1 / #34). The session we just minted is the newest, so
+  // revoke_other_user_sessions keeps it and drops the rest.
+  await revokeOtherUserSessions(authData.user.id, 'login_single_session', {
+    actorId: authData.user.id,
+    schoolId: profile.school_id as string | null,
+  });
+
   return {
     accessToken: authData.session.access_token,
     refreshToken: authData.session.refresh_token,
@@ -257,6 +266,11 @@ export async function pinLogin({ schoolCode, studentId, pin }: PinLoginInput): P
   }
 
   recordLoginEvent(studentId, schoolId, 'student', 'pin');
+
+  await revokeOtherUserSessions(studentId, 'pin_login_single_session', {
+    actorId: studentId,
+    schoolId,
+  });
 
   return {
     accessToken: authData.session.access_token,

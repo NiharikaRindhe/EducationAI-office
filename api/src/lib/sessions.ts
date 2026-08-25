@@ -81,6 +81,50 @@ export async function revokeUserSessions(
 /** Bulk variant for school suspension / bulk deactivation. Sequential on
  *  purpose: this runs rarely and a burst of parallel admin calls against
  *  GoTrue is more likely to rate-limit than to finish faster. */
+/**
+ * Keep the newest session and drop every older one for this user.
+ *
+ * Used on login so the same credentials cannot stay open on two lab PCs
+ * (sheet items #1 / #34). Must run AFTER the new session exists — otherwise
+ * there is nothing to keep.
+ */
+export async function revokeOtherUserSessions(
+  userId: string,
+  reason: string,
+  ctx: RevocationContext = {},
+): Promise<void> {
+  let revoked = false;
+  let sessionsDeleted = 0;
+  try {
+    const { data, error } = await supabaseAdmin.rpc('revoke_other_user_sessions', { p_user_id: userId });
+    if (error) {
+      logger.error({ userId, reason, err: error.message }, 'Failed to revoke other sessions');
+    } else {
+      revoked = true;
+      sessionsDeleted = Number(data ?? 0);
+      if (sessionsDeleted > 0) {
+        logger.info({ userId, reason, sessionsDeleted }, 'Revoked older sessions for user');
+      }
+    }
+  } catch (err) {
+    logger.error(
+      { userId, reason, err: err instanceof Error ? err.message : String(err) },
+      'Failed to revoke other sessions',
+    );
+  }
+
+  if (sessionsDeleted === 0) return;
+
+  await writeAuditLog({
+    schoolId: ctx.schoolId ?? null,
+    actorId: ctx.actorId ?? userId,
+    action: revoked ? 'session.replaced' : 'session.revoke_failed',
+    entity: 'user',
+    entityId: userId,
+    metadata: { reason, sessionsDeleted },
+  });
+}
+
 export async function revokeSessionsForUsers(
   userIds: string[],
   reason: string,

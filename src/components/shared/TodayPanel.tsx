@@ -63,7 +63,7 @@ const teacherName = (s: ActiveSession): string => {
   return Array.isArray(up) ? (up[0]?.full_name ?? 'your teacher') : up.full_name;
 };
 
-export const TodayPanel: React.FC<{ accent: Accent; tasksHref: string; examsHref: string }> = ({ accent, tasksHref, examsHref }) => {
+export const TodayPanel: React.FC<{ accent: Accent; tasksHref?: string; examsHref: string; hideTasks?: boolean }> = ({ accent, tasksHref, examsHref, hideTasks = false }) => {
   const a = ACCENT[accent];
   const [session, setSession] = useState<ActiveSession | null | undefined>(undefined);
   const [hasJoined, setHasJoined] = useState(false);
@@ -97,6 +97,7 @@ export const TodayPanel: React.FC<{ accent: Accent; tasksHref: string; examsHref
 
   useEffect(() => {
     void pollSession();
+    if (!hideTasks) {
     void (async () => {
       try {
         setTasks(await api.get<TaskAssignment[]>('/student/tasks'));
@@ -104,6 +105,7 @@ export const TodayPanel: React.FC<{ accent: Accent; tasksHref: string; examsHref
         setTasksError(err instanceof Error ? err.message : 'Could not load tasks.');
       }
     })();
+    }
     void (async () => {
       try {
         setExams(await api.get<ExamListItem[]>('/student/exams'));
@@ -277,8 +279,9 @@ export const TodayPanel: React.FC<{ accent: Accent; tasksHref: string; examsHref
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className={`grid grid-cols-1 ${hideTasks ? '' : 'md:grid-cols-2'} gap-4`}>
         {/* Tasks preview */}
+        {!hideTasks && tasksHref && (
         <div className="bento-card border border-slate-100 bg-white p-5 flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <h3 className="font-display font-bold text-sm text-slate-800 flex items-center gap-2">
@@ -307,6 +310,7 @@ export const TodayPanel: React.FC<{ accent: Accent; tasksHref: string; examsHref
             </div>
           )}
         </div>
+        )}
 
         {/* Exams preview */}
         <div className="bento-card border border-slate-100 bg-white p-5 flex flex-col gap-3">

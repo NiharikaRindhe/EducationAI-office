@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { SessionEndWatcher } from '../../components/shared/SessionEndWatcher';
-import { LogOut, Home as HomeIcon, Bell, GraduationCap, Trophy } from 'lucide-react';
+import { LogOut, Home as HomeIcon, Bell, GraduationCap, User } from 'lucide-react';
 import { getClassTheme } from './theme';
 import { Pic, IconButton, T } from './ui';
 import { Scene } from './Scene';
@@ -186,8 +186,8 @@ export const Batch1Layout: React.FC = () => {
                       className="flex items-center gap-3 px-3 py-3 font-display font-black text-sm hover:bg-slate-50"
                       style={{ borderRadius: T.radius.sm, color: T.ink.strong }}
                     >
-                      <Trophy size={19} className="text-amber-500" />
-                      My Trophies
+                      <User size={19} />
+                      Profile
                     </Link>
                     <button
                       type="button"

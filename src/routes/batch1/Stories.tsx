@@ -134,6 +134,44 @@ export const Batch1Stories: React.FC = () => {
         { q: 'How did the mouse help the lion?', options: ['By roaring', 'By chewing the net ropes', 'By calling elephant', 'By scratching hunter'], correct: 'By chewing the net ropes' },
         { q: 'What is the lesson of the story?', options: ['Lions are mean', 'Chew everything', 'Even tiny friends can help', 'Do not sleep'], correct: 'Even tiny friends can help' }
       ]
+    },
+    {
+      id: 's5',
+      title: 'Where Does Rain Come From?',
+      emoji: '💧',
+      subject: 'Science',
+      readTime: '3 min',
+      completed: false,
+      pages: [
+        "Mira stood at the window and watched the rain. 'Where does all this water come from?' she asked her teacher.",
+        "Her teacher said the sun warms rivers and ponds. Tiny drops rise into the air like steam from a kettle. That is called evaporation.",
+        "High in the sky the drops get cold and join together as clouds. When the clouds get heavy, the water falls back as rain.",
+        "Mira smiled. The same water goes up, becomes a cloud, and comes home again. That journey is called the water cycle."
+      ],
+      quiz: [
+        { q: 'What makes water rise into the air?', options: ['The wind only', 'The sun warming water', 'Fish swimming', 'A broom'], correct: 'The sun warming water' },
+        { q: 'What are clouds made of?', options: ['Cotton', 'Tiny water drops', 'Smoke', 'Leaves'], correct: 'Tiny water drops' },
+        { q: 'What is the water cycle?', options: ['A race', 'Water going up and coming back as rain', 'A song', 'A game'], correct: 'Water going up and coming back as rain' }
+      ]
+    },
+    {
+      id: 's6',
+      title: 'Sharing the Rotis',
+      emoji: '🫓',
+      subject: 'Maths',
+      readTime: '3 min',
+      completed: false,
+      pages: [
+        "Ammi made 8 hot rotis for lunch. Arjun and his sister Zara sat at the table, very hungry.",
+        "Ammi said, 'Share them fairly. Fair means each of you gets the same number.'",
+        "They put the rotis in two plates: one for Arjun, one for Zara. 8 rotis shared by 2 children is 4 rotis each.",
+        "Both plates had the same amount. Arjun said, 'Fair sharing is just dividing!' And then they ate."
+      ],
+      quiz: [
+        { q: 'How many rotis did Ammi make?', options: ['6', '8', '10', '2'], correct: '8' },
+        { q: 'How many children shared the rotis?', options: ['2', '3', '4', '8'], correct: '2' },
+        { q: 'How many rotis did each child get?', options: ['2', '3', '4', '8'], correct: '4' }
+      ]
     }
   ];
 
@@ -379,7 +417,7 @@ export const Batch1Stories: React.FC = () => {
                     </div>
 
                     <Button tone="secondary" block onClick={() => setSelectedStory(null)}>
-                      Back to Stories
+                      Back to Research
                     </Button>
                   </div>
                 )}
@@ -390,7 +428,7 @@ export const Batch1Stories: React.FC = () => {
       ) : (
         /* ── Story list ── */
         <>
-          <PageHeader emoji="📖" artKey="nav-stories" title="Stories" hint="Pick a story and read along" />
+          <PageHeader emoji="📖" artKey="nav-stories" title="Research" hint="Pick a story and read along" />
 
           <div className="flex gap-2.5 flex-wrap" role="tablist" aria-label="Choose a subject">
             {(['All', 'English', 'Maths', 'Science'] as const).map((tab) => {

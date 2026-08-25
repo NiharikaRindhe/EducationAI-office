@@ -268,8 +268,9 @@ export const SchoolAdminTimetable: React.FC = () => {
                     Upload the school&apos;s own <strong className="font-semibold text-slate-800">.csv or .xlsx</strong> with one row per period.
                     Columns: <span className="font-mono text-[11.5px]">Class, Section, Day, Period, Start, End, Subject, Teacher, Lab</span>.
                     <span className="mt-1.5 block text-slate-500">
+                      Weekly grid for the current academic year — the same Mon–Sat periods repeat all year (sheet item #60).
                       Day accepts Mon–Sat or 1–6, times accept 09:00 or 9:00 AM, and Teacher accepts the full name or employee id.
-                      Teacher and Lab may be left blank.
+                      Teacher and Lab may be left blank. A teacher already booked that period is skipped.
                     </span>
                   </div>
 

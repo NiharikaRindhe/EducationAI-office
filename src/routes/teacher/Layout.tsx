@@ -11,17 +11,26 @@ export const TeacherLayout: React.FC = () => {
   // Entries whose feature the school hasn't bought are dropped. Create Exam
   // stays — manual exam creation is core; only the AI generator inside it is
   // gated, so the page itself must remain reachable.
+  // Sheet items #99 / #102 / #108 / #109 — removed from nav, routes blocked.
+  // Live Session stays reachable from the dashboard strip so Batch 1 PIN login
+  // can still be started.
+  const LIVE_SESSIONS_NAV = false;
+  const ASSIGN_TASKS_NAV = false;
+  const QUESTION_BANK_NAV = false;
+  const REPORTS_NAV = false;
+
   const navItems: NavItem[] = ([
     { href: '/teacher/dashboard', label: 'Dashboard', iconName: 'dashboard' },
-    { href: '/teacher/live-session', label: 'Live Session', iconName: 'cast_for_education' },
+    LIVE_SESSIONS_NAV ? { href: '/teacher/live-session', label: 'Live Session', iconName: 'cast_for_education' } : null,
     { href: '/teacher/timetable', label: 'Timetable', iconName: 'calendar_month' },
     { href: '/teacher/students', label: 'Students', iconName: 'people' },
-    { href: '/teacher/assign-tasks', label: 'Assign Tasks', iconName: 'assignment_add' },
+    ASSIGN_TASKS_NAV ? { href: '/teacher/assign-tasks', label: 'Assign Tasks', iconName: 'assignment_add' } : null,
     { href: '/teacher/create-exam', label: 'Create Exam', iconName: 'edit_note' },
-    { href: '/teacher/question-bank', label: 'Question Bank', iconName: 'library_books' },
-    { href: '/teacher/reports', label: 'Reports & Analytics', iconName: 'analytics', feature: 'reports_analytics' },
+    QUESTION_BANK_NAV ? { href: '/teacher/question-bank', label: 'Question Bank', iconName: 'library_books' } : null,
+    REPORTS_NAV ? { href: '/teacher/reports', label: 'Reports & Analytics', iconName: 'analytics', feature: 'reports_analytics' } : null,
     { href: '/teacher/tickets', label: 'Report an Issue', iconName: 'confirmation_number' }
-  ] as (NavItem & { feature?: FeatureKey })[])
+  ] as (NavItem & { feature?: FeatureKey } | null)[])
+    .filter((item): item is NavItem & { feature?: FeatureKey } => item !== null)
     .filter((item) => !item.feature || hasFeature(item.feature));
 
   const getHeaderDetails = () => {
@@ -55,6 +64,7 @@ export const TeacherLayout: React.FC = () => {
           subtitle={header.sub}
           batchColor="teacher"
           profileHref="/teacher/dashboard"
+          showProfileLink={false}
         />
 
         {/* Dynamic page container */}

@@ -12,6 +12,8 @@ interface TopBarProps {
   userAvatar?: string;
   profileHref?: string;
   rightSlot?: React.ReactNode;
+  /** Sheet item #110 — teacher portal has no Profile / Settings page. */
+  showProfileLink?: boolean;
 }
 
 const NO_XP_STRIP_PORTALS = new Set(['teacher', 'emerald', 'schoolAdmin', 'superAdmin', 'labIncharge']);
@@ -29,7 +31,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   batchColor,
   userAvatar,
   profileHref = '/profile',
-  rightSlot
+  rightSlot,
+  showProfileLink = true,
 }) => {
   const { studentXP, studentStreak } = useApp();
   const { user, logout } = useAuth();
@@ -137,8 +140,8 @@ export const TopBar: React.FC<TopBarProps> = ({
                   menuOpen ? 'bg-slate-100 border-slate-300' : 'bg-slate-50 hover:bg-slate-100 border-slate-200'
                 }`}
               >
-                <span className={`w-8 h-8 rounded-lg text-white flex items-center justify-center font-bold text-sm shrink-0 ${themeColors[batchColor].replace('text-', 'bg-')}`}>
-                  {(user?.full_name ?? '?').charAt(0).toUpperCase()}
+                <span className={`w-8 h-8 rounded-lg text-white flex items-center justify-center shrink-0 ${themeColors[batchColor].replace('text-', 'bg-')}`}>
+                  <UserIcon size={16} />
                 </span>
                 <ChevronDown size={14} className={`text-slate-400 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
               </button>
@@ -149,6 +152,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                     <span className="block text-[13px] font-semibold text-slate-800 truncate">{user?.full_name ?? 'Account'}</span>
                     <span className="block text-[11px] text-slate-400">{ROLE_LABELS[batchColor]}</span>
                   </div>
+                  {showProfileLink && (
                   <Link
                     to={profileHref}
                     onClick={() => setMenuOpen(false)}
@@ -156,6 +160,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                   >
                     <UserIcon size={14} /> Profile &amp; Settings
                   </Link>
+                  )}
                   <button
                     onClick={handleLogout}
                     className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"

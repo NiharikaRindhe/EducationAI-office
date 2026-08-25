@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Loader2, AlertCircle, ArrowLeft, Users, GraduationCap, Radio, Bot,
-  KeyRound, UserPlus, Copy, Check, X, Save, Power, Upload, Image as ImageIcon,
+  KeyRound, UserPlus, Copy, Check, X, Save, Power, Upload, Image as ImageIcon, Trash2,
 } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 import { schoolLogoUrl } from '../../lib/assets';
@@ -84,6 +84,7 @@ const FEATURES_TAB_ENABLED = false;
 
 export const SuperAdminSchoolDetail: React.FC = () => {
   const { schoolId } = useParams<{ schoolId: string }>();
+  const navigate = useNavigate();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [error, setError] = useState('');
   const [tab, setTab] = useState<'profile' | 'features' | 'admins' | 'usage' | 'content'>('profile');
@@ -99,6 +100,7 @@ export const SuperAdminSchoolDetail: React.FC = () => {
   const [form, setForm] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Admin management
   const [showAddAdmin, setShowAddAdmin] = useState(false);
@@ -253,6 +255,23 @@ export const SuperAdminSchoolDetail: React.FC = () => {
     }
   };
 
+  const deleteSchool = async () => {
+    if (!schoolId || !detail) return;
+    const ok = window.confirm(
+      `Delete ${detail.school.name}? It will disappear from the schools list and nobody there can sign in. This cannot be undone from the UI.`,
+    );
+    if (!ok) return;
+    setIsDeleting(true);
+    try {
+      await api.delete(`/super-admin/schools/${schoolId}`);
+      navigate('/super-admin/schools', { replace: true });
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Failed to delete school');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const addAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!schoolId) return;
@@ -340,18 +359,28 @@ export const SuperAdminSchoolDetail: React.FC = () => {
             <span className="font-mono">{school.code}</span> · {school.board} · onboarded {new Date(school.created_at).toLocaleDateString()}
           </p>
         </div>
-        <button
-          onClick={() => void toggleActive()}
-          disabled={isToggling}
-          className={`inline-flex items-center gap-2 text-[13px] font-semibold px-4 py-2 rounded-lg border transition-colors cursor-pointer disabled:opacity-50 ${
-            school.is_active
-              ? 'text-slate-600 border-slate-200 hover:border-rose-200 hover:text-rose-600 hover:bg-rose-50'
-              : 'text-emerald-700 border-emerald-200 hover:bg-emerald-50'
-          }`}
-        >
-          {isToggling ? <Loader2 size={14} className="animate-spin" /> : <Power size={14} />}
-          {school.is_active ? 'Deactivate school' : 'Activate school'}
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => void toggleActive()}
+            disabled={isToggling}
+            className={`inline-flex items-center gap-2 text-[13px] font-semibold px-4 py-2 rounded-lg border transition-colors cursor-pointer disabled:opacity-50 ${
+              school.is_active
+                ? 'text-slate-600 border-slate-200 hover:border-rose-200 hover:text-rose-600 hover:bg-rose-50'
+                : 'text-emerald-700 border-emerald-200 hover:bg-emerald-50'
+            }`}
+          >
+            {isToggling ? <Loader2 size={14} className="animate-spin" /> : <Power size={14} />}
+            {school.is_active ? 'Deactivate school' : 'Activate school'}
+          </button>
+          <button
+            onClick={() => void deleteSchool()}
+            disabled={isDeleting}
+            className="inline-flex items-center gap-2 text-[13px] font-semibold px-4 py-2 rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer disabled:opacity-50"
+          >
+            {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+            Delete school
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -364,7 +393,7 @@ export const SuperAdminSchoolDetail: React.FC = () => {
       {credential && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3.5 flex items-center justify-between gap-4">
           <div className="text-[13px] text-emerald-900">
-            <span className="font-semibold block mb-0.5">Credentials for {credential.fullName} — shown only once.</span>
+            <span className="font-semibold block mb-0.5">Credentials for {credential.fullName} — shown only once and not stored.</span>
             <span className="font-mono">{credential.email}</span>
             <span className="mx-2 text-emerald-400">·</span>
             <span className="font-mono font-semibold">{credential.password}</span>

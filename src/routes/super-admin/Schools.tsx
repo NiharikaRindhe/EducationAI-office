@@ -130,7 +130,7 @@ export const SuperAdminSchools: React.FC = () => {
       {newCredential && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3.5 flex items-center justify-between gap-4">
           <div className="text-[13px] text-emerald-900">
-            <span className="font-semibold block mb-0.5">School admin account created — share these credentials securely. They are shown only once.</span>
+            <span className="font-semibold block mb-0.5">School admin account created — share these credentials securely. They are shown only once and are not stored.</span>
             <span className="font-mono text-emerald-800">{newCredential.email}</span>
             <span className="mx-2 text-emerald-400">·</span>
             <span className="font-mono font-semibold">{newCredential.password}</span>

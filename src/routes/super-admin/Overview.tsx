@@ -31,6 +31,7 @@ interface Overview {
   totalStudents: number;
   totalTeachers: number;
   totalUsers: number;
+  totalLoggedIn: number;
   totalActiveNow: number;
   totalOpenTickets: number;
   schools: SchoolRow[];
@@ -41,6 +42,7 @@ interface Overview {
     newSchoolsThisWeek: number;
     ingestionQueued: number;
     ingestionErrors: number;
+    sameLogins?: { userId: string; fullName: string; schoolName: string | null; role: string; count: number }[];
   };
 }
 
@@ -70,6 +72,7 @@ export const SuperAdminOverview: React.FC = () => {
   const stats = [
     { label: 'Active Schools', value: `${overview.activeSchools} / ${overview.totalSchools}`, icon: School, colorClass: 'text-slate-800' },
     { label: 'Total Users', value: overview.totalUsers, icon: Users, colorClass: 'text-indigo-500' },
+    { label: 'Users logged in', value: overview.totalLoggedIn, icon: UserCheck, colorClass: 'text-sky-600' },
     { label: 'Active Now', value: overview.totalActiveNow, icon: Activity, colorClass: 'text-amber-500' },
     { label: 'Total Students', value: overview.totalStudents, icon: UserCheck, colorClass: 'text-sky-500' },
     { label: 'Total Teachers', value: overview.totalTeachers, icon: GraduationCap, colorClass: 'text-emerald-500' },
@@ -78,7 +81,7 @@ export const SuperAdminOverview: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
         {stats.map((s) => (
           <div key={s.label} className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col gap-2">
             <s.icon className={s.colorClass} size={20} />
@@ -148,14 +151,15 @@ export const SuperAdminOverview: React.FC = () => {
  */
 const NeedsAttentionPanel: React.FC<{ attention: Overview['attention'] }> = ({ attention }) => {
   const {
-    dormantSchools, escalatedTickets, staleTickets, newSchoolsThisWeek, ingestionQueued, ingestionErrors,
+    dormantSchools, escalatedTickets, staleTickets, newSchoolsThisWeek, ingestionQueued, ingestionErrors, sameLogins = [],
   } = attention;
 
   const rowCls = 'flex items-center gap-3 rounded-2xl border border-slate-100 px-4 py-3';
 
   const hasAnything =
     dormantSchools.length > 0 || escalatedTickets > 0 || staleTickets > 0 ||
-    newSchoolsThisWeek > 0 || ingestionQueued > 0 || ingestionErrors > 0;
+    newSchoolsThisWeek > 0 || ingestionQueued > 0 || ingestionErrors > 0 ||
+    (sameLogins?.length ?? 0) > 0;
 
   return (
     <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm flex flex-col gap-3">
@@ -225,6 +229,24 @@ const NeedsAttentionPanel: React.FC<{ attention: Overview['attention'] }> = ({ a
             {dormantSchools.length > 8 && (
               <span className="text-[11px] text-slate-400 py-1">+{dormantSchools.length - 8} more</span>
             )}
+          </div>
+        </div>
+      )}
+
+      {(sameLogins?.length ?? 0) > 0 && (
+        <div className={`${rowCls} items-start text-amber-800 bg-amber-50/50 flex-col`}>
+          <div className="flex items-center gap-3">
+            <ShieldAlert size={18} />
+            <span className="text-xs font-semibold">
+              {sameLogins.length} account{sameLogins.length === 1 ? '' : 's'} signed in more than once in the last 20 minutes
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2 pl-8">
+            {sameLogins.map((u) => (
+              <span key={u.userId} className="text-[11px] font-medium bg-white border border-amber-200 rounded-full px-2.5 py-1">
+                {u.fullName} · {u.schoolName ?? '—'} · {u.count} logins
+              </span>
+            ))}
           </div>
         </div>
       )}

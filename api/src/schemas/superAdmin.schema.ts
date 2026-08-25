@@ -99,3 +99,9 @@ export const addClassSubjectSchema = z.object({
 export const setEntitlementsSchema = z.object({
   features: z.record(z.string(), z.boolean()),
 });
+
+export const supportLookupSchema = z.object({
+  schoolId: z.string().uuid(),
+  q: z.string().trim().min(2).max(80),
+  ticketId: z.string().uuid().optional(),
+});

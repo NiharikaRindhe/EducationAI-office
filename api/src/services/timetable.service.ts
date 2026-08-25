@@ -100,6 +100,34 @@ async function assertLabInSchool(schoolId: string, labId: string) {
   if (!data) throw new ApiError('VALIDATION_ERROR', 'Lab not found in this school');
 }
 
+/** Sheet item #61 — teacher already booked (or marked unavailable) that period. */
+async function assertTeacherFree(
+  schoolId: string,
+  teacherId: string,
+  dayOfWeek: number,
+  periodNo: number,
+  exceptSlotId?: string,
+) {
+  let query = supabaseAdmin
+    .from('timetable_slots')
+    .select('id, class_sections(class_num, section_label)')
+    .eq('school_id', schoolId)
+    .eq('teacher_id', teacherId)
+    .eq('academic_year', currentAcademicYear())
+    .eq('day_of_week', dayOfWeek)
+    .eq('period_no', periodNo)
+    .limit(1);
+  if (exceptSlotId) query = query.neq('id', exceptSlotId);
+
+  const { data } = await query;
+  const clash = data?.[0];
+  if (!clash) return;
+
+  const cs = one(clash.class_sections as Embedded<{ class_num: number; section_label: string }>);
+  const where = cs ? `Class ${cs.class_num}-${cs.section_label}` : 'another section';
+  throw new ApiError('VALIDATION_ERROR', `That teacher is already booked for ${where} in this period`);
+}
+
 function friendlyConflictError(message: string): ApiError {
   if (message.includes('timetable_slots_teacher_period_uq')) {
     return new ApiError('VALIDATION_ERROR', 'That teacher is already teaching another section in this period');
@@ -159,7 +187,10 @@ export async function listTimetable(schoolId: string, classSectionId?: string) {
 
 export async function createSlot(schoolId: string, input: CreateSlotInput) {
   await assertSectionInSchool(schoolId, input.classSectionId);
-  if (input.teacherId) await assertTeacherInSchool(schoolId, input.teacherId);
+  if (input.teacherId) {
+    await assertTeacherInSchool(schoolId, input.teacherId);
+    await assertTeacherFree(schoolId, input.teacherId, input.dayOfWeek, input.periodNo);
+  }
   if (input.labId) await assertLabInSchool(schoolId, input.labId);
 
   const { data, error } = await supabaseAdmin
@@ -190,6 +221,21 @@ export async function updateSlot(schoolId: string, slotId: string, patch: Update
   if (patch.classSectionId) await assertSectionInSchool(schoolId, patch.classSectionId);
   if (patch.teacherId) await assertTeacherInSchool(schoolId, patch.teacherId);
   if (patch.labId) await assertLabInSchool(schoolId, patch.labId);
+
+  if (patch.teacherId || patch.dayOfWeek !== undefined || patch.periodNo !== undefined) {
+    const { data: current } = await supabaseAdmin
+      .from('timetable_slots')
+      .select('teacher_id, day_of_week, period_no')
+      .eq('id', slotId)
+      .eq('school_id', schoolId)
+      .maybeSingle();
+    const teacherId = patch.teacherId !== undefined ? patch.teacherId : current?.teacher_id;
+    const dayOfWeek = patch.dayOfWeek ?? current?.day_of_week;
+    const periodNo = patch.periodNo ?? current?.period_no;
+    if (teacherId && dayOfWeek != null && periodNo != null) {
+      await assertTeacherFree(schoolId, teacherId, dayOfWeek, periodNo, slotId);
+    }
+  }
 
   const updates: Record<string, unknown> = {};
   if (patch.classSectionId !== undefined) updates.class_section_id = patch.classSectionId;

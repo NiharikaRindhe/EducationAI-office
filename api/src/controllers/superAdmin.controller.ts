@@ -6,6 +6,7 @@ import {
   auditLogQuerySchema,
   auditLogExportQuerySchema,
   setEntitlementsSchema,
+  supportLookupSchema,
 } from '../schemas/superAdmin.schema.js';
 import * as superAdminService from '../services/superAdmin.service.js';
 import { ApiError } from '../lib/errors.js';
@@ -47,6 +48,25 @@ export async function setSchoolActiveController(req: Request, res: Response, nex
     const { isActive } = req.body as { isActive: boolean };
     const school = await superAdminService.setSchoolActive(id, isActive, req.user!.id);
     res.json(school);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteSchoolController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    if (!id) throw new ApiError('VALIDATION_ERROR', 'Missing school id in path');
+    res.json(await superAdminService.deleteSchool(id, req.user!.id));
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function supportLookupController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const input = supportLookupSchema.parse(req.query);
+    res.json(await superAdminService.supportLookup(req.user!.id, input));
   } catch (err) {
     next(err);
   }

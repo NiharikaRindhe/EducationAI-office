@@ -158,7 +158,7 @@ export const TeacherCreateExam: React.FC = () => {
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
               <div>
                 <h2 className="font-display font-bold text-[15px] text-slate-900 flex items-center gap-2">
-                  <FileText size={17} className="text-indigo-500" /> Exam library
+                  <FileText size={17} className="text-indigo-500" /> Saved exams
                 </h2>
                 <p className="mt-1 text-xs text-slate-400">Open an exam to edit, duplicate, publish or review results.</p>
               </div>

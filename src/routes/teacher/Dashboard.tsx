@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Users, BarChart3, ClipboardList, Activity, Plus, Loader2, PenLine, BookOpen, CalendarClock, Ban, FlaskConical, ArrowRight, AlertTriangle } from 'lucide-react';
+import { Users, BarChart3, Activity, Plus, Loader2, PenLine, CalendarClock, Ban, FlaskConical, ArrowRight, AlertTriangle } from 'lucide-react';
 import { api } from '../../lib/api';
 
 interface PendingReview {
@@ -54,7 +54,7 @@ export const TeacherDashboard: React.FC = () => {
           { label: 'My Students', val: stats?.totalStudents.toString() ?? '—', icon: <Users size={20} />, color: 'text-indigo-600 bg-indigo-50 border-indigo-100' },
           { label: 'Classes Taught', val: stats?.classesTaught.join(', ') || '—', icon: <Activity size={20} />, color: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
           { label: 'Exams Created', val: stats?.examsCreated.toString() ?? '—', icon: <BarChart3 size={20} />, color: 'text-sky-600 bg-sky-50 border-sky-100' },
-          { label: 'Tasks Assigned', val: stats?.tasksAssigned.toString() ?? '—', icon: <ClipboardList size={20} />, color: 'text-amber-600 bg-amber-50 border-amber-100' }
+          { label: 'Need attention', val: atRisk ? String(atRisk.length) : '—', icon: <AlertTriangle size={20} />, color: 'text-amber-600 bg-amber-50 border-amber-100' }
         ].map((card, idx) => (
           <div key={idx} className={`bento-card border p-5 flex items-center justify-between bg-white ${card.color}`}>
             <div>
@@ -112,10 +112,10 @@ export const TeacherDashboard: React.FC = () => {
                   <div className="flex items-center gap-4 select-none">
                     <span className="badge pill-rose font-bold">{stud.risks.map((r) => r.label).join(' · ')}</span>
                     <button
-                      onClick={() => navigate('/teacher/assign-tasks')}
+                      onClick={() => navigate('/teacher/students')}
                       className="py-1 px-3 bg-red-600 hover:bg-red-700 text-white font-sans font-bold text-[10px] rounded-lg shadow-xs cursor-pointer transition-all"
                     >
-                      Assign Task
+                      View student
                     </button>
                   </div>
                 </div>
@@ -135,30 +135,23 @@ export const TeacherDashboard: React.FC = () => {
 
           <div className="flex flex-col gap-3 select-none">
             <Link
-              to="/teacher/assign-tasks"
+              to="/teacher/create-exam"
               className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-sans font-bold text-xs text-center shadow-md shadow-indigo-600/10 transition-all flex items-center justify-center gap-1.5"
             >
               <Plus size={14} />
-              Assign New Task
+              Create Exam
             </Link>
             <Link
-              to="/teacher/create-exam"
+              to="/teacher/live-session"
               className="w-full py-3 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-sans font-bold text-xs text-center transition-all"
             >
-              Create Mock Exam
+              Start lab period
             </Link>
             <Link
-              to="/teacher/reports"
+              to="/teacher/timetable"
               className="w-full py-3 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-sans font-bold text-xs text-center transition-all"
             >
-              View Class Reports
-            </Link>
-            <Link
-              to="/teacher/question-bank"
-              className="w-full py-3 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-sans font-bold text-xs text-center transition-all flex items-center justify-center gap-1.5"
-            >
-              <BookOpen size={13} />
-              Question Bank
+              Open timetable
             </Link>
           </div>
         </div>
@@ -225,6 +218,11 @@ const TodayLabPeriodsStrip: React.FC = () => {
                 <span className="flex items-center gap-1 text-[10px] text-slate-400 truncate mt-0.5">
                   <FlaskConical size={10} /> {p.labName}
                 </span>
+              )}
+              {p.status !== 'cancelled' && (
+                <Link to="/teacher/live-session" className="mt-1.5 inline-block text-[10px] font-bold text-indigo-600 hover:underline">
+                  Start period
+                </Link>
               )}
             </div>
           ))}

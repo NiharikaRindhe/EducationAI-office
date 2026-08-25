@@ -143,6 +143,7 @@ export async function listSchools(opts: { page?: number; pageSize?: number; sear
       'id, name, code, address, city, state, pincode, board, plan, logo_path, contact_name, contact_email, contact_phone, is_active, created_at',
       { count: 'exact' },
     )
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .range(from, from + pageSize - 1);
 
@@ -200,8 +201,10 @@ export async function getOverview() {
     { count: staleTickets, error: staleError },
     { count: ingestionQueued, error: ingestionQueuedError },
     { count: ingestionErrors, error: ingestionErrorsError },
+    { count: totalLoggedIn, error: loggedInError },
+    { data: recentLogins, error: recentLoginsError },
   ] = await Promise.all([
-    supabaseAdmin.from('schools').select('id, name, code, is_active, created_at').order('created_at', { ascending: false }),
+    supabaseAdmin.from('schools').select('id, name, code, is_active, created_at, deleted_at').is('deleted_at', null).order('created_at', { ascending: false }),
     supabaseAdmin.rpc('platform_school_stats'),
     supabaseAdmin
       .from('support_tickets')
@@ -221,6 +224,15 @@ export async function getOverview() {
       .from('ncert_ingestion_jobs')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'error'),
+    supabaseAdmin
+      .from('user_profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('has_logged_in_ever', true)
+      .neq('role', 'super_admin'),
+    supabaseAdmin
+      .from('login_events')
+      .select('user_id, school_id, role')
+      .gte('created_at', new Date(Date.now() - 20 * 60 * 1000).toISOString()),
   ]);
 
   if (schoolsError) throw new ApiError('INTERNAL_ERROR', 'Failed to load schools', schoolsError.message);
@@ -229,6 +241,8 @@ export async function getOverview() {
   if (staleError) throw new ApiError('INTERNAL_ERROR', 'Failed to load stale tickets', staleError.message);
   if (ingestionQueuedError) throw new ApiError('INTERNAL_ERROR', 'Failed to load ingestion backlog', ingestionQueuedError.message);
   if (ingestionErrorsError) throw new ApiError('INTERNAL_ERROR', 'Failed to load ingestion errors', ingestionErrorsError.message);
+  if (loggedInError) throw new ApiError('INTERNAL_ERROR', 'Failed to load logged-in count', loggedInError.message);
+  if (recentLoginsError) throw new ApiError('INTERNAL_ERROR', 'Failed to load recent logins', recentLoginsError.message);
 
   const byId = new Map<string, SchoolStatsRow>(
     ((stats ?? []) as SchoolStatsRow[]).map((r) => [r.school_id, r]),
@@ -262,6 +276,35 @@ export async function getOverview() {
     .map((s) => ({ id: s.id, name: s.name, code: s.code, lastActivityAt: s.lastActivityAt }));
   const newSchoolsThisWeek = schoolRows.filter((s) => s.createdAt >= weekAgo).length;
 
+  const loginCounts = new Map<string, { count: number; schoolId: string | null; role: string }>();
+  for (const row of recentLogins ?? []) {
+    const prev = loginCounts.get(row.user_id) ?? { count: 0, schoolId: row.school_id, role: row.role };
+    prev.count += 1;
+    loginCounts.set(row.user_id, prev);
+  }
+  const duplicateIds = [...loginCounts.entries()].filter(([, v]) => v.count > 1).slice(0, 12);
+  let sameLogins: { userId: string; fullName: string; schoolName: string | null; role: string; count: number }[] = [];
+  if (duplicateIds.length > 0) {
+    const ids = duplicateIds.map(([id]) => id);
+    const { data: dupProfiles } = await supabaseAdmin
+      .from('user_profiles')
+      .select('id, full_name, role, schools(name)')
+      .in('id', ids);
+    const byUser = new Map((dupProfiles ?? []).map((p) => [p.id as string, p]));
+    sameLogins = duplicateIds.map(([userId, info]) => {
+      const p = byUser.get(userId);
+      const school = p?.schools as { name?: string } | { name?: string }[] | null | undefined;
+      const schoolName = Array.isArray(school) ? school[0]?.name ?? null : school?.name ?? null;
+      return {
+        userId,
+        fullName: (p?.full_name as string) ?? 'Unknown',
+        schoolName,
+        role: (p?.role as string) ?? info.role,
+        count: info.count,
+      };
+    });
+  }
+
   return {
     totalSchools: schoolRows.length,
     activeSchools: schoolRows.filter((s) => s.isActive).length,
@@ -271,6 +314,8 @@ export async function getOverview() {
     // teachers and staff (school admins/lab in-charges). Distinct from
     // activeNow below, which is "online in the last 15 minutes".
     totalUsers: totalStudents + totalTeachers + totalStaff,
+    // Sheet item #6 — accounts that have signed in at least once.
+    totalLoggedIn: totalLoggedIn ?? 0,
     totalActiveNow: schoolRows.reduce((sum, s) => sum + s.activeNow, 0),
     totalOpenTickets: schoolRows.reduce((sum, s) => sum + s.openTickets, 0),
     schools: schoolRows,
@@ -283,15 +328,25 @@ export async function getOverview() {
       newSchoolsThisWeek,
       ingestionQueued: ingestionQueued ?? 0,
       ingestionErrors: ingestionErrors ?? 0,
+      sameLogins,
     },
   };
 }
 
 export async function setSchoolActive(schoolId: string, isActive: boolean, actorId: string) {
+  const { data: existing } = await supabaseAdmin
+    .from('schools')
+    .select('id, deleted_at')
+    .eq('id', schoolId)
+    .maybeSingle();
+  if (!existing) throw new ApiError('NOT_FOUND', 'School not found');
+  if (existing.deleted_at) throw new ApiError('VALIDATION_ERROR', 'This school has been deleted and cannot be reactivated');
+
   const { data, error } = await supabaseAdmin
     .from('schools')
     .update({ is_active: isActive })
     .eq('id', schoolId)
+    .is('deleted_at', null)
     .select()
     .single();
 
@@ -327,6 +382,118 @@ export async function setSchoolActive(schoolId: string, isActive: boolean, actor
   return data;
 }
 
+/**
+ * Soft-delete a school (sheet item #32). The row stays for audit history;
+ * it disappears from lists and cannot be reactivated. Sessions are cut off
+ * the same way as a suspend.
+ */
+export async function deleteSchool(schoolId: string, actorId: string) {
+  const { data: existing, error: existingError } = await supabaseAdmin
+    .from('schools')
+    .select('id, name, code, deleted_at, is_active')
+    .eq('id', schoolId)
+    .maybeSingle();
+  if (existingError || !existing) throw new ApiError('NOT_FOUND', 'School not found');
+  if (existing.deleted_at) throw new ApiError('VALIDATION_ERROR', 'This school is already deleted');
+
+  const now = new Date().toISOString();
+  const { error } = await supabaseAdmin
+    .from('schools')
+    .update({ is_active: false, deleted_at: now })
+    .eq('id', schoolId);
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to delete school', error.message);
+
+  const { data: members } = await supabaseAdmin
+    .from('user_profiles')
+    .select('id')
+    .eq('school_id', schoolId);
+  const ids = (members ?? []).map((m) => m.id as string);
+  await revokeSessionsForUsers(ids, 'school_deleted', { actorId, schoolId });
+
+  await writeAuditLog({
+    schoolId,
+    actorId,
+    action: 'school.deleted',
+    entity: 'school',
+    entityId: schoolId,
+    metadata: { code: existing.code, name: existing.name, sessionsRevoked: ids.length },
+  });
+
+  return { id: schoolId, deleted: true };
+}
+
+/**
+ * Narrow, audited lookup for ticket solving (sheet item #2).
+ * Requires a school and a search term so this cannot dump every child.
+ */
+export async function supportLookup(
+  actorId: string,
+  input: { schoolId: string; q: string; ticketId?: string },
+) {
+  const q = input.q.trim();
+  if (q.length < 2) throw new ApiError('VALIDATION_ERROR', 'Enter at least 2 characters to search');
+
+  const { data: school, error: schoolError } = await supabaseAdmin
+    .from('schools')
+    .select('id, name, code, deleted_at')
+    .eq('id', input.schoolId)
+    .maybeSingle();
+  if (schoolError || !school || school.deleted_at) throw new ApiError('NOT_FOUND', 'School not found');
+
+  if (input.ticketId) {
+    const { data: ticket } = await supabaseAdmin
+      .from('support_tickets')
+      .select('id, school_id, subject')
+      .eq('id', input.ticketId)
+      .maybeSingle();
+    if (!ticket || ticket.school_id !== input.schoolId) {
+      throw new ApiError('VALIDATION_ERROR', 'That ticket does not belong to this school');
+    }
+  }
+
+  const safe = q.replace(/[%_,()]/g, ' ').slice(0, 80);
+  const { data: rows, error } = await supabaseAdmin
+    .from('user_profiles')
+    .select('id, full_name, role, is_active, last_seen_at, student_profiles(class_num, section, roll_number)')
+    .eq('school_id', input.schoolId)
+    .ilike('full_name', `%${safe}%`)
+    .in('role', ['student', 'teacher', 'school_admin'])
+    .limit(25);
+
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to search school directory', error.message);
+
+  const results = (rows ?? []).map((row) => {
+    const sp = Array.isArray(row.student_profiles) ? row.student_profiles[0] : row.student_profiles;
+    return {
+      id: row.id as string,
+      fullName: row.full_name as string,
+      role: row.role as string,
+      isActive: row.is_active as boolean,
+      lastSeenAt: row.last_seen_at as string | null,
+      classNum: sp?.class_num ?? null,
+      section: sp?.section ?? null,
+      rollNumber: sp?.roll_number ?? null,
+    };
+  });
+
+  await writeAuditLog({
+    schoolId: input.schoolId,
+    actorId,
+    action: 'support.lookup',
+    entity: 'user_profile',
+    metadata: {
+      q: safe,
+      ticketId: input.ticketId ?? null,
+      resultCount: results.length,
+    },
+  });
+
+  return {
+    school: { id: school.id, name: school.name, code: school.code },
+    results,
+  };
+}
+
 // ─────────────────────────────────────────────────────────────
 //  SCHOOL DETAIL — the drill-down page: full profile, staff
 //  accounts, per-class enrollment, and recent platform usage.
@@ -337,8 +504,9 @@ export async function getSchoolDetail(schoolId: string) {
   const [schoolRes, profilesRes, loginsRes, aiRes, contentUploadUsage] = await Promise.all([
     supabaseAdmin
       .from('schools')
-      .select('id, name, code, address, city, state, pincode, board, plan, logo_path, contact_name, contact_email, contact_phone, is_active, created_at')
+      .select('id, name, code, address, city, state, pincode, board, plan, logo_path, contact_name, contact_email, contact_phone, is_active, created_at, deleted_at')
       .eq('id', schoolId)
+      .is('deleted_at', null)
       .single(),
     supabaseAdmin
       .from('user_profiles')

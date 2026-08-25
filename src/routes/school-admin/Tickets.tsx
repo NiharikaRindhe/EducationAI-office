@@ -13,6 +13,6 @@ export const SchoolAdminTickets: React.FC = () => {
   const initialDraft = (location.state as { prefillTicket?: TicketDraft } | null)?.prefillTicket;
 
   return (
-    <TicketsInbox accentColor="rose" canTriage canEscalate showSchoolFilter={false} fixedSchool initialDraft={initialDraft} />
+    <TicketsInbox accentColor="rose" canTriage canEscalate showSchoolFilter={false} fixedSchool hideStatus initialDraft={initialDraft} />
   );
 };
