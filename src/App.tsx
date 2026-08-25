@@ -33,10 +33,11 @@ import {
   Batch2Profile
 } from './routes/batch2/MinorPages';
 
-// PDF Simulator reader — mounted under both batch2 (Class 5-8) and batch3
-// (Class 9-10), same component either way. Lazy-loaded so its ~4k lines of
-// ported UI (and reader.css) stay out of the main bundle for students who
-// never open it. See src/routes/shared/reader/ for the port itself.
+// PDF Simulator reader — removed per user request (PDF_SIMULATOR_ENABLED in
+// Layout.tsx; both /batch2/reader and /batch3/reader now redirect home
+// below). These lazy imports are unused while that's off, left in place —
+// component/API/DB are untouched, this is meant to be reversible. See
+// src/routes/shared/reader/ for the port itself.
 const ReaderLibrary = lazy(() => import('./routes/shared/reader/routes/ReaderLibrary').then((m) => ({ default: m.ReaderLibrary })));
 const ReaderBookPage = lazy(() => import('./routes/shared/reader/routes/ReaderBookPage').then((m) => ({ default: m.ReaderBookPage })));
 
@@ -100,6 +101,7 @@ import { SchoolAdminTeachers } from './routes/school-admin/Teachers';
 import { SchoolAdminTimetable } from './routes/school-admin/Timetable';
 import { SchoolAdminTickets } from './routes/school-admin/Tickets';
 import { SchoolAdminContentLibrary } from './routes/school-admin/ContentLibrary';
+import { SchoolAdminPromotion } from './routes/school-admin/Promotion';
 // Labs, Lab In-charges, Feature Toggles, Branding and Principal Report are
 // hidden + route-blocked (see Layout.tsx's *_ENABLED flags, UI testing pass
 // Aug 24 2026, items #58/#65/#66/#67/#68) — components kept on disk,
@@ -173,8 +175,11 @@ function App() {
               <Route path="badges" element={<Navigate to="/batch2/home" replace />} />
               <Route path="profile" element={<Batch2Profile />} />
               <Route path="help" element={<Navigate to="/batch2/home" replace />} />
-              <Route path="reader" element={<ReaderLibrary />} />
-              <Route path="reader/:bookId" element={<ReaderBookPage />} />
+              {/* PDF Simulator — removed per user request (see PDF_SIMULATOR_ENABLED
+                  in Layout.tsx). Route blocked, not just unlinked: a typed URL
+                  redirects too. Component/API/DB left intact and reversible. */}
+              <Route path="reader" element={<Navigate to="/batch2/home" replace />} />
+              <Route path="reader/:bookId" element={<Navigate to="/batch2/home" replace />} />
             </Route>
 
             {/* Student Batch 3 (Class 9-10) Dashboard Routes */}
@@ -201,8 +206,11 @@ function App() {
               <Route path="streak" element={<Batch3Streak />} />
               <Route path="profile" element={<Batch3Profile />} />
               <Route path="help" element={<Navigate to="/batch3/home" replace />} />
-              <Route path="reader" element={<ReaderLibrary />} />
-              <Route path="reader/:bookId" element={<ReaderBookPage />} />
+              {/* PDF Simulator — removed per user request (see PDF_SIMULATOR_ENABLED
+                  in Layout.tsx). Route blocked, not just unlinked: a typed URL
+                  redirects too. Component/API/DB left intact and reversible. */}
+              <Route path="reader" element={<Navigate to="/batch3/home" replace />} />
+              <Route path="reader/:bookId" element={<Navigate to="/batch3/home" replace />} />
 
               {/* Class 9-10 science labs. Rendered inside this layout so the
                   dashboard sidebar/topbar stay put; Batch3Layout gives lab
@@ -265,7 +273,8 @@ function App() {
               <Route path="principal-report" element={<Navigate to="/school-admin/dashboard" replace />} />
               <Route path="timetable" element={<SchoolAdminTimetable />} />
               <Route path="content" element={<SchoolAdminContentLibrary />} />
-              <Route path="promotion" element={<Navigate to="/school-admin/dashboard" replace />} />
+              {/* Restored (Aug 25 2026, user request) — see Layout.tsx comment. */}
+              <Route path="promotion" element={<SchoolAdminPromotion />} />
               <Route path="tickets" element={<SchoolAdminTickets />} />
               <Route path="profile" element={<AccountSettings />} />
             </Route>

@@ -23,14 +23,25 @@ import { upsertSimPage, processPageIngestion } from '../services/simIngest.servi
 // ─────────────────────────────────────────────────────────────
 
 const POLL_INTERVAL_MS = 15_000;
-/** Sleep between classified pages — matches upstream's 600ms inter-page
- *  throttle, easing pressure on the AI provider during a big book. */
+/** Sleep after each classified page on a given lane — matches upstream's
+ *  600ms inter-page throttle, easing pressure on the AI provider during a
+ *  big book. Applied per lane, not per page, now that pages run concurrently
+ *  (see PAGE_CONCURRENCY) — the aggregate request rate is what the provider
+ *  actually sees, and that scales with lane count same as before. */
 const INTER_PAGE_DELAY_MS = 600;
+/** How many pages of the same book are classified at once. Pages are fully
+ *  independent (own text, own content-hash cache entry, own annotation
+ *  rows) so there's nothing to coordinate — this is a pure throughput lever.
+ *  4 was picked to comfortably undercut the AI provider's real concurrency
+ *  headroom (this deployment rotates 14 keys) while still cutting a
+ *  200-page book's wall-clock time roughly 4x over one-at-a-time. */
+const PAGE_CONCURRENCY = 4;
 const WORKER_ID = `${hostname()}:${process.pid}`;
 
 let busy = false;
 let stopping = false;
 let timer: NodeJS.Timeout | null = null;
+let sweepTimer: NodeJS.Timeout | null = null;
 
 interface ClaimedSimJob {
   id: string;
@@ -88,24 +99,42 @@ async function runSimPipeline(job: ClaimedSimJob): Promise<void> {
 
   await updateSimStatus(job.id, { sim_status: 'running', sim_pages_total: pages.length, sim_pages_done: 0 });
 
+  // Bounded-concurrency pool: PAGE_CONCURRENCY lanes each pull the next
+  // unclaimed page off the shared `next` cursor and run it to completion.
+  // `next`/`done` are only ever touched between `await`s, never inside a
+  // multi-step critical section, so JS's single-threaded execution keeps
+  // them race-free despite the concurrent lanes — no locking needed.
+  let next = 0;
   let done = 0;
-  for (const page of pages) {
-    await upsertSimPage(job.id, page.pageNumber, page.text, page.wordCount);
+  async function lane(): Promise<void> {
+    while (next < pages.length) {
+      const page = pages[next++];
+      if (!page) continue;
+      await upsertSimPage(job.id, page.pageNumber, page.text, page.wordCount);
 
-    if (shouldClassify(page.text)) {
-      try {
-        await processPageIngestion({ jobId: job.id, pageNumber: page.pageNumber, pageText: page.text, classNum: job.class_num });
-      } catch (err) {
-        // One bad page shouldn't sink the whole book — log and keep going,
-        // same tolerance the RAG figure-upload loop applies per-figure.
-        logger.warn({ err, jobId: job.id, pageNumber: page.pageNumber }, '[sim-worker] page ingestion failed — continuing');
+      if (shouldClassify(page.text)) {
+        try {
+          await processPageIngestion({ jobId: job.id, pageNumber: page.pageNumber, pageText: page.text, classNum: job.class_num });
+        } catch (err) {
+          // One bad page shouldn't sink the whole book — log and keep going,
+          // same tolerance the RAG figure-upload loop applies per-figure.
+          logger.warn({ err, jobId: job.id, pageNumber: page.pageNumber }, '[sim-worker] page ingestion failed — continuing');
+        }
+        await new Promise((resolve) => setTimeout(resolve, INTER_PAGE_DELAY_MS));
       }
-      await new Promise((resolve) => setTimeout(resolve, INTER_PAGE_DELAY_MS));
-    }
 
-    done += 1;
-    await updateSimStatus(job.id, { sim_status: 'running', sim_pages_done: done });
+      done += 1;
+      // Progress writes from different lanes can land out of order (network
+      // latency varies per request) — worst case the done-count flickers
+      // back down by a page or two on the Content Portal for a moment. Not
+      // worth an atomic RPC to prevent; the terminal write below is what
+      // actually has to be correct, and it only happens once, after every
+      // lane has finished.
+      await updateSimStatus(job.id, { sim_status: 'running', sim_pages_done: done });
+    }
   }
+
+  await Promise.all(Array.from({ length: Math.min(PAGE_CONCURRENCY, pages.length) }, () => lane()));
 
   await updateSimStatus(job.id, { sim_status: 'ready', sim_pages_done: done });
 }
@@ -136,10 +165,19 @@ async function processNextJob() {
   }
 }
 
+/** Independent of POLL_INTERVAL_MS: this only needs to run often enough to
+ *  reclaim a job abandoned by a worker that died mid-run (crash, or — as
+ *  found while debugging a slow book locally — a dev-server restart mid-job)
+ *  well before a student notices. Only ran once at boot until now, which
+ *  meant a job could sit orphaned for up to the full 15-minute staleness
+ *  window if no restart happened to trigger another boot in the meantime. */
+const REQUEUE_SWEEP_MS = 5 * 60_000;
+
 export function startSimWorker() {
   void requeueStaleJobs();
   void processNextJob();
   timer = setInterval(() => void processNextJob(), POLL_INTERVAL_MS);
+  sweepTimer = setInterval(() => void requeueStaleJobs(), REQUEUE_SWEEP_MS);
   logger.info({ workerId: WORKER_ID }, `[sim-worker] polling every ${POLL_INTERVAL_MS / 1000}s`);
 }
 
@@ -148,6 +186,7 @@ export function startSimWorker() {
 export async function stopSimWorker(): Promise<void> {
   stopping = true;
   if (timer) clearInterval(timer);
+  if (sweepTimer) clearInterval(sweepTimer);
   if (!busy) return;
   logger.info('[sim-worker] waiting for the in-flight job to finish…');
   while (busy) await new Promise((resolve) => setTimeout(resolve, 500));

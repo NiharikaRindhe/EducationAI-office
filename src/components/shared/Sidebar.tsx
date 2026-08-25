@@ -155,7 +155,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {collapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
         </button>
       )}
-      <div className={`flex flex-col gap-8 overflow-y-auto ${collapsed ? '' : 'pr-1'}`}>
+      {/* min-h-0 lets this flex child actually shrink inside the h-screen
+          aside so overflow-y-auto scrolls just the nav list — without it the
+          whole sidebar (including the footer/logout button) grew past the
+          viewport instead. no-scrollbar keeps that internal scroll working
+          on wheel/touch without showing a scrollbar track next to the nav. */}
+      <div className={`flex flex-col gap-8 overflow-y-auto no-scrollbar min-h-0 ${collapsed ? '' : 'pr-1'}`}>
         {/* Brand — the school's own identity when the user belongs to one,
             falling back to EduAI's for the Super Admin (no school) and for
             schools that haven't uploaded a logo yet. */}

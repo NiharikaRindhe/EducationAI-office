@@ -216,7 +216,19 @@ insert into package_features (package_key, feature_key) values
 -- (entitlementsFor() only grandfathers a school with ZERO rows), so
 -- without this every already-onboarded school would silently lose access
 -- to a feature their package nominally includes.
+--
+-- Restricted to schools that already have at least one entitlement row.
+-- A school with ZERO rows is a different case entirely: entitlementsFor()
+-- treats zero rows as "grandfathered into everything" (see entitlements.ts),
+-- so inserting a single pdf_simulator row for one of THOSE schools doesn't
+-- add a feature — it silently narrows every other feature from "on" to
+-- "off", because the presence of any row switches that school off the
+-- grandfathered path entirely. (Caught locally: a school with zero prior
+-- rows lost virtual_labs/ai_tutor/pyq_hub/games/leaderboard/reports the
+-- moment this ran, keeping only pdf_simulator.) Those schools already get
+-- pdf_simulator for free via the grandfathered path — nothing to insert.
 insert into school_entitlements (school_id, feature_key, enabled)
 select s.id, 'pdf_simulator', true
 from schools s
+where exists (select 1 from school_entitlements se where se.school_id = s.id)
 on conflict (school_id, feature_key) do nothing;

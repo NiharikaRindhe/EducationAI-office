@@ -43,13 +43,28 @@ function getSystemPrompt(classNum?: number): string {
   return cached;
 }
 
-/** Strips markdown code fences (```json ... ```) from LLM output. */
+/** Escapes any backslash that isn't already the start of a valid JSON escape
+ *  sequence (\", \\, \/, \b, \f, \n, \r, \t, \uXXXX). Prompts that ask for
+ *  LaTeX inside a JSON string field (simExplain's sim-brief prompt: "use
+ *  $LaTeX$ for formulas") routinely got back raw `\frac`/`\pi`/`\times`
+ *  instead of the doubled `\\` JSON requires — every one of those calls was
+ *  silently failing JSON.parse with "Bad escaped character" and falling
+ *  back, which was both wasting a full LLM round trip per page and losing
+ *  the real brief. The alternation matches (and leaves alone) a whole valid
+ *  escape first so an already-correct `\\` pair is never touched; only a
+ *  backslash that isn't part of one gets fixed. */
+function repairInvalidJsonEscapes(text: string): string {
+  return text.replace(/\\u[0-9a-fA-F]{4}|\\["\\/bfnrtu]|\\/g, (match) => (match.length === 1 ? '\\\\' : match));
+}
+
+/** Strips markdown code fences (```json ... ```) from LLM output and repairs
+ *  invalid backslash escapes that would otherwise trip JSON.parse. */
 export function cleanJsonResponse(raw: string): string {
   const trimmed = raw.trim();
-  if (trimmed.startsWith('```')) {
-    return trimmed.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-  }
-  return trimmed;
+  const unfenced = trimmed.startsWith('```')
+    ? trimmed.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+    : trimmed;
+  return repairInvalidJsonEscapes(unfenced);
 }
 
 /** Parses raw JSON text into a validated Candidate array. Handles a bare
