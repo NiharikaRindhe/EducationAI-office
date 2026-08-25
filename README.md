@@ -34,6 +34,12 @@ npx supabase start
 ```
 This prints the local `API_URL`, `SERVICE_ROLE_KEY`, `STUDIO_URL`, etc. First run applies all migrations automatically.
 
+If the stack was **already running** from a previous session (`npx supabase status` shows containers `Up`), new migration files added since then are *not* applied automatically — `supabase start` only runs migrations while creating the containers. Apply anything pending with:
+```bash
+npx supabase migration up
+```
+This is safe to run any time — it only applies migrations not yet recorded as applied, and never wipes data (unlike `supabase db reset`, which rebuilds the database from scratch and is only for when you want a clean slate).
+
 **3. Redis** (shared tutor slots when many schools ask at once):
 ```bash
 docker run -d --name eduai-redis -p 6379:6379 redis:7.4-alpine
@@ -54,14 +60,19 @@ npm run dev:worker
 ```
 → health on **http://localhost:4100**
 
-This runs NCERT PDF ingestion plus the streak/leaderboard cron jobs. It is a
-**separate process from the API on purpose**: ingestion is a long synchronous
-block, so running it inside the API froze every in-flight student request until
-a book finished processing.
+This runs NCERT PDF ingestion (RAG chunking/embedding), the PDF Simulator
+generation pipeline (`sim_status`: `queued → running → ready`, feeding the
+`/batch2/reader` and `/batch3/reader` UI), plus the streak/leaderboard cron
+jobs. It is a **separate process from the API on purpose**: ingestion is a
+long synchronous block, so running it inside the API froze every in-flight
+student request until a book finished processing. RAG ingestion and sim
+generation are independent queues on the same worker — a book is usable by
+the AI tutor as soon as `status='done'`, even while its simulations are
+still generating in the background.
 
-You only need it if you're uploading books or testing the cron jobs — the API
-serves everything else fine without it, uploads just sit in `queued` until a
-worker is running.
+You only need it if you're uploading books, testing the cron jobs, or working
+on the PDF Simulator — the API serves everything else fine without it,
+uploads just sit in `queued` until a worker is running.
 
 **6. The frontend** (from the repo root, separate terminal):
 ```bash
@@ -100,11 +111,27 @@ Chat/grading/vision can run against this same local daemon (`OLLAMA_CHAT_MODEL` 
 | Teacher (Mr. Rao) | `mr.rao.5d2a15@sps.delhi.01.eduai.local` | `Teacher-Demo-2026` | `/teacher/dashboard` |
 | Student (Dev Kumar) | `dev.kumar.c43f1a@sps.delhi.01.eduai.local` | `2uBUAVW3` | student batch home |
 
-The demo school code is **`SPS-DELHI-01`**. These come from `npm run seed:super-admin`; schools, admins, teachers, and students beyond that are created through the app itself (Super Admin creates schools; School Admin imports teachers/students).
+The demo school code is **`SPS-DELHI-01`**. These are the values `seed:super-admin` / `seed:school-admin` set on a **fresh** database; schools, admins, teachers, and students beyond that are created through the app itself (Super Admin creates schools; School Admin imports teachers/students).
+
+> **Passwords above not working?** `seed:super-admin` refuses to touch an account that already exists, so if you're running against a local database that's been used before, someone may have changed the password since (there's a self-service "change password" page). Either use whatever password was last set, or run `npx supabase db reset` for a genuinely clean slate that restores these exact values.
 
 **Class 1–4 PIN login:** young students don't type emails — they use the **CLASS 1–4 (PIN)** tab on the login page (school code → class → section → tap their name → 4-digit PIN). This only works while their teacher has a live class session running.
 
 > **Login fails with "Something went wrong — please try again"?** That means the frontend can't reach the backend — check the API (step 3 above) is actually running.
+
+## Testing the PDF Simulator
+
+Newest feature (Aug 2026): a textbook PDF becomes interactive per-page
+simulations + a page-grounded AI tutor, for classes 5-10. It reuses the
+existing NCERT upload pipeline — there is no separate upload flow.
+
+1. Migration `20250101000186_pdf_simulator.sql` must be applied (`npx supabase migration up` — see above) and the **worker** must be running (step 5) — sim generation happens there, not in the API.
+2. Log in as Super Admin → Content Portal, upload (or find) a Class 5-10 Maths/Science NCERT PDF. Platform-wide uploads for that class/subject range auto-queue simulation generation once RAG ingestion (`status`) reaches `done`; a school's own upload needs an explicit **Enable** in the new Simulations column.
+3. Watch `sim_status` progress `queued → running → ready` in that same column (independent of the RAG `status` column/progress bar).
+4. Log in as a student in that class → the reader tab (`/batch2/reader` or `/batch3/reader`, depending on which batch layout the student's class uses) lists books with `sim_status='ready'`. Open one: PDF renders from a 15-minute signed URL, simulations appear on annotated pages, highlight text for an explanation, ask the chat tutor a question, take notes.
+5. To confirm the entitlement gate: toggle `pdf_simulator` off for a school in the Super Admin entitlements editor — the reader nav tab should disappear and the `/student/sim/*` API routes should start returning 403.
+
+`api/tests/simIsolation.test.ts` covers the cross-class/cross-school access boundary (a student should never reach a book outside their class, or another school's own upload) but needs the local stack up to run — see the `npm run test:security` note below.
 
 ## Other commands
 
@@ -119,11 +146,26 @@ npm run preview    # preview a production build
 ```bash
 npm run build       # tsc compile to dist/
 npm run start       # run the compiled build (node dist/index.js)
+npm run start:worker # run the compiled worker (node dist/worker.js)
 npm run typecheck   # tsc --noEmit
 npm run lint        # eslint
-npm run seed:super-admin   # seed a Super Admin account
-npm run seed:school-admin  # seed a School Admin account
+npm run seed:super-admin   # seed a Super Admin account (no-op if one already exists)
+npm run seed:school-admin  # seed a School Admin + demo school
+npm run seed:test-roster   # seed the demo teacher/student roster (Mr. Rao, Dev Kumar, etc.)
+npm run test         # vitest run — full suite (no DB needed for most files)
+npm run test:security # vitest run tests/security.test.ts — needs the local Supabase stack up
+npm run test:watch   # vitest, watch mode
 ```
+
+A few one-off scripts exist but aren't wired to `npm run` — invoke directly with `npx tsx`:
+```bash
+npx tsx scripts/seedSampleRagContent.ts   # seed fake RAG chunks without uploading a real PDF
+npx tsx scripts/uploadLabAssets.ts        # push Science Lab asset files to Supabase Storage
+npx tsx scripts/testMail.ts               # send a test email through the configured SMTP settings
+npx tsx scripts/testPdfExtract.ts <path>  # sanity-check MuPDF text extraction on a local PDF
+```
+
+> Some `isolation.test.ts` / `security.test.ts` / `simIsolation.test.ts` suites create and tear down real fixture rows against the local Postgres + GoTrue stack — they need `npx supabase start` (and, per above, `npx supabase migration up`) run first, not just `npm test` on its own.
 
 ## Stopping
 
