@@ -6,10 +6,12 @@ import { useAuth, type FeatureKey } from '../../context/AuthContext';
 import { Sidebar, NavItem } from '../../components/shared/Sidebar';
 import { TopBar } from '../../components/shared/TopBar';
 
-// Removed per user request (Aug 25 2026) — hidden from nav and its route
-// blocked (App.tsx redirects /batch3/reader home), component/API/DB left
-// intact so this is a one-line revert, not a rebuild.
-const PDF_SIMULATOR_ENABLED = false;
+// Re-enabled (Aug 26 2026) — was disabled per user request Aug 25 2026 after
+// an unrelated Sidebar regression; that fix, an entitlement-backfill bug fix,
+// worker reliability fixes, and a real-streaming restoration for the chat
+// tutor all landed since. See App.tsx (route wiring) and worker.ts
+// (startSimWorker) for the other two flags this was gated behind.
+const PDF_SIMULATOR_ENABLED = true;
 
 const LabLoading: React.FC = () => (
   <div className="h-full w-full flex items-center justify-center">

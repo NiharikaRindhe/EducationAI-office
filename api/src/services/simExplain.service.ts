@@ -8,22 +8,28 @@
 // rotation, and the Super Admin's per-tier kill-switches. A guaranteed
 // procedural fallback (ported verbatim, zero LLM) still backs every path.
 //
-// Streaming is NOT ported. generateChatReplyStream() keeps its upstream
-// (messages, context, emit) signature and {delta|done|error} event
-// contract — the route and the reader's word-streamer both consume that
-// shape — but internally makes one non-streaming chatCompletion() call and
-// emits the whole reply as a single delta via emitFullChatReply(), which
-// upstream already used as its own "provider produced no incremental
-// output" fallback. The client's createWordStreamer already types the
-// reply out at a fixed cadence regardless of how many deltas arrive, so
-// this is invisible to the student.
+// generateChatReplyStream() DOES stream for real: it drives lib/ai.ts's
+// chatCompletionStream() (a separate entry point from the chatCompletion()
+// used everywhere else in this file — see that file's own header comment)
+// and forwards genuinely incremental "reply" field text to emit({type:
+// 'delta', ...}) as it arrives, using extractStreamingJsonField() (ported
+// verbatim from upstream, below) to pull just that field's growing text
+// out of the still-incomplete JSON blob. Every other explanation/brief
+// path in this file (student explanation, selection explanation, sim
+// brief) stays on the single blocking chatCompletion() call — only the
+// multi-turn chat tutor needed real streaming restored.
+//
+// emitFullChatReply() is kept as the zero-incremental-output fallback
+// (procedural replies, syllabus refusals, and the rare case a provider
+// returns its whole JSON in one non-streamed chunk) — the same role
+// upstream gave it.
 //
 // withLlmPrompt() / the `llmPrompt` response field are NOT ported: upstream
 // stamped the exact system+user prompt text onto every explain/chat
 // response and shipped it to the browser. Dropped as an unnecessary prompt
 // leak.
 
-import { chatCompletion } from '../lib/ai.js';
+import { chatCompletion, chatCompletionStream, StreamInterruptedError, type StreamChunkHandler } from '../lib/ai.js';
 import type { AiUsageContext } from '../lib/aiUsage.js';
 import { logger } from '../lib/logger.js';
 import { parsePageImage } from '../lib/simPageImage.js';
@@ -604,17 +610,170 @@ function emitFullChatReply(reply: ChatReply, emit: ChatStreamSink): void {
   emit({ type: 'done', relatedFormulas: reply.relatedFormulas, keyTakeaways: reply.keyTakeaways });
 }
 
+/** Ported verbatim from pdf-simulation-master's explainService.ts. Pulls
+ *  the still-growing value of one string field (here, always "reply") out
+ *  of a partial/incomplete JSON blob — handles \uXXXX and the standard
+ *  JSON escapes, and degrades gracefully (returns whatever was parseable
+ *  so far) on anything malformed or cut off mid-character. This is what
+ *  lets the chat tutor's answer type in live before the enclosing
+ *  {inSyllabus, reply, relatedFormulas, keyTakeaways} object has closed. */
+export function extractStreamingJsonField(partial: string, field: string): string {
+  const key = `"${field}"`;
+  const keyIdx = partial.indexOf(key);
+  if (keyIdx < 0) return '';
+
+  let i = keyIdx + key.length;
+  while (i < partial.length && /\s/.test(partial.charAt(i))) i++;
+  if (partial.charAt(i) !== ':') return '';
+  i++;
+  while (i < partial.length && /\s/.test(partial.charAt(i))) i++;
+  if (partial.charAt(i) !== '"') return '';
+  i++;
+
+  let out = '';
+  while (i < partial.length) {
+    const ch = partial.charAt(i);
+    if (ch === '\\') {
+      if (i + 1 >= partial.length) return out;
+      const next = partial.charAt(i + 1);
+      if (next === 'u') {
+        const hex = partial.slice(i + 2, i + 6);
+        if (hex.length < 4 || /[^0-9a-fA-F]/.test(hex)) return out;
+        out += String.fromCharCode(parseInt(hex, 16));
+        i += 6;
+        continue;
+      }
+      const escaped: Record<string, string> = {
+        '"': '"',
+        '\\': '\\',
+        '/': '/',
+        b: '\b',
+        f: '\f',
+        n: '\n',
+        r: '\r',
+        t: '\t',
+      };
+      out += escaped[next] ?? next;
+      i += 2;
+      continue;
+    }
+    if (ch === '"') return out;
+    out += ch;
+    i++;
+  }
+  return out;
+}
+
+type ChatAttemptOutcome = 'done' | 'interrupted' | 'no-output';
+
+/** Drives one streamed chatCompletionStream() call for the chat tutor,
+ *  extracting and forwarding only genuinely new "reply" text as it
+ *  arrives. Returns which of three things happened:
+ *   - 'no-output': nothing was ever shown to the student for this
+ *     attempt (provider/parse failure before any reply text streamed) —
+ *     safe for the caller to fall through to the next cascade step.
+ *   - 'interrupted': some real reply text WAS shown, then the stream
+ *     ended (successfully or via a failure) — too late to retry, this
+ *     attempt is final regardless of what caused it to stop.
+ *   - 'done': the attempt completed normally with no incremental deltas
+ *     ever separable (provider returned the whole JSON in one non-
+ *     streamed chunk) — handled via the same emitFullChatReply() path
+ *     procedural/refusal replies use. */
+async function tryStreamedChatAttempt(
+  llmMessages: { role: 'system' | 'user' | 'assistant'; content: string; images?: string[] }[],
+  streamOpts: { tier: 'chat' | 'vision'; usageContext?: AiUsageContext },
+  context: ChatBookContext,
+  emit: ChatStreamSink,
+  logLabel: string,
+  signal?: AbortSignal,
+): Promise<ChatAttemptOutcome> {
+  let raw = '';
+  let emittedReply = '';
+  let streamedAny = false;
+
+  const onChunk: StreamChunkHandler = (delta) => {
+    raw += delta;
+    const extracted = extractStreamingJsonField(raw, 'reply');
+    if (extracted.length > emittedReply.length) {
+      const newText = extracted.slice(emittedReply.length);
+      emit({ type: 'delta', text: newText });
+      emittedReply = extracted;
+      streamedAny = true;
+    }
+  };
+
+  try {
+    await chatCompletionStream(llmMessages, { jsonMode: true, ...streamOpts }, onChunk, signal);
+  } catch (err) {
+    if (err instanceof StreamInterruptedError) {
+      // A chunk not yet run through onChunk can still be sitting in
+      // err.partialText if the failure landed between chunks — re-derive
+      // from the authoritative accumulated text rather than trusting
+      // whatever onChunk last saw.
+      raw = err.partialText;
+      const extracted = extractStreamingJsonField(raw, 'reply');
+      if (extracted.length > emittedReply.length) {
+        emit({ type: 'delta', text: extracted.slice(emittedReply.length) });
+        emittedReply = extracted;
+        streamedAny = true;
+      }
+    } else {
+      logger.warn({ err }, `${logLabel} failed`);
+      return 'no-output';
+    }
+  }
+
+  if (streamedAny && emittedReply) {
+    // Real reply text is already on screen — this attempt is final. Try to
+    // recover relatedFormulas/keyTakeaways if the JSON happened to finish
+    // parsing; otherwise the student keeps exactly what they already saw.
+    let relatedFormulas: string[] | undefined;
+    let keyTakeaways: string[] | undefined;
+    try {
+      const parsed = JSON.parse(cleanJson(raw));
+      const reply = chatReplyFromParsed(parsed, context);
+      if (reply) {
+        relatedFormulas = reply.relatedFormulas;
+        keyTakeaways = reply.keyTakeaways;
+      }
+    } catch {
+      // raw never closed into valid JSON — the done event ships without extras.
+    }
+    emit({ type: 'done', relatedFormulas, keyTakeaways });
+    return 'interrupted';
+  }
+
+  // Nothing was ever shown for this attempt — safe to try the next cascade step.
+  try {
+    if (!raw.trim()) return 'no-output';
+    const parsed = JSON.parse(cleanJson(raw));
+    const reply = chatReplyFromParsed(parsed, context);
+    if (!reply) return 'no-output';
+    emitFullChatReply(reply, emit);
+    return 'done';
+  } catch (err) {
+    logger.warn({ err }, `${logLabel} produced unparsable JSON`);
+    return 'no-output';
+  }
+}
+
 /**
- * Multi-turn tutor reply. Ported signature/event-contract only — see this
- * file's header comment for why the actual provider call is a single
- * chatCompletion() rather than a streamed multi-provider cascade.
- * Cascade: image attempt (if present) -> text-only retry -> procedural.
+ * Multi-turn tutor reply — streams for real. Cascade: image attempt (if
+ * present) -> text-only retry -> procedural, same order as before; the
+ * only new rule is that once an attempt has shown the student real reply
+ * text (tryStreamedChatAttempt returning anything but 'no-output'), the
+ * cascade stops there rather than falling through and duplicating/
+ * restarting content already on screen.
  */
 export async function generateChatReplyStream(
   messages: ChatTurn[],
   bookContext: ChatBookContext = {},
   emit: ChatStreamSink,
   usageContext?: AiUsageContext,
+  /** Cancels the in-flight AI call once the connection is open — wired
+   *  from the controller's res.on('close') so a student navigating away
+   *  mid-answer doesn't keep spending on a response nobody will read. */
+  signal?: AbortSignal,
 ): Promise<void> {
   const turns = sanitizeChatTurns(messages);
   const lastUser = turns[turns.length - 1];
@@ -626,7 +785,7 @@ export async function generateChatReplyStream(
   const context = gateChatPageImage(turns, bookContext);
   const systemPrompt = buildChatSystemPrompt(context);
 
-  // Zero-LLM firewall — a refusal here never spends a chatCompletion call.
+  // Zero-LLM firewall — a refusal here never spends a chatCompletionStream call.
   const scope = assessSyllabusScope({
     question: lastUser.content,
     context,
@@ -642,33 +801,13 @@ export async function generateChatReplyStream(
   const llmMessages = [{ role: 'system' as const, content: systemPrompt }, ...turns];
 
   if (parsedImage) {
-    try {
-      const raw = await chatCompletion(
-        llmMessages.map((m, i) => (i === llmMessages.length - 1 ? { ...m, images: [parsedImage.base64] } : m)),
-        { jsonMode: true, tier: 'vision', usageContext },
-      );
-      const parsed = JSON.parse(cleanJson(raw));
-      const reply = chatReplyFromParsed(parsed, context);
-      if (reply) {
-        emitFullChatReply(reply, emit);
-        return;
-      }
-    } catch (err) {
-      logger.warn({ err }, '[simExplain] chat (vision) failed — retrying text-only');
-    }
+    const visionMessages = llmMessages.map((m, i) => (i === llmMessages.length - 1 ? { ...m, images: [parsedImage.base64] } : m));
+    const outcome = await tryStreamedChatAttempt(visionMessages, { tier: 'vision', usageContext }, context, emit, '[simExplain] chat (vision)', signal);
+    if (outcome !== 'no-output') return;
   }
 
-  try {
-    const raw = await chatCompletion(llmMessages, { jsonMode: true, tier: 'chat', usageContext });
-    const parsed = JSON.parse(cleanJson(raw));
-    const reply = chatReplyFromParsed(parsed, context);
-    if (reply) {
-      emitFullChatReply(reply, emit);
-      return;
-    }
-  } catch (err) {
-    logger.warn({ err }, '[simExplain] chat call failed — using procedural fallback');
-  }
+  const outcome = await tryStreamedChatAttempt(llmMessages, { tier: 'chat', usageContext }, context, emit, '[simExplain] chat', signal);
+  if (outcome !== 'no-output') return;
 
   emitFullChatReply(generateProceduralChatReply(turns, context), emit);
 }

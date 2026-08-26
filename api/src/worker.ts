@@ -37,13 +37,8 @@ import { startExamSweeper, stopExamSweeper } from './jobs/examSweeper.job.js';
 startStreakResetJob();
 startLeaderboardRecomputeJob();
 startIngestionWorker();
-// PDF Simulator removed per user request (Aug 25 2026) — not started, so it
-// can't keep claiming/spending on sim_status='queued' rows (RAG ingestion's
-// auto-queue for classes 5-10 Maths/Science books still writes those; they
-// just sit unclaimed now) for a feature students can no longer reach
-// (App.tsx blocks /reader; Layout.tsx's PDF_SIMULATOR_ENABLED hides the nav
-// tab). One-line revert: uncomment this and flip both those flags back.
-// startSimWorker();
+// Re-enabled (Aug 26 2026) — see Layout.tsx's PDF_SIMULATOR_ENABLED comment.
+startSimWorker();
 startExamSweeper();
 
 // Minimal health endpoint so Docker/orchestrators can tell a live worker from
