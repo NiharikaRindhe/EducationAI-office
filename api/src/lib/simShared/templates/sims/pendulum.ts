@@ -1,8 +1,13 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { pendulumPeriod } from '../physics.js'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, circle, label, line, n } from '../stage.js'
+
+const schema = z.object({
+  length: num(0.1, 20, 1),
+  g: num(0.1, 30, 9.81),
+  theta0: num(1, 60, 20),
+})
 
 export const pendulum: SimFile = {
   id: 'pendulum',
@@ -18,12 +23,9 @@ export const pendulum: SimFile = {
     param('g', 'Gravity', 'm/s²', 1.6, 20, 0.01, 9.81),
     param('theta0', 'Amplitude', 'deg', 2, 40, 1, 20),
   ],
-  schema: z.object({
-    length: num(0.1, 20, 1),
-    g: num(0.1, 30, 9.81),
-    theta0: num(1, 60, 20),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const L = params.length
     const g = params.g
     const theta0 = (params.theta0 * Math.PI) / 180

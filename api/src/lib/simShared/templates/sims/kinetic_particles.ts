@@ -1,7 +1,11 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, label, particles, rect } from '../stage.js'
+
+const schema = z.object({
+  temperature: num(50, 1000, 300),
+  count: num(2, 20, 12),
+})
 
 export const kinetic_particles: SimFile = {
   id: 'kinetic_particles',
@@ -16,11 +20,9 @@ export const kinetic_particles: SimFile = {
     param('temperature', 'Temperature', 'K', 100, 600, 10, 300),
     param('count', 'Particle count', '', 4, 20, 1, 12),
   ],
-  schema: z.object({
-    temperature: num(50, 1000, 300),
-    count: num(2, 20, 12),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const { temperature, count } = params
     const speed = Math.sqrt(temperature / 300)
     return {

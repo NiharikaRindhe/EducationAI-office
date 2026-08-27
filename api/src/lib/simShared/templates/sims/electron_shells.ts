@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { choice, num, type SimFile } from '../contract.js'
 import { VIEW, circle, label, line, n } from '../stage.js'
@@ -8,6 +7,10 @@ const SHELL_NAME = ['K', 'L', 'M', 'N'] as const
 function capacity(k: number): number {
   return 2 * k * k
 }
+
+const schema = z.object({
+  n: num(1, 4, 2),
+})
 
 export const electron_shells: SimFile = {
   id: 'electron_shells',
@@ -26,10 +29,9 @@ export const electron_shells: SimFile = {
       { value: 4, label: 'N' },
     ], 2),
   ],
-  schema: z.object({
-    n: num(1, 4, 2),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const nShell = Math.min(4, Math.max(1, Math.round(params.n)))
     const cx = 188
     const cy = 168
@@ -60,12 +62,14 @@ export const electron_shells: SimFile = {
       )
       const lx = cx + r * 0.72
       const ly = cy - r * 0.72
-      const count = filled[k - 1]
-      const tag = count > 0 ? `${SHELL_NAME[k - 1]}:${count}` : SHELL_NAME[k - 1]
+      // k ranges 1..4 here, always in bounds for these 4-entry arrays.
+      const count = filled[k - 1]!
+      const tag = count > 0 ? `${SHELL_NAME[k - 1]!}:${count}` : SHELL_NAME[k - 1]!
       elements.push(label(`name-${k}`, lx + 4, ly - 2, tag, occupied ? '#2563eb' : '#64748b'))
     }
     for (let k = 1; k <= nShell; k++) {
-      const count = filled[k - 1]
+      // k ranges 1..nShell (<=4) here, always in bounds for filled's 4 entries.
+      const count = filled[k - 1]!
       const r = rOf(k)
       const omega = 1.1 / k
       const er = count > 12 ? 2.6 : count > 4 ? 3.2 : 4

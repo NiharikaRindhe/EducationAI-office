@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { thinPrismDeviation } from '../physics.js'
 import { num, param, type SimFile } from '../contract.js'
@@ -60,6 +59,11 @@ const SPECTRUM = [
   { id: 'R', fill: '#dc2626' },
 ] as const
 
+const schema = z.object({
+  A: num(0.2, 40, 6),
+  mu: num(1.01, 3, 1.5),
+})
+
 export const prism: SimFile = {
   id: 'prism',
   domain: 'physics',
@@ -73,11 +77,9 @@ export const prism: SimFile = {
     param('A', 'Prism angle A', 'deg', 1, 20, 0.5, 6),
     param('mu', 'μ', '', 1.1, 2.2, 0.01, 1.5),
   ],
-  schema: z.object({
-    A: num(0.2, 40, 6),
-    mu: num(1.01, 3, 1.5),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const { A, mu } = params
     const delta = thinPrismDeviation(A, mu)
     const ink = '#334155'

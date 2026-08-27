@@ -1,10 +1,14 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, circle, label, line, n, pathEl, rect } from '../stage.js'
 
 /** Lamp-to-screen distance (cm). Object stays between the lamp and the wall. */
 const SCREEN_CM = 120
+
+const schema = z.object({
+  sourceDistance: num(5, 200, 40),
+  objectHeight: num(1, 80, 15),
+})
 
 export const shadow_light: SimFile = {
   id: 'shadow_light',
@@ -19,11 +23,9 @@ export const shadow_light: SimFile = {
     param('sourceDistance', 'Source distance u', 'cm', 10, 110, 1, 40),
     param('objectHeight', 'Object height h', 'cm', 5, 40, 1, 15),
   ],
-  schema: z.object({
-    sourceDistance: num(5, 200, 40),
-    objectHeight: num(1, 80, 15),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const h = params.objectHeight
     const D = SCREEN_CM
     const u = Math.min(Math.max(params.sourceDistance, 8), D - 10)

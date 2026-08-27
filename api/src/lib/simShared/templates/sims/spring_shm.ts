@@ -1,8 +1,13 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { shmPeriod } from '../physics.js'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, circle, label, n, rect, spring } from '../stage.js'
+
+const schema = z.object({
+  k: num(0.1, 500, 20),
+  m: num(0.05, 50, 1),
+  A: num(0.01, 5, 0.4),
+})
 
 export const spring_shm: SimFile = {
   id: 'spring_shm',
@@ -18,12 +23,9 @@ export const spring_shm: SimFile = {
     param('m', 'Mass', 'kg', 0.1, 20, 0.1, 1),
     param('A', 'Amplitude', 'm', 0.05, 2, 0.05, 0.4),
   ],
-  schema: z.object({
-    k: num(0.1, 500, 20),
-    m: num(0.05, 50, 1),
-    A: num(0.01, 5, 0.4),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const { k, m, A } = params
     const T = shmPeriod(k, m)
     const omega = (2 * Math.PI) / T

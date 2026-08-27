@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { choice, num, type SimFile } from '../contract.js'
 import { VIEW, circle, label, line, n, particles, pathEl, rect, tLoop } from '../stage.js'
@@ -17,6 +16,11 @@ function salt(name: string): string {
 function ion(name: string): string {
   return name === 'Na' ? 'Na⁺' : `${name}²⁺`
 }
+
+const schema = z.object({
+  metalA: num(0, 4, 2),
+  metalB: num(0, 4, 4),
+})
 
 export const reactivity_swap: SimFile = {
   id: 'reactivity_swap',
@@ -42,15 +46,14 @@ export const reactivity_swap: SimFile = {
       4
     ),
   ],
-  schema: z.object({
-    metalA: num(0, 4, 2),
-    metalB: num(0, 4, 4),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const a = Math.max(0, Math.min(4, Math.round(params.metalA)))
     const b = Math.max(0, Math.min(4, Math.round(params.metalB)))
-    const nameA = METALS[a]
-    const nameB = METALS[b]
+    // a, b are clamped to 0-4 just above, always in bounds for these 5-entry arrays.
+    const nameA = METALS[a]!
+    const nameB = METALS[b]!
     const willDisplace = a < b
     const same = a === b
     const ink = '#334155'
@@ -84,7 +87,7 @@ export const reactivity_swap: SimFile = {
         y: yLiq,
         width: liqW,
         height: liqH,
-        fill: SALT_FILL[b],
+        fill: SALT_FILL[b]!,
         opacity: willDisplace ? { $expr: `1 - 0.85 * (${frac})` } : 1,
       }),
       rect('solA', {
@@ -92,7 +95,7 @@ export const reactivity_swap: SimFile = {
         y: yLiq,
         width: liqW,
         height: liqH,
-        fill: SALT_FILL[a],
+        fill: SALT_FILL[a]!,
         opacity: willDisplace ? { $expr: `0.85 * (${frac})` } : 0,
       }),
       pathEl('beaker', {
@@ -109,7 +112,7 @@ export const reactivity_swap: SimFile = {
         count: willDisplace ? 10 : 8,
         speed: willDisplace ? { $expr: `0.7 - 0.55 * (${frac})` } : 0.35,
         r: 4,
-        fill: METAL_FILL[b],
+        fill: METAL_FILL[b]!,
         time: { $expr: 'time' },
       }),
       rect('strip', {
@@ -117,7 +120,7 @@ export const reactivity_swap: SimFile = {
         y: stripY,
         width: stripW,
         height: stripH,
-        fill: METAL_FILL[a],
+        fill: METAL_FILL[a]!,
         stroke: ink,
         strokeWidth: 1.5,
         rx: 2,
@@ -142,7 +145,7 @@ export const reactivity_swap: SimFile = {
             cx: s.x,
             cy: s.y,
             r: s.r,
-            fill: METAL_FILL[b],
+            fill: METAL_FILL[b]!,
             stroke: ink,
             strokeWidth: 0.75,
             opacity: { $expr: `min(1, max(0, (${frac}) - ${delay}) / 0.22)` },
@@ -156,7 +159,7 @@ export const reactivity_swap: SimFile = {
             cx: { $expr: `${n(318)} - ${n(64)} * (${frac})` },
             cy: { $expr: `${n(168)} + 6 * sin(2 * (${frac}) * 3.14159)` },
             r: 5,
-            fill: METAL_FILL[b],
+            fill: METAL_FILL[b]!,
             stroke: ink,
             strokeWidth: 0.75,
             opacity: { $expr: `1 - ${frac}` },

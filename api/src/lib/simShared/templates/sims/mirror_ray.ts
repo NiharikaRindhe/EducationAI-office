@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { mirrorImage } from '../physics.js'
 import { choice, num, param, type SimFile } from '../contract.js'
@@ -48,6 +47,12 @@ function nature(real: boolean, m: number): string {
   return `${real ? 'Real' : 'Virtual'}, ${m < 0 ? 'inverted' : 'erect'}, ${size}`
 }
 
+const schema = z.object({
+  u: num(1, 200, 30),
+  f: num(1, 80, 10),
+  kind: num(0, 1, 0),
+})
+
 export const mirror_ray: SimFile = {
   id: 'mirror_ray',
   domain: 'physics',
@@ -78,12 +83,9 @@ export const mirror_ray: SimFile = {
       0
     ),
   ],
-  schema: z.object({
-    u: num(1, 200, 30),
-    f: num(1, 80, 10),
-    kind: num(0, 1, 0),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const { u, f } = params
     const concave = params.kind < 0.5
     const { v, m, real } = mirrorImage(u, f, concave ? 0 : 1)

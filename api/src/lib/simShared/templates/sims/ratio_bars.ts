@@ -1,7 +1,11 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, label, rect } from '../stage.js'
+
+const schema = z.object({
+  partA: num(0, 400, 30),
+  partB: num(0, 400, 70),
+})
 
 export const ratio_bars: SimFile = {
   id: 'ratio_bars',
@@ -16,11 +20,9 @@ export const ratio_bars: SimFile = {
     param('partA', 'Part A', '', 1, 80, 1, 30),
     param('partB', 'Part B', '', 1, 80, 1, 70),
   ],
-  schema: z.object({
-    partA: num(0, 400, 30),
-    partB: num(0, 400, 70),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const { partA, partB } = params
     const whole = Math.max(partA + partB, 1e-9)
     const pctA = (100 * partA) / whole

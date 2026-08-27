@@ -52,6 +52,16 @@ export default defineConfig([
       'react-hooks/set-state-in-effect': 'warn',
       'react-refresh/only-export-components': 'warn',
       'react-hooks/preserve-manual-memoization': 'warn',
+
+      // Same convention as the api/**/*.ts block below, for the same reason:
+      // a `_` prefix marks a name as deliberately unused (a required
+      // destructuring/tuple slot, a signature the caller controls) instead
+      // of switching the rule off. The frontend already relies on this in
+      // several places; this override just makes the config match.
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
     },
   },
   {

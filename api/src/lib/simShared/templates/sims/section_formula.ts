@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { sectionPoint } from '../math.js'
 import { num, param, type SimFile } from '../contract.js'
@@ -12,6 +11,15 @@ function fmt(x: number): string {
 function coord(x: number, y: number): string {
   return `(${fmt(x)}, ${fmt(y)})`
 }
+
+const schema = z.object({
+  x1: num(-20, 20, 0),
+  y1: num(-20, 20, 0),
+  x2: num(-20, 20, 4),
+  y2: num(-20, 20, 2),
+  m: num(0.1, 20, 1),
+  n: num(0.1, 20, 1),
+})
 
 export const section_formula: SimFile = {
   id: 'section_formula',
@@ -30,15 +38,9 @@ export const section_formula: SimFile = {
     param('m', 'm', '', 1, 8, 1, 1),
     param('n', 'n', '', 1, 8, 1, 1),
   ],
-  schema: z.object({
-    x1: num(-20, 20, 0),
-    y1: num(-20, 20, 0),
-    x2: num(-20, 20, 4),
-    y2: num(-20, 20, 2),
-    m: num(0.1, 20, 1),
-    n: num(0.1, 20, 1),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const { x1, y1, x2, y2, m, n } = params
     const { x, y } = sectionPoint(x1, y1, x2, y2, m, n)
     const ink = '#334155'
@@ -75,9 +77,9 @@ export const section_formula: SimFile = {
       x: 60 + (p.x - minX) * s,
       y: 44 + (maxY - p.y) * s,
     })
-    const A = to(pts[0])
-    const B = to(pts[1])
-    const P = to(pts[2])
+    const A = to(pts[0]!)
+    const B = to(pts[1]!)
+    const P = to(pts[2]!)
     const O = to({ x: 0, y: 0 })
     const dx = B.x - A.x
     const dy = B.y - A.y

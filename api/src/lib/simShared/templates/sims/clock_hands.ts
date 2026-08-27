@@ -1,7 +1,11 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, circle, label, line } from '../stage.js'
+
+const schema = z.object({
+  hours: num(0, 23, 3),
+  minutes: num(0, 59, 0),
+})
 
 export const clock_hands: SimFile = {
   id: 'clock_hands',
@@ -16,11 +20,9 @@ export const clock_hands: SimFile = {
     param('hours', 'Hours', '', 0, 12, 1, 3),
     param('minutes', 'Minutes', '', 0, 59, 1, 0),
   ],
-  schema: z.object({
-    hours: num(0, 23, 3),
-    minutes: num(0, 59, 0),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const hours = ((Math.round(params.hours) % 12) + 12) % 12
     const minutes = Math.max(0, Math.min(59, Math.round(params.minutes)))
     const raw = Math.abs(30 * hours - 5.5 * minutes)

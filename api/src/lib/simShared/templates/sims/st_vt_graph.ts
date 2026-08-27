@@ -1,8 +1,13 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { motionGraphs } from '../math.js'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, circle, label, line, n, pathEl, tLoop } from '../stage.js'
+
+const schema = z.object({
+  u: num(0, 80, 0),
+  a: num(-20, 40, 2),
+  tMax: num(0.5, 40, 5),
+})
 
 export const st_vt_graph: SimFile = {
   id: 'st_vt_graph',
@@ -18,12 +23,9 @@ export const st_vt_graph: SimFile = {
     param('a', 'Acceleration a', 'm/s²', -10, 20, 0.1, 2),
     param('tMax', 'Duration', 's', 1, 20, 0.5, 5),
   ],
-  schema: z.object({
-    u: num(0, 80, 0),
-    a: num(-20, 40, 2),
-    tMax: num(0.5, 40, 5),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const { u, a, tMax } = params
     const { sMax, vEnd } = motionGraphs(u, a, tMax)
     const sAbs = Math.max(Math.abs(sMax), 1)

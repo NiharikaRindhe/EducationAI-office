@@ -38,7 +38,9 @@ import {
 // below). These lazy imports are unused while that's off, left in place —
 // component/API/DB are untouched, this is meant to be reversible. See
 // src/routes/shared/reader/ for the port itself.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- unused while PDF_SIMULATOR_ENABLED is off, see comment above
 const ReaderLibrary = lazy(() => import('./routes/shared/reader/routes/ReaderLibrary').then((m) => ({ default: m.ReaderLibrary })));
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- unused while PDF_SIMULATOR_ENABLED is off, see comment above
 const ReaderBookPage = lazy(() => import('./routes/shared/reader/routes/ReaderBookPage').then((m) => ({ default: m.ReaderBookPage })));
 
 // Import Batch 3 Pages

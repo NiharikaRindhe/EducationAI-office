@@ -375,10 +375,17 @@ export const NotebookPanel: React.FC<NotebookPanelProps> = ({
                   key={note.id}
                   data-note-id={note.id}
                   className={`notebook__card-anchor${focusedId === note.id ? ' is-focused' : ''}`}
+                  // React's documented "map of refs" pattern (react.dev/learn/
+                  // manipulating-the-dom-with-refs#how-to-manage-a-list-of-refs-using-a-ref-callback):
+                  // the callback runs at commit time, not during render, so
+                  // mutating cardRefs here is safe despite the lint rule's
+                  // static (render-body-only) heuristic flagging it.
+                  /* eslint-disable react-hooks/refs */
                   ref={(el) => {
                     if (el) cardRefs.current.set(note.id, el)
                     else cardRefs.current.delete(note.id)
                   }}
+                  /* eslint-enable react-hooks/refs */
                 >
                   <NoteCard
                     note={note}

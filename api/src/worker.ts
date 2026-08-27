@@ -4,6 +4,7 @@ import { logger } from './lib/logger.js';
 import { startStreakResetJob } from './jobs/streakReset.job.js';
 import { startLeaderboardRecomputeJob } from './jobs/leaderboardRecompute.job.js';
 import { startIngestionWorker, stopIngestionWorker } from './jobs/ingestionWorker.job.js';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- startSimWorker unused while the call below is commented out, see it for why
 import { startSimWorker, stopSimWorker } from './jobs/simWorker.job.js';
 import { startExamSweeper, stopExamSweeper } from './jobs/examSweeper.job.js';
 

@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, circle, label, line, n, pathEl, rect, tLoop } from '../stage.js'
@@ -29,10 +28,11 @@ function mbPlot(temperature: number, Ea: number) {
   const shade: string[] = [`M ${ox + (Math.min(Ea, Emax) / Emax) * w} ${oy}`]
   let shadeStarted = false
   for (let i = 0; i < samples.length; i++) {
-    const px = ox + (samples[i].E / Emax) * w
-    const py = oy - (samples[i].f / peak) * h
+    const s = samples[i]! // i is bounded by samples.length above
+    const px = ox + (s.E / Emax) * w
+    const py = oy - (s.f / peak) * h
     curve.push(`${i === 0 ? 'M' : 'L'} ${px.toFixed(1)} ${py.toFixed(1)}`)
-    if (samples[i].E + 1e-6 >= Ea) {
+    if (s.E + 1e-6 >= Ea) {
       if (!shadeStarted) {
         shade.push(`L ${px.toFixed(1)} ${py.toFixed(1)}`)
         shadeStarted = true
@@ -45,6 +45,11 @@ function mbPlot(temperature: number, Ea: number) {
   const eaX = ox + (Math.min(Math.max(Ea, 0), Emax) / Emax) * w
   return { ox, oy, w, h, curve: curve.join(' '), shade: shade.join(' '), eaX }
 }
+
+const schema = z.object({
+  temperature: num(100, 900, 350),
+  activationEnergy: num(1, 150, 40),
+})
 
 export const collision_theory: SimFile = {
   id: 'collision_theory',
@@ -59,11 +64,9 @@ export const collision_theory: SimFile = {
     param('temperature', 'Temperature', 'K', 250, 700, 10, 350),
     param('activationEnergy', 'Ea', 'kJ/mol', 10, 80, 1, 40),
   ],
-  schema: z.object({
-    temperature: num(100, 900, 350),
-    activationEnergy: num(1, 150, 40),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const { temperature, activationEnergy } = params
     const RT = 0.008314 * temperature
     const fraction = Math.exp(-activationEnergy / Math.max(RT, 0.1))

@@ -1,7 +1,11 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, label, n, wave } from '../stage.js'
+
+const schema = z.object({
+  A: num(1, 80, 20),
+  f: num(0.1, 20, 1.5),
+})
 
 export const sound_wave: SimFile = {
   id: 'sound_wave',
@@ -16,11 +20,9 @@ export const sound_wave: SimFile = {
     param('A', 'Amplitude', 'units', 4, 50, 1, 20),
     param('f', 'Frequency', 'Hz', 0.2, 8, 0.1, 1.5),
   ],
-  schema: z.object({
-    A: num(1, 80, 20),
-    f: num(0.1, 20, 1.5),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const { A, f } = params
     const wavelength = Math.max(40, 180 / Math.max(f, 0.2))
     return {
