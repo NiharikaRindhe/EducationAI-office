@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { complement, supplement } from '../math.js'
 import { num, param, type SimFile } from '../contract.js'
@@ -28,6 +27,10 @@ function midLabel(ox: number, oy: number, startDeg: number, endDeg: number, radi
   return { x: ox + radius * Math.cos(m) - 10, y: oy - radius * Math.sin(m) + 4 }
 }
 
+const schema = z.object({
+  angleDeg: num(1, 89, 35),
+})
+
 export const angle_pair: SimFile = {
   id: 'angle_pair',
   domain: 'math',
@@ -38,10 +41,9 @@ export const angle_pair: SimFile = {
   equations: ["A + A' = 90^\\circ", "A + A'' = 180^\\circ"],
   keywords: ['complementary', 'supplementary', 'adjacent angles', 'pair of angles'],
   params: [param('angleDeg', 'Angle', 'deg', 5, 85, 1, 35)],
-  schema: z.object({
-    angleDeg: num(1, 89, 35),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const A = params.angleDeg
     const comp = complement(A)
     const supp = supplement(A)

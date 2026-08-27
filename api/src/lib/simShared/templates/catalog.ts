@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 // shared/templates/catalog.ts
 // Registry assembled from sim files. Param clamp + provenance live here.
 
@@ -133,7 +132,8 @@ export function randomizeTemplateParams(templateId: TemplateId): Record<string, 
   const params: Record<string, number> = {}
   for (const def of defs) {
     if (def.options?.length) {
-      params[def.key] = def.options[Math.floor(Math.random() * def.options.length)].value
+      // Math.floor(random * length) is always a valid index into def.options.
+      params[def.key] = def.options[Math.floor(Math.random() * def.options.length)]!.value
       continue
     }
     const span = def.max - def.min
@@ -145,8 +145,10 @@ export function randomizeTemplateParams(templateId: TemplateId): Record<string, 
     params[def.key] = Number(clamped.toFixed(decimals))
   }
   if (templateId === 'collision_1d') {
-    params.u1 = Math.abs(params.u1)
-    params.u2 = -Math.abs(params.u2 === 0 ? 2 : params.u2)
+    // The loop above always fills a key for every def in collision_1d's own
+    // params array, which includes u1/u2 — both are set by this point.
+    params.u1 = Math.abs(params.u1!)
+    params.u2 = -Math.abs(params.u2 === 0 ? 2 : params.u2!)
   }
   return parseTemplateParams(templateId, params).params
 }

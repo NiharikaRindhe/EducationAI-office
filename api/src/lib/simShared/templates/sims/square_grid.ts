@@ -1,7 +1,10 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, label, rect } from '../stage.js'
+
+const schema = z.object({
+  n: num(1, 20, 5),
+})
 
 export const square_grid: SimFile = {
   id: 'square_grid',
@@ -13,10 +16,9 @@ export const square_grid: SimFile = {
   equations: ['n^2', '\\sqrt{n^2} = n'],
   keywords: ['square number', 'square root', '8×8', 'perfect square'],
   params: [param('n', 'n', '', 1, 12, 1, 5)],
-  schema: z.object({
-    n: num(1, 20, 5),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const n = Math.max(1, Math.round(params.n))
     const n2 = n * n
     const root = Math.sqrt(n)

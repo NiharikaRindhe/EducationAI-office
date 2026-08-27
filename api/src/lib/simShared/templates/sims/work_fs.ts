@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { workFs } from '../physics.js'
 import { num, param, type SimFile } from '../contract.js'
@@ -8,6 +7,12 @@ function fmt(x: number): string {
   const r = Math.round(x * 100) / 100
   return Number.isInteger(r) ? String(r) : r.toFixed(2)
 }
+
+const schema = z.object({
+  force: num(0, 1e4, 10),
+  s: num(0, 200, 2),
+  angleDeg: num(0, 180, 0),
+})
 
 export const work_fs: SimFile = {
   id: 'work_fs',
@@ -23,12 +28,9 @@ export const work_fs: SimFile = {
     param('s', 'Displacement', 'm', 0.5, 20, 0.5, 2),
     param('angleDeg', 'Angle θ', 'deg', 0, 180, 5, 0),
   ],
-  schema: z.object({
-    force: num(0, 1e4, 10),
-    s: num(0, 200, 2),
-    angleDeg: num(0, 180, 0),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const { force, s, angleDeg } = params
     const W = workFs(force, s, angleDeg)
     const ink = '#334155'

@@ -1,9 +1,12 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, circle, label, line, n, tLoop } from '../stage.js'
 
 const CL_ANGLES = [0, 45, 90, 135, 225, 270, 315].map((deg) => (deg * Math.PI) / 180)
+
+const schema = z.object({
+  duration: num(0.5, 12, 3),
+})
 
 export const ionic_bond: SimFile = {
   id: 'ionic_bond',
@@ -15,10 +18,9 @@ export const ionic_bond: SimFile = {
   equations: ['\\text{Na} + \\text{Cl} \\rightarrow \\text{Na}^+ + \\text{Cl}^-'],
   keywords: ['ionic bond', 'ionic bonding', 'electron transfer', 'sodium chloride', 'cation anion'],
   params: [param('duration', 'Duration', 's', 1, 8, 0.5, 3)],
-  schema: z.object({
-    duration: num(0.5, 12, 3),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const d = params.duration
     const t = tLoop(d + 1.1, d)
     const frac = `(${t}) / ${n(d)}`

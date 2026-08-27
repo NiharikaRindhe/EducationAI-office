@@ -1,8 +1,13 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { apSum, apTerm } from '../math.js'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, circle, label, line } from '../stage.js'
+
+const schema = z.object({
+  a: num(-80, 80, 2),
+  d: num(-40, 40, 3),
+  n: num(1, 30, 5),
+})
 
 export const ap_graph: SimFile = {
   id: 'ap_graph',
@@ -18,12 +23,9 @@ export const ap_graph: SimFile = {
     param('d', 'Common difference d', '', -10, 10, 1, 3),
     param('n', 'Number of terms n', '', 2, 12, 1, 5),
   ],
-  schema: z.object({
-    a: num(-80, 80, 2),
-    d: num(-40, 40, 3),
-    n: num(1, 30, 5),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const a = params.a
     const d = params.d
     const n = Math.max(1, Math.round(params.n))

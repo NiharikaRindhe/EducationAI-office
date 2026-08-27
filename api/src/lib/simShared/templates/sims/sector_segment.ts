@@ -1,8 +1,12 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { sectorArea, segmentArea } from '../math.js'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, circle, label, line, pathEl } from '../stage.js'
+
+const schema = z.object({
+  r: num(0.5, 20, 4),
+  thetaDeg: num(5, 350, 90),
+})
 
 export const sector_segment: SimFile = {
   id: 'sector_segment',
@@ -20,11 +24,9 @@ export const sector_segment: SimFile = {
     param('r', 'Radius r', '', 1, 10, 0.1, 4),
     param('thetaDeg', 'Angle θ', 'deg', 20, 180, 1, 90),
   ],
-  schema: z.object({
-    r: num(0.5, 20, 4),
-    thetaDeg: num(5, 350, 90),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const { r, thetaDeg } = params
     const sector = sectorArea(r, thetaDeg)
     const segment = segmentArea(r, thetaDeg)

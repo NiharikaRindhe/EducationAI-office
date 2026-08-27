@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { tangentLength } from '../math.js'
 import { num, param, type SimFile } from '../contract.js'
@@ -23,6 +22,11 @@ function fmt(x: number): string {
   return Number.isInteger(r) ? String(r) : r.toFixed(2)
 }
 
+const schema = z.object({
+  r: num(0.5, 20, 3),
+  d: num(0.5, 40, 5),
+})
+
 export const circle_tangent: SimFile = {
   id: 'circle_tangent',
   domain: 'math',
@@ -36,11 +40,9 @@ export const circle_tangent: SimFile = {
     param('r', 'Radius r', '', 1, 8, 0.1, 3),
     param('d', 'Distance d', '', 2, 14, 0.1, 5),
   ],
-  schema: z.object({
-    r: num(0.5, 20, 3),
-    d: num(0.5, 40, 5),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const { r, d } = params
     const { length, real } = tangentLength(r, d)
     const warnings = real ? [] : ['Point is inside the circle: no real tangent']

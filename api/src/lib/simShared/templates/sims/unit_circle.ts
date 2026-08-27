@@ -1,7 +1,11 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, arrow, circle, label, line, n, pathEl } from '../stage.js'
+
+const schema = z.object({
+  angleDeg: num(0, 360, 60),
+  omega: num(0.05, 12, 0.8),
+})
 
 export const unit_circle: SimFile = {
   id: 'unit_circle',
@@ -16,11 +20,9 @@ export const unit_circle: SimFile = {
     param('angleDeg', 'Start θ', 'deg', 0, 360, 1, 60),
     param('omega', 'ω', 'rad/s', 0.2, 4, 0.1, 0.8),
   ],
-  schema: z.object({
-    angleDeg: num(0, 360, 60),
-    omega: num(0.05, 12, 0.8),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const angleDeg = ((params.angleDeg % 360) + 360) % 360
     const omega = params.omega
     const th0 = (angleDeg * Math.PI) / 180

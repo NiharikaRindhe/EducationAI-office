@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, circle, label, line, pathEl } from '../stage.js'
@@ -26,6 +25,10 @@ function chevron(id: string, x: number, y: number): ReturnType<typeof pathEl> {
   })
 }
 
+const schema = z.object({
+  angleDeg: num(10, 170, 120),
+})
+
 export const parallel_transversal: SimFile = {
   id: 'parallel_transversal',
   domain: 'math',
@@ -36,10 +39,9 @@ export const parallel_transversal: SimFile = {
   equations: ['matching corners are equal', 'corners in a straight line add to 180°'],
   keywords: ['parallel lines', 'transversal', 'corresponding angles', 'matching corners', 'co-interior'],
   params: [param('angleDeg', 'This corner', 'deg', 20, 160, 1, 120)],
-  schema: z.object({
-    angleDeg: num(10, 170, 120),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const A = Math.round(params.angleDeg)
     const adj = 180 - A
     const tilt = A > 90 ? 180 - A : A

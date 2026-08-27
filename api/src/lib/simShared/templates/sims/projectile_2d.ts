@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { analyticFlatRange, solveProjectile } from '../physics.js'
 import { num, param, type SimFile } from '../contract.js'
@@ -22,6 +21,13 @@ function buildParabolaPath(
   return pts.join(' ')
 }
 
+const schema = z.object({
+  v0: num(0.1, 200, 20),
+  angleDeg: num(0, 90, 45),
+  h0: num(0, 200, 0),
+  g: num(0.1, 30, 9.81),
+})
+
 export const projectile_2d: SimFile = {
   id: 'projectile_2d',
   domain: 'physics',
@@ -41,13 +47,9 @@ export const projectile_2d: SimFile = {
     param('h0', 'Height', 'm', 0, 50, 0.5, 0),
     param('g', 'Gravity', 'm/s²', 1.6, 20, 0.01, 9.81),
   ],
-  schema: z.object({
-    v0: num(0.1, 200, 20),
-    angleDeg: num(0, 90, 45),
-    h0: num(0, 200, 0),
-    g: num(0.1, 30, 9.81),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const { v0, angleDeg, h0, g } = params
     const sol = solveProjectile(v0, angleDeg, h0, g)
     const warnings: string[] = []

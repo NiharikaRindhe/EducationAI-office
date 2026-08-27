@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 // shared/templates/match.ts
 // Map natural-language / textbook text onto a catalog template + extracted numbers.
 
@@ -54,8 +53,8 @@ function extractMetals(text: string): { metalA?: number; metalB?: number } {
   }
   found.sort((a, b) => a.index - b.index)
   if (found.length === 0) return {}
-  if (found.length === 1) return { metalA: found[0].rank }
-  return { metalA: found[0].rank, metalB: found[1].rank }
+  if (found.length === 1) return { metalA: found[0]!.rank }
+  return { metalA: found[0]!.rank, metalB: found[1]!.rank }
 }
 
 function extractCommon(text: string): Record<string, number> {
@@ -106,7 +105,7 @@ function extractCommon(text: string): Record<string, number> {
   set('force', pickNumber(text, [/(\d+(?:\.\d+)?)\s*N\b/, /force[^\d]{0,12}(\d+(?:\.\d+)?)/i]))
   set('densityObject', pickNumber(text, [/(\d+(?:\.\d+)?)\s*kg\/m/i, /density[^\d]{0,12}(\d+(?:\.\d+)?)/i]))
   set('rho', pickNumber(text, [/ρ\s*=\s*(\d+(?:\.\d+)?)/i, /rho\s*=\s*(\d+(?:\.\d+)?)/i, /(\d+(?:\.\d+)?)\s*kg\s*\/\s*m/i]))
-  if (raw.rho === undefined) raw.rho = raw.densityObject
+  if (raw.rho === undefined) set('rho', raw.densityObject)
   set(
     'temperature',
     pickNumber(text, [
@@ -200,8 +199,10 @@ function extractCommon(text: string): Record<string, number> {
 
   const eq = text.match(/(-?\d+)\s*x\s*([+-])\s*(\d+)\s*=\s*(-?\d+)/i)
   if (eq) {
+    // None of this regex's 4 capture groups are optional, so all are present
+    // whenever the overall match (eq) succeeds.
     raw.coeff = Number(eq[1])
-    raw.addend = Number(eq[2] === '-' ? -eq[3] : eq[3])
+    raw.addend = Number(eq[2] === '-' ? -Number(eq[3]) : eq[3])
     raw.rhs = Number(eq[4])
   }
 
@@ -264,7 +265,8 @@ function extractCommon(text: string): Record<string, number> {
 
   const indianLakh = text.match(/\b(\d{1,2}),(\d{2}),(\d{3})\b/)
   if (indianLakh) {
-    const n = Number(indianLakh[1] + indianLakh[2] + indianLakh[3])
+    // None of this regex's 3 capture groups are optional.
+    const n = Number(indianLakh[1]! + indianLakh[2]! + indianLakh[3]!)
     if (Number.isFinite(n)) {
       raw.ones = n % 10
       raw.tens = Math.floor(n / 10) % 10
@@ -278,7 +280,8 @@ function extractCommon(text: string): Record<string, number> {
   } else {
     const indian = text.match(/\b(\d{1,2}),(\d{3})\b/)
     if (indian) {
-      const n = Number(indian[1] + indian[2])
+      // Neither of this regex's 2 capture groups are optional.
+      const n = Number(indian[1]! + indian[2]!)
       if (Number.isFinite(n)) {
         raw.ones = n % 10
         raw.tens = Math.floor(n / 10) % 10

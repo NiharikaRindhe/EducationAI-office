@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { ohmCurrent, parallelReq, seriesReq } from '../physics.js'
 import { choice, num, param, type SimFile } from '../contract.js'
@@ -55,6 +54,13 @@ function fmt(x: number): string {
   return Number.isInteger(r) ? String(r) : r.toFixed(2)
 }
 
+const schema = z.object({
+  V: num(0.1, 200, 10),
+  R1: num(0.1, 500, 2),
+  R2: num(0.1, 500, 3),
+  mode: num(0, 1, 0),
+})
+
 export const series_parallel: SimFile = {
   id: 'series_parallel',
   domain: 'physics',
@@ -73,13 +79,9 @@ export const series_parallel: SimFile = {
       { value: 1, label: 'Parallel' },
     ], 0),
   ],
-  schema: z.object({
-    V: num(0.1, 200, 10),
-    R1: num(0.1, 500, 2),
-    R2: num(0.1, 500, 3),
-    mode: num(0, 1, 0),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const { V, R1, R2 } = params
     const parallel = params.mode >= 0.5
     const Req = parallel ? parallelReq(R1, R2) : seriesReq(R1, R2)

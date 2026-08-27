@@ -1,7 +1,14 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, label, rect } from '../stage.js'
+
+const schema = z.object({
+  v1: num(0, 200, 8),
+  v2: num(0, 200, 12),
+  v3: num(0, 200, 5),
+  v4: num(0, 200, 0),
+  v5: num(0, 200, 0),
+})
 
 export const bar_chart: SimFile = {
   id: 'bar_chart',
@@ -19,14 +26,9 @@ export const bar_chart: SimFile = {
     param('v4', 'v₄', '', 0, 50, 1, 0),
     param('v5', 'v₅', '', 0, 50, 1, 0),
   ],
-  schema: z.object({
-    v1: num(0, 200, 8),
-    v2: num(0, 200, 12),
-    v3: num(0, 200, 5),
-    v4: num(0, 200, 0),
-    v5: num(0, 200, 0),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const values = [params.v1, params.v2, params.v3, params.v4, params.v5]
     const total = values.reduce((s, v) => s + v, 0)
     const max = Math.max(...values, 1)
@@ -46,7 +48,7 @@ export const bar_chart: SimFile = {
           y: baseY - h,
           width: 48,
           height: h,
-          fill: colors[i],
+          fill: colors[i]!,
           rx: 3,
         })
       )
