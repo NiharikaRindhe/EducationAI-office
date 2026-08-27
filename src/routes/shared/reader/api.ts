@@ -17,11 +17,14 @@
 //  - No book upload/library/delete here — that's the Super Admin's
 //    Content Portal. bookId (kept as the param name upstream used) is
 //    really our ncert_ingestion_jobs id ("jobId" server-side).
-//  - Chat is no longer SSE. sendChatMessageStream() keeps its exact
-//    (params, { onDelta, signal }) contract, but makes one plain POST and
-//    calls onDelta ONCE with the full reply — the caller
-//    (ReaderRoute.handleSendChatMessage) already wraps every onDelta call
-//    through createWordStreamer, so the typing effect is unchanged.
+//  - Chat streams for real again: sendChatMessageStream() keeps its exact
+//    (params, { onDelta, signal }) contract, but now reads the backend's
+//    SSE response via fetch + a ReadableStream reader (not EventSource,
+//    which can't send a POST body or an Authorization header) and calls
+//    onDelta once per incremental chunk. wordStreamer.appendTarget() (the
+//    only consumer, via ReaderRoute.handleSendChatMessage) expects the
+//    CUMULATIVE reply text on every call despite the callback's name, so
+//    this accumulates deltas into a running total before each call.
 //  - Grounding text is never sent by the client. bookContext.pageText is
 //    accepted on the type (ReaderRoute still tracks it for other reasons)
 //    but is NOT put on the wire — the server derives it itself from
@@ -334,8 +337,9 @@ class SimulationApiClient {
     return data.explanation
   }
 
-  /** Streaming contract preserved (see header comment) — one plain POST,
-   *  one onDelta call with the full reply. */
+  /** Streaming contract preserved (see header comment): reads the
+   *  backend's real SSE response and calls onDelta with the cumulative
+   *  reply text as each chunk arrives. */
   async sendChatMessageStream(
     params: { messages: ChatApiTurn[]; bookContext?: ChatBookContext; bookId?: string },
     options: { onDelta: (text: string) => void; signal?: AbortSignal },
@@ -356,9 +360,67 @@ class SimulationApiClient {
       }),
       signal: options.signal,
     })
-    const data = await readJson<ChatReply>(res, 'Failed to send chat message')
-    if (data.reply) options.onDelta(data.reply)
-    return data
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err?.error?.message || err?.error || 'Failed to send chat message')
+    }
+    if (!res.body) throw new Error('Chat stream was empty')
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let reply = ''
+    let relatedFormulas: string[] | undefined
+    let keyTakeaways: string[] | undefined
+    let streamError: string | undefined
+
+    const applyFrame = (payload: string) => {
+      let event: { type: string; text?: string; relatedFormulas?: string[]; keyTakeaways?: string[]; error?: string }
+      try {
+        event = JSON.parse(payload)
+      } catch {
+        return // a stray/partial frame — skip rather than crash the stream
+      }
+      if (event.type === 'delta' && event.text) {
+        reply += event.text
+        options.onDelta(reply) // cumulative — see this method's doc comment
+      } else if (event.type === 'done') {
+        relatedFormulas = event.relatedFormulas
+        keyTakeaways = event.keyTakeaways
+      } else if (event.type === 'error') {
+        streamError = event.error || 'Failed to generate chat reply'
+      }
+    }
+
+    const consume = () => {
+      const parts = buffer.split('\n\n')
+      buffer = parts.pop() ?? ''
+      for (const block of parts) {
+        const payload = block
+          .split('\n')
+          .filter((l) => l.startsWith('data:'))
+          .map((l) => l.replace(/^data:\s?/, ''))
+          .join('\n')
+          .trim()
+        if (payload) applyFrame(payload)
+      }
+    }
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      consume()
+    }
+    if (buffer.trim()) {
+      buffer += '\n\n'
+      consume()
+    }
+
+    if (streamError) throw new Error(streamError)
+    if (!reply.trim()) throw new Error('Chat stream ended without a reply')
+    return { reply, relatedFormulas, keyTakeaways }
   }
 
   /** Never calls an LLM — reads the brief stored on the spec, or derives

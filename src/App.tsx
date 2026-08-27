@@ -26,12 +26,12 @@ import { Batch1Tasks } from './routes/batch1/Tasks';
 // Import Batch 2 Pages
 import { Batch2Layout } from './routes/batch2/Layout';
 import { Batch2Home } from './routes/batch2/Home';
+import { Batch2Subjects } from './routes/batch2/Subjects';
 import { Batch2Chat } from './routes/batch2/Chat';
 import { Batch2Exams } from './routes/batch2/Exams';
-import { Batch2Activities } from './routes/batch2/Activities';
-import { Batch2Subjects } from './routes/batch2/Subjects';
 import { Batch2Tasks } from './routes/batch2/Tasks';
 import { Batch2Help } from './routes/batch2/Help';
+import { Batch2Activities } from './routes/batch2/Activities';
 import {
   Batch2Notes,
   Batch2Pyq,
@@ -52,12 +52,12 @@ const ReaderBookPage = lazy(() => import('./routes/shared/reader/routes/ReaderBo
 // Import Batch 3 Pages
 import { Batch3Layout } from './routes/batch3/Layout';
 import { Batch3Home } from './routes/batch3/Home';
-import { Batch3ScienceLabs } from './routes/batch3/ScienceLabs';
 import { Batch3BoardPrep } from './routes/batch3/BoardPrep';
 import { Batch3ConceptMap } from './routes/batch3/ConceptMap';
 import { Batch3Pomodoro } from './routes/batch3/Pomodoro';
 import { Batch3Tasks } from './routes/batch3/Tasks';
 import { Batch3Help } from './routes/batch3/Help';
+import { Batch3ScienceLabs } from './routes/batch3/ScienceLabs';
 /* Class 9-10 science labs — ported from EducationAI-Games-master. They render
    inside Batch3Layout so the dashboard sidebar/topbar stay in place; the
    .lab-embed rules in index.css size their viewport-based roots to the content

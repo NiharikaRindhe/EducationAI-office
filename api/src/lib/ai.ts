@@ -105,7 +105,7 @@ export async function aiConfigured(tier: ModelTier = 'chat'): Promise<boolean> {
   return isDaemonReachable();
 }
 
-interface ChatOpts {
+export interface ChatOpts {
   jsonMode?: boolean;
   tier?: ModelTier;
   /** School/user attribution for the AI Console's usage-by-school breakdown. Omit for system-initiated calls. */
@@ -244,6 +244,273 @@ export async function chatCompletion(messages: ChatMessage[], opts: ChatOpts = {
     }
   }
   return ollamaChatCompletion(messages, opts);
+}
+
+// ─────────────────────────────────────────────────────────────
+//  STREAMING — additive only. chatCompletion() above and its callers
+//  are untouched; this is a separate entry point for the one caller
+//  (the PDF Simulator's chat tutor) that needs real token-by-token
+//  delivery instead of a single blocking response.
+//
+//  Rotation/fallback rule: a provider or key may be swapped for
+//  another BEFORE any chunk has reached the caller's onChunk (same
+//  retryable-miss handling as chatCompletion()'s non-streaming path).
+//  Once even one chunk has been delivered, a later failure throws
+//  StreamInterruptedError instead of silently retrying elsewhere —
+//  the caller has already shown the student real text, so restarting
+//  on a different provider would duplicate or contradict it.
+// ─────────────────────────────────────────────────────────────
+
+export type StreamChunkHandler = (textDelta: string) => void;
+
+/** Thrown when a stream fails after at least one chunk was already
+ *  forwarded to the caller. Callers can read `partialText` to decide
+ *  what to do with whatever the student already saw. */
+export class StreamInterruptedError extends Error {
+  constructor(message: string, public readonly partialText: string) {
+    super(message);
+    this.name = 'StreamInterruptedError';
+  }
+}
+
+async function cloudChatCompletionStream(messages: ChatMessage[], opts: ChatOpts, onChunk: StreamChunkHandler, signal?: AbortSignal): Promise<void> {
+  const tier = opts.tier ?? 'chat';
+  const model = await modelForTier(tier);
+  const body = {
+    model,
+    messages: messages.map((m) =>
+      m.images?.length
+        ? {
+            role: m.role,
+            content: [
+              { type: 'text', text: m.content },
+              ...m.images.map((b64) => ({
+                type: 'image_url',
+                image_url: { url: `data:image/jpeg;base64,${b64}` },
+              })),
+            ],
+          }
+        : { role: m.role, content: m.content },
+    ),
+    stream: true,
+    // OpenAI-compatible extension: asks the final chunk to carry token
+    // counts. Providers that don't support it just omit usage — falls
+    // back to the same `?? 0` pattern chatCompletion() already uses.
+    stream_options: { include_usage: true },
+    ...(opts.jsonMode ? { response_format: { type: 'json_object' } } : {}),
+  };
+
+  const keys = env.cloudAiApiKeys;
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < keys.length; attempt++) {
+    const keyIndex = (currentKeyIndex + attempt) % keys.length;
+    const response = await fetch(`${env.cloudAiBaseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${keys[keyIndex]}`,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(120_000),
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      if (isRateLimitOrQuotaError(response.status, text) && attempt < keys.length - 1) {
+        logger.warn(
+          { status: response.status, keyIndex, keysAvailable: keys.length },
+          'Cloud AI key hit its limit — rotating to the next key (streaming)',
+        );
+        currentKeyIndex = (keyIndex + 1) % keys.length;
+        continue;
+      }
+      logger.error({ status: response.status, body: text }, 'Cloud AI streaming chat request failed');
+      lastError = new Error(`Cloud AI chat request failed: ${response.status}`);
+      break;
+    }
+
+    if (!response.body) {
+      lastError = new Error('Cloud AI returned no response body for a streaming request');
+      if (attempt < keys.length - 1) continue;
+      break;
+    }
+
+    let deliveredAny = false;
+    let accumulated = '';
+    let usage: { promptTokens: number; completionTokens: number } | undefined;
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    // A caller-supplied signal only cancels the READER once the connection
+    // is already open (the initial request above keeps its own timeout
+    // signal) — enough to stop spending on a student who closed the tab
+    // mid-answer without needing to combine two AbortSignals.
+    const onExternalAbort = () => { reader.cancel().catch(() => {}); };
+    signal?.addEventListener('abort', onExternalAbort);
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const frames = buffer.split('\n\n');
+        buffer = frames.pop() ?? '';
+        for (const frame of frames) {
+          for (const line of frame.split('\n')) {
+            if (!line.startsWith('data:')) continue;
+            const payload = line.slice(5).trim();
+            if (!payload || payload === '[DONE]') continue;
+            let json: { choices?: { delta?: { content?: string } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+            try {
+              json = JSON.parse(payload);
+            } catch {
+              continue; // a stray/partial frame — skip rather than abort the stream over it
+            }
+            const delta = json.choices?.[0]?.delta?.content;
+            if (delta) {
+              deliveredAny = true;
+              accumulated += delta;
+              onChunk(delta);
+            }
+            if (json.usage) {
+              usage = { promptTokens: json.usage.prompt_tokens ?? 0, completionTokens: json.usage.completion_tokens ?? 0 };
+            }
+          }
+        }
+      }
+    } catch (err) {
+      if (deliveredAny) throw new StreamInterruptedError(err instanceof Error ? err.message : String(err), accumulated);
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (attempt < keys.length - 1) continue;
+      break;
+    } finally {
+      signal?.removeEventListener('abort', onExternalAbort);
+    }
+
+    if (!deliveredAny) {
+      lastError = new Error('Cloud AI streaming response produced no content');
+      if (attempt < keys.length - 1) continue;
+      break;
+    }
+
+    currentKeyIndex = keyIndex; // this key worked — stay on it next call
+    if (opts.usageContext) {
+      logAiUsage(opts.usageContext, tier, 'cloud', model, usage?.promptTokens ?? 0, usage?.completionTokens ?? 0);
+    }
+    return;
+  }
+
+  throw lastError ?? new Error('All cloud AI keys are rate-limited or over quota');
+}
+
+async function ollamaChatCompletionStream(messages: ChatMessage[], opts: ChatOpts, onChunk: StreamChunkHandler, signal?: AbortSignal): Promise<void> {
+  if (!(await isDaemonReachable())) {
+    throw new Error('Ollama daemon is not reachable — AI features are unavailable until it is running');
+  }
+
+  const tier = opts.tier ?? 'chat';
+  const model = await modelForTier(tier);
+
+  const response = await fetch(`${env.ollamaUrl}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      messages,
+      stream: true,
+      ...(opts.jsonMode ? { format: 'json' } : {}),
+    }),
+    signal, // no competing timeout signal on this path, so this can attach directly
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    logger.error({ status: response.status, body }, 'Ollama streaming chat request failed');
+    throw new Error(`Ollama chat request failed: ${response.status}`);
+  }
+  if (!response.body) throw new Error('Ollama returned no response body for a streaming request');
+
+  let deliveredAny = false;
+  let accumulated = '';
+  let promptEvalCount = 0;
+  let evalCount = 0;
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // Ollama's streaming wire format is newline-delimited JSON, not SSE.
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        let json: { message?: { content?: string }; done?: boolean; prompt_eval_count?: number; eval_count?: number };
+        try {
+          json = JSON.parse(trimmed);
+        } catch {
+          continue;
+        }
+        const content = json.message?.content;
+        if (content) {
+          deliveredAny = true;
+          accumulated += content;
+          onChunk(content);
+        }
+        if (json.done) {
+          promptEvalCount = json.prompt_eval_count ?? 0;
+          evalCount = json.eval_count ?? 0;
+        }
+      }
+    }
+  } catch (err) {
+    if (deliveredAny) throw new StreamInterruptedError(err instanceof Error ? err.message : String(err), accumulated);
+    throw err;
+  }
+
+  if (!deliveredAny) throw new Error('Ollama streaming response produced no content');
+
+  if (opts.usageContext) {
+    logAiUsage(opts.usageContext, tier, 'ollama', model, promptEvalCount, evalCount);
+  }
+}
+
+/** Streaming counterpart to chatCompletion() — same tier gating, same
+ *  cloud-vs-Ollama dispatch, same graceful cloud->Ollama degradation,
+ *  but delivers text incrementally via onChunk instead of returning
+ *  the full string at once. See the section header comment above for
+ *  the rotation/interruption contract. `signal`, if given, cancels the
+ *  in-flight request once the connection is open (e.g. the caller's
+ *  HTTP response closed) — it does not need to be combined with the
+ *  per-request timeout signal each provider path already sets. */
+export async function chatCompletionStream(messages: ChatMessage[], opts: ChatOpts = {}, onChunk: StreamChunkHandler, signal?: AbortSignal): Promise<void> {
+  const tier = opts.tier ?? 'chat';
+  if (!(await isTierEnabled(tier))) {
+    throw new Error(`The "${tier}" AI feature has been disabled by your platform administrator`);
+  }
+
+  if (cloudConfigured()) {
+    try {
+      await cloudChatCompletionStream(messages, opts, onChunk, signal);
+      return;
+    } catch (err) {
+      if (err instanceof StreamInterruptedError) throw err; // already shown the student something — don't retry elsewhere
+      if (await isDaemonReachable()) {
+        logger.warn({ err }, 'Cloud AI streaming failed — falling back to local Ollama');
+        return ollamaChatCompletionStream(messages, opts, onChunk, signal);
+      }
+      throw err;
+    }
+  }
+  return ollamaChatCompletionStream(messages, opts, onChunk, signal);
 }
 
 /** Embeddings always run locally (mxbai-embed-large, CPU) — see header comment. */

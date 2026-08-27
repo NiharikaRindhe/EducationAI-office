@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { ApiError } from '../lib/errors.js';
 import { requireId } from '../lib/httpParams.js';
+import { logger } from '../lib/logger.js';
 import { parsePageImage } from '../lib/simPageImage.js';
 import { SimSpecSchema, resolveSimBrief } from '../lib/simShared/index.js';
 import {
@@ -71,7 +72,20 @@ export async function getAnnotationsController(req: Request, res: Response, next
   }
 }
 
+/** Streams the chat tutor's reply over SSE as it's generated. SSE-always —
+ *  the reader (src/routes/shared/reader/api.ts) is the only consumer, so
+ *  there's no dual JSON-or-SSE mode to maintain (a plain-JSON fallback can
+ *  be added later in a few lines if some other client ever needs one,
+ *  since generateChatReplyStream()'s `emit` sink is transport-agnostic).
+ *
+ *  IMPORTANT: once res.flushHeaders() below has run, this function must
+ *  never call next(err) — errorHandler.ts calls res.status().json()
+ *  unconditionally with no headersSent check, which would crash with
+ *  ERR_HTTP_HEADERS_SENT on a response that's already streaming. The
+ *  `streaming` flag marks that boundary; past it, failures are written
+ *  as an SSE {type:'error'} frame and the stream is closed directly. */
 export async function chatController(req: Request, res: Response, next: NextFunction) {
+  let streaming = false;
   try {
     const input = simChatSchema.parse(req.body);
     const student = studentOf(req);
@@ -80,35 +94,56 @@ export async function chatController(req: Request, res: Response, next: NextFunc
     const topics = await simAccess.listBookTopics(input.jobId, student);
     const image = validatedImage(input.image);
 
-    const chunks: string[] = [];
-    let relatedFormulas: string[] | undefined;
-    let keyTakeaways: string[] | undefined;
-    const collect = (event: ChatStreamEvent) => {
-      if (event.type === 'delta') chunks.push(event.text);
-      else if (event.type === 'done') {
-        relatedFormulas = event.relatedFormulas;
-        keyTakeaways = event.keyTakeaways;
-      }
+    // Everything above can still safely reach errorHandler via next(err) —
+    // no response headers have been written yet.
+    streaming = true;
+    res.status(200);
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // nginx: don't buffer this response
+    res.flushHeaders();
+
+    const write = (event: ChatStreamEvent) => {
+      if (!res.writableEnded) res.write(`data: ${JSON.stringify(event)}\n\n`);
     };
 
-    await generateChatReplyStream(
-      input.messages,
-      {
-        title: book.bookTitle,
-        currentPage: input.page,
-        parentTopic: input.parentTopic,
-        domain: input.domain,
-        pageText,
-        pageImage: image,
-        syllabusTopics: topicsFromSpecs(topics),
-        bookId: input.jobId,
-      },
-      collect,
-      usageContextOf(req),
-    );
+    // Cancels the in-flight AI call if the student navigates away —
+    // stops spending tokens on a response nobody will read.
+    const abortController = new AbortController();
+    res.on('close', () => abortController.abort());
 
-    res.json({ success: true, reply: chunks.join(''), relatedFormulas, keyTakeaways });
+    try {
+      await generateChatReplyStream(
+        input.messages,
+        {
+          title: book.bookTitle,
+          currentPage: input.page,
+          parentTopic: input.parentTopic,
+          domain: input.domain,
+          pageText,
+          pageImage: image,
+          syllabusTopics: topicsFromSpecs(topics),
+          bookId: input.jobId,
+        },
+        write,
+        usageContextOf(req),
+        abortController.signal,
+      );
+    } catch (err) {
+      logger.error({ err }, '[sim.controller] chat stream failed');
+      write({ type: 'error', error: err instanceof Error ? err.message : 'Failed to generate chat reply' });
+    }
+    if (!res.writableEnded) res.end();
   } catch (err) {
+    if (streaming) {
+      logger.error({ err }, '[sim.controller] chat controller error after stream start');
+      if (!res.writableEnded) {
+        res.write(`data: ${JSON.stringify({ type: 'error', error: 'Failed to generate chat reply' })}\n\n`);
+        res.end();
+      }
+      return;
+    }
     next(err);
   }
 }
