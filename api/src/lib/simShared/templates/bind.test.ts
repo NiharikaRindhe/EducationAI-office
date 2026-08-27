@@ -1049,7 +1049,7 @@ describe('Class 9 NCERT templates — book numbers', () => {
 
   it('ap_gp_steps AP 1,4,7… sixth term 16; GP starts at 18', () => {
     expect(bindTemplate('ap_gp_steps', { look: 0, n: 6 }).metrics.last).toBe(16)
-    expect(bindTemplate('ap_gp_steps', { look: 1, n: 6 }).metrics.terms.toString().startsWith('18')).toBe(true)
+    expect(String(bindTemplate('ap_gp_steps', { look: 1, n: 6 }).metrics.terms).startsWith('18')).toBe(true)
   })
 
   it('dist_displace out 100 back 40', () => {
