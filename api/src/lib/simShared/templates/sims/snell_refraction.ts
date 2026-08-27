@@ -1,8 +1,13 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { snellTheta2 } from '../physics.js'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, label, line, rect } from '../stage.js'
+
+const schema = z.object({
+  n1: num(1, 3, 1),
+  n2: num(1, 3, 1.5),
+  theta1: num(0, 85, 35),
+})
 
 export const snell_refraction: SimFile = {
   id: 'snell_refraction',
@@ -18,12 +23,9 @@ export const snell_refraction: SimFile = {
     param('n2', 'n₂', '', 1, 2.5, 0.01, 1.5),
     param('theta1', 'θ₁', 'deg', 1, 80, 1, 35),
   ],
-  schema: z.object({
-    n1: num(1, 3, 1),
-    n2: num(1, 3, 1.5),
-    theta1: num(0, 85, 35),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const { n1, n2, theta1 } = params
     const { theta2Deg, tir } = snellTheta2(n1, n2, theta1)
     const t1 = (theta1 * Math.PI) / 180

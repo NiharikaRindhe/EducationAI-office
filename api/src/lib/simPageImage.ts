@@ -47,7 +47,7 @@ export function parsePageImage(raw: unknown): ParsedPageImage | null {
   if (typeof raw !== 'string' || !raw.trim()) return null;
   const stripped = stripDataUrlPrefix(raw);
   if (!stripped || !allowedMime(stripped.mime)) return null;
-  let byteLength = 0;
+  let byteLength: number;
   try {
     byteLength = Buffer.from(stripped.base64, 'base64').byteLength;
   } catch {

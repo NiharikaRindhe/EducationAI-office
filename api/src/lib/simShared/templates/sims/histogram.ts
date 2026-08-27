@@ -1,7 +1,16 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, label, line, pathEl, rect } from '../stage.js'
+
+const schema = z.object({
+  binStart: num(-50, 400, 0),
+  binWidth: num(0.5, 100, 10),
+  f1: num(0, 200, 4),
+  f2: num(0, 200, 8),
+  f3: num(0, 200, 6),
+  f4: num(0, 200, 3),
+  f5: num(0, 200, 1),
+})
 
 export const histogram: SimFile = {
   id: 'histogram',
@@ -21,16 +30,9 @@ export const histogram: SimFile = {
     param('f4', 'f₄', '', 0, 40, 1, 3),
     param('f5', 'f₅', '', 0, 40, 1, 1),
   ],
-  schema: z.object({
-    binStart: num(-50, 400, 0),
-    binWidth: num(0.5, 100, 10),
-    f1: num(0, 200, 4),
-    f2: num(0, 200, 8),
-    f3: num(0, 200, 6),
-    f4: num(0, 200, 3),
-    f5: num(0, 200, 1),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const freqs = [params.f1, params.f2, params.f3, params.f4, params.f5]
     const n = freqs.reduce((s, v) => s + v, 0)
     const fMax = Math.max(...freqs, 1)
@@ -56,7 +58,7 @@ export const histogram: SimFile = {
           y: y0 - h,
           width: barW,
           height: h,
-          fill: colors[i],
+          fill: colors[i]!,
           stroke: '#0f172a',
           strokeWidth: 1,
         })

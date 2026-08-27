@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 // shared/katexForLlm.ts
 // Convert textbook/PDF math into KaTeX so the LLM sees unambiguous equations.
 
@@ -214,7 +213,7 @@ export function unicodeMathToLatex(input: string): string {
   out = collapseScriptRuns(out, SUB, (inner) => `_{${inner}}`)
   let greekOut = ''
   for (let i = 0; i < out.length; i++) {
-    const cmd = GREEK[out[i]]
+    const cmd = GREEK[out[i]!] // i is bounded by the loop condition above
     if (cmd) {
       const next = out[i + 1]
       greekOut += next && /[A-Za-z]/.test(next) ? `${cmd} ` : cmd
@@ -252,7 +251,7 @@ export function joinStackedPdfMath(text: string): string {
       continue
     }
     if (out.length > 0 && isMathFragmentLine(t)) {
-      const prev = out[out.length - 1]
+      const prev = out[out.length - 1]! // guarded by out.length > 0 above
       const prevT = prev.trim()
       const isDenom = /^\d+°?$/.test(t)
       const prevEndsWithIdent = /[A-Za-zπΠθΘφαβγλμσω)]$/.test(prevT)
@@ -287,7 +286,7 @@ function wrapBareLatexExpr(line: string): string {
   }
   if (start < 0) return line
   let end = start
-  while (end < line.length && /[A-Za-z0-9\\{}()[\]^_+\-/=.*,\s]/.test(line[end])) end += 1
+  while (end < line.length && /[A-Za-z0-9\\{}()[\]^_+\-/=.*,\s]/.test(line[end]!)) end += 1
   const span = line.slice(start, end).replace(/(?:\s+[A-Za-z]{3,})+$/g, '').trimEnd()
   if (span.length < 3 || !/\\/.test(span)) return line
   if (countLongEnglish(span) >= 2) return line
@@ -305,7 +304,7 @@ function prepareEquationBody(raw: string): string {
     /(?<![A-Za-z\\])((?:\\[A-Za-z]+(?:\{[^}]+\})?|[A-Za-z0-9]+(?:_\{[^}]+\}|_\w+|\^\{[^}]+\}|\^\w+)?))\s*\/\s*((?:\\[A-Za-z]+(?:\{[^}]+\})?|[A-Za-z0-9]+(?:_\{[^}]+\}|_\w+|\^\{[^}]+\}|\^\w+)?))/g,
     '\\frac{$1}{$2}'
   )
-  out = out.replace(/([A-Za-z0-9}])\^([A-Za-z0-9+\-]+)(?![A-Za-z0-9{])/g, '$1^{$2}')
+  out = out.replace(/([A-Za-z0-9}])\^([A-Za-z0-9+-]+)(?![A-Za-z0-9{])/g, '$1^{$2}')
   out = out.replace(/([A-Za-z0-9}])_([A-Za-z0-9]+)(?![A-Za-z0-9{])/g, '$1_{$2}')
   return out.replace(/[ \t]+/g, ' ').trim()
 }
@@ -320,7 +319,7 @@ function isMathToken(tok: string): boolean {
   if (/^\\frac\{/.test(t)) return true
   if (/^\d+(\.\d+)?$/.test(t)) return true
   if (/^[A-Za-z][A-Za-z0-9]*$/.test(t) && t.length <= 4 && !STOP_WORDS.has(t.toLowerCase())) return true
-  if (/^[A-Za-z0-9]+([_/^]\{?[\w+\-]+\}?)+$/.test(t)) return true
+  if (/^[A-Za-z0-9]+([_/^]\{?[\w+-]+\}?)+$/.test(t)) return true
   if (/^\\sqrt/.test(t)) return true
   return false
 }
@@ -378,19 +377,19 @@ function wrapInlineEquations(line: string): string {
   for (const i of eqIdx) {
     wrap[i] = true
     for (let L = i - 1; L >= 0; L--) {
-      if (/^\s+$/.test(parts[L])) {
+      if (/^\s+$/.test(parts[L]!)) {
         wrap[L] = true
         continue
       }
-      if (isMathToken(parts[L])) wrap[L] = true
+      if (isMathToken(parts[L]!)) wrap[L] = true
       else break
     }
     for (let R = i + 1; R < parts.length; R++) {
-      if (/^\s+$/.test(parts[R])) {
+      if (/^\s+$/.test(parts[R]!)) {
         wrap[R] = true
         continue
       }
-      if (isMathToken(parts[R])) wrap[R] = true
+      if (isMathToken(parts[R]!)) wrap[R] = true
       else break
     }
   }
@@ -407,8 +406,8 @@ function wrapInlineEquations(line: string): string {
     while (j < parts.length && wrap[j]) j += 1
     const snippet = parts.slice(i, j).join('').trim()
     if (snippet.length >= 3 && /[=≈]/.test(snippet)) {
-      const leadSpace = /^\s+$/.test(parts[i]) ? parts[i] : ''
-      const trailSpace = j > i && /^\s+$/.test(parts[j - 1]) ? parts[j - 1] : ''
+      const leadSpace = /^\s+$/.test(parts[i]!) ? parts[i] : ''
+      const trailSpace = j > i && /^\s+$/.test(parts[j - 1]!) ? parts[j - 1] : ''
       const inner = parts
         .slice(leadSpace ? i + 1 : i, trailSpace ? j - 1 : j)
         .join('')

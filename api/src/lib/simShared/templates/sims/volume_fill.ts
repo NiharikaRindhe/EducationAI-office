@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { choice, num, param, type SimFile } from '../contract.js'
 import { VIEW, arrow, label, line, n, pathEl, rect, tLoop } from '../stage.js'
@@ -8,6 +7,12 @@ function ellipseD(cx: number, cy: number, rx: number, ry: number): string {
   const ryf = ry.toFixed(1)
   return `M ${(cx - rx).toFixed(1)} ${cy.toFixed(1)} A ${rxf} ${ryf} 0 0 0 ${(cx + rx).toFixed(1)} ${cy.toFixed(1)} A ${rxf} ${ryf} 0 0 0 ${(cx - rx).toFixed(1)} ${cy.toFixed(1)}`
 }
+
+const schema = z.object({
+  r: num(0.2, 20, 2),
+  h: num(0.5, 30, 5),
+  shape: num(0, 1, 0),
+})
 
 export const volume_fill: SimFile = {
   id: 'volume_fill',
@@ -26,12 +31,9 @@ export const volume_fill: SimFile = {
       { value: 1, label: 'Cone' },
     ], 0),
   ],
-  schema: z.object({
-    r: num(0.2, 20, 2),
-    h: num(0.5, 30, 5),
-    shape: num(0, 1, 0),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const { r, h, shape } = params
     const isCone = shape >= 0.5
     const V = Math.PI * r * r * h * (isCone ? 1 / 3 : 1)

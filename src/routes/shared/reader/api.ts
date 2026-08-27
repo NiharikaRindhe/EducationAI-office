@@ -209,7 +209,10 @@ function toSimAnnotation(bookId: string, row: ServerAnnotation): SimAnnotation {
 
 class SimulationApiClient {
   private bookAnnotationsCache: Map<string, SimAnnotation[]> = new Map()
-  private pendingRequests: Map<string, Promise<any>> = new Map()
+  // Only fetchBookAnnotations uses this today, hence the concrete type
+  // rather than Promise<unknown> — that would fail the `!`-asserted return
+  // below against this method's Promise<SimAnnotation[]> signature.
+  private pendingRequests: Map<string, Promise<SimAnnotation[]>> = new Map()
 
   /** Every sim-ready book the student's class can read, for the library
    *  picker (ReaderLibrary.tsx — new, not part of upstream's API shape,

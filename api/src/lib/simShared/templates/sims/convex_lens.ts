@@ -1,8 +1,12 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { lensImageDistance } from '../physics.js'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, arrow, circle, label, line } from '../stage.js'
+
+const schema = z.object({
+  u: num(1, 200, 30),
+  f: num(1, 80, 15),
+})
 
 export const convex_lens: SimFile = {
   id: 'convex_lens',
@@ -17,11 +21,9 @@ export const convex_lens: SimFile = {
     param('u', 'Object distance u', 'cm', 4, 80, 1, 30),
     param('f', 'Focal length f', 'cm', 4, 40, 1, 15),
   ],
-  schema: z.object({
-    u: num(1, 200, 30),
-    f: num(1, 80, 15),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const { u, f } = params
     const { v, real, m } = lensImageDistance(u, f)
     const lensX = 250

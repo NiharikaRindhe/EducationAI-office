@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 // shared/templates/contract.ts
 // One-file-per-sim contract. A sim file only needs params to produce a stage.
 
@@ -94,6 +93,7 @@ export function classBandToNcert(band: ClassBand): number {
  *  own class instead of always showing all 74 (e.g. a Class 5 Maths book
  *  should never be offered '9-10' electromagnetism templates). */
 export function classBandContains(band: ClassBand, classNum: number): boolean {
-  const [min, max] = band.split('-').map(Number)
+  // Every ClassBand literal is exactly "min-max" — split always yields 2 parts.
+  const [min, max] = band.split('-').map(Number) as [number, number]
   return classNum >= min && classNum <= max
 }

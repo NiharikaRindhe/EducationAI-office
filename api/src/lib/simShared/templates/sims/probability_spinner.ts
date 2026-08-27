@@ -1,7 +1,11 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, circle, label, line, n, pathEl, tLoop } from '../stage.js'
+
+const schema = z.object({
+  favorable: num(0, 40, 2),
+  total: num(1, 40, 6),
+})
 
 export const probability_spinner: SimFile = {
   id: 'probability_spinner',
@@ -16,11 +20,9 @@ export const probability_spinner: SimFile = {
     param('favorable', 'Favourable', '', 1, 12, 1, 2),
     param('total', 'Total', '', 2, 12, 1, 6),
   ],
-  schema: z.object({
-    favorable: num(0, 40, 2),
-    total: num(1, 40, 6),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const total = Math.max(1, Math.round(params.total))
     const favorable = Math.min(total, Math.max(0, Math.round(params.favorable)))
     const P = favorable / total

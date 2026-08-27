@@ -1,7 +1,12 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, circle, label, line } from '../stage.js'
+
+const schema = z.object({
+  T: num(-80, 400, 25),
+  melting: num(-80, 200, 0),
+  boiling: num(-20, 500, 100),
+})
 
 export const state_change_curve: SimFile = {
   id: 'state_change_curve',
@@ -17,13 +22,10 @@ export const state_change_curve: SimFile = {
     param('melting', 'Melting point', '°C', -20, 80, 1, 0),
     param('boiling', 'Boiling point', '°C', 40, 200, 1, 100),
   ],
-  schema: z.object({
-    T: num(-80, 400, 25),
-    melting: num(-80, 200, 0),
-    boiling: num(-20, 500, 100),
-  }),
-  run(params) {
-    let Tm = params.melting
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
+    const Tm = params.melting
     let Tb = params.boiling
     const warnings: string[] = []
     if (Tm >= Tb) {
@@ -44,23 +46,26 @@ export const state_change_curve: SimFile = {
       { x: 360, y: yOf(Tb) },
       { x: 450, y: yOf(Math.min(Tmax, Tb + 40)) },
     ]
-    let mx = pts[0].x
+    // pts always has exactly these 6 entries — every index below is literal
+    // and in range. mx/my are always overwritten below (the if/else chain
+    // is exhaustive), so no initial value here.
+    let mx: number
     let my = yOf(T)
     if (T < Tm) {
       const u = (T - Tmin) / Math.max(Tm - Tmin, 1e-6)
-      mx = pts[0].x + u * (pts[1].x - pts[0].x)
+      mx = pts[0]!.x + u * (pts[1]!.x - pts[0]!.x)
     } else if (Math.abs(T - Tm) < 0.5) {
-      mx = (pts[1].x + pts[2].x) / 2
+      mx = (pts[1]!.x + pts[2]!.x) / 2
       my = yOf(Tm)
     } else if (T < Tb) {
       const u = (T - Tm) / Math.max(Tb - Tm, 1e-6)
-      mx = pts[2].x + u * (pts[3].x - pts[2].x)
+      mx = pts[2]!.x + u * (pts[3]!.x - pts[2]!.x)
     } else if (Math.abs(T - Tb) < 0.5) {
-      mx = (pts[3].x + pts[4].x) / 2
+      mx = (pts[3]!.x + pts[4]!.x) / 2
       my = yOf(Tb)
     } else {
       const u = Math.min(1, (T - Tb) / 40)
-      mx = pts[4].x + u * (pts[5].x - pts[4].x)
+      mx = pts[4]!.x + u * (pts[5]!.x - pts[4]!.x)
     }
     const elements = [
       line('axis-x', { x1: 50, y1: 250, x2: 460, y2: 250, stroke: '#64748b', strokeWidth: 1 }),
@@ -69,12 +74,15 @@ export const state_change_curve: SimFile = {
       label('pts', 28, 46, `Tm = ${Tm} °C    Tb = ${Tb} °C`),
     ]
     for (let i = 0; i < pts.length - 1; i++) {
+      // i and i+1 are both bounded by the loop condition above.
+      const p0 = pts[i]!
+      const p1 = pts[i + 1]!
       elements.push(
         line(`seg-${i}`, {
-          x1: pts[i].x,
-          y1: pts[i].y,
-          x2: pts[i + 1].x,
-          y2: pts[i + 1].y,
+          x1: p0.x,
+          y1: p0.y,
+          x2: p1.x,
+          y2: p1.y,
           stroke: '#38bdf8',
           strokeWidth: 3,
         })

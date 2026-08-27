@@ -96,7 +96,20 @@ export const SimStage: React.FC<SimStageProps> = ({
     }
   }, [isPlaying, speed])
 
-  // Evaluate current frame
+  // Evaluate current frame.
+  //
+  // This deliberately mutates historyMapRef/lastTimeRef inside useMemo, and
+  // reads historyMapRef.current during render below — both flagged by
+  // react-hooks/refs, which assumes render purity. The trade-off is
+  // intentional: trail history is per-animation-frame, append-only state
+  // driven by a requestAnimationFrame loop already running outside React
+  // (see the effect above), not by props/state a re-render could recompute
+  // from scratch. Moving it to real React state would double the re-renders
+  // per frame (once for `time`, once for the history update) and introduce
+  // a one-frame lag in every rendered trail across every physics/motion
+  // template — a real behavior change to sign off on, not a lint fix, for a
+  // pattern ported working as-is from pdf-simulation-master.
+  /* eslint-disable react-hooks/refs */
   const resolvedStage: ResolvedStage = useMemo(() => {
     const resolved = evalSpec(compiledStage, time)
 
@@ -195,6 +208,7 @@ export const SimStage: React.FC<SimStageProps> = ({
             />
           )
         })}
+        {/* eslint-enable react-hooks/refs */}
       </svg>
 
       {showControls && (

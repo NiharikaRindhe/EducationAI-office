@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { ohmCurrent } from '../physics.js'
 import { num, param, type SimFile } from '../contract.js'
@@ -32,6 +31,11 @@ function onLoop(speed: number, offset: number, xL: number, xR: number, yT: numbe
   return { cx, cy }
 }
 
+const schema = z.object({
+  V: num(0.1, 100, 6),
+  R: num(0.1, 200, 3),
+})
+
 export const ohm_circuit: SimFile = {
   id: 'ohm_circuit',
   domain: 'physics',
@@ -45,11 +49,9 @@ export const ohm_circuit: SimFile = {
     param('V', 'Voltage', 'V', 1, 24, 0.5, 6),
     param('R', 'Resistance', 'Ω', 1, 50, 0.5, 3),
   ],
-  schema: z.object({
-    V: num(0.1, 100, 6),
-    R: num(0.1, 200, 3),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const { V, R } = params
     const I = ohmCurrent(V, R)
     const xL = 100
