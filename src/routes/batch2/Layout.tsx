@@ -5,10 +5,9 @@ import { useAuth, type FeatureKey } from '../../context/AuthContext';
 import { Sidebar, NavItem } from '../../components/shared/Sidebar';
 import { TopBar } from '../../components/shared/TopBar';
 
-// Removed per user request (Aug 25 2026) — hidden from nav and its route
-// blocked (App.tsx redirects /batch2/reader home), component/API/DB left
-// intact so this is a one-line revert, not a rebuild.
-const PDF_SIMULATOR_ENABLED = false;
+// Re-enabled per user request (Aug 26 2026) — was hidden from nav with its
+// route blocked (App.tsx redirected /batch2/reader home) since Aug 25 2026.
+const PDF_SIMULATOR_ENABLED = true;
 
 const ReaderLoading: React.FC = () => (
   <div className="h-full w-full flex items-center justify-center">
@@ -101,7 +100,7 @@ export const Batch2Layout: React.FC = () => {
 
         {/* Dynamic page container */}
         {isReader ? (
-          <main className="reader-embed relative flex-1 min-h-0 w-full overflow-hidden font-sans text-slate-800">
+          <main className="reader-embed relative flex-1 min-h-0 w-full overflow-hidden font-sans text-slate-800" data-batch="2">
             <Link
               to="/batch2/home"
               className="absolute left-4 top-4 z-[100] inline-flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/90 px-3 py-2 text-xs font-bold text-white backdrop-blur"

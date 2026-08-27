@@ -29,20 +29,21 @@ function chevron(id: string, x: number, y: number): ReturnType<typeof pathEl> {
 export const parallel_transversal: SimFile = {
   id: 'parallel_transversal',
   domain: 'math',
-  classBand: '6-8',
+  classBand: '7-7',
   ncertClass: 7,
-  label: 'Parallel lines and transversal',
-  description: 'A transversal cuts two parallel lines; corresponding and alternate interior angles are equal',
-  equations: ['\\text{corresponding } = \\text{alternate interior}', '\\text{co-interior } = 180^\\circ'],
-  keywords: ['parallel lines', 'transversal', 'corresponding angles', 'alternate interior'],
-  params: [param('angleDeg', 'Angle', 'deg', 20, 80, 1, 60)],
+  label: 'Parallel lines cut by a transversal',
+  description: 'Two parallel lines. A third line cuts both. Matching corners stay the same size.',
+  equations: ['matching corners are equal', 'corners in a straight line add to 180°'],
+  keywords: ['parallel lines', 'transversal', 'corresponding angles', 'matching corners', 'co-interior'],
+  params: [param('angleDeg', 'This corner', 'deg', 20, 160, 1, 120)],
   schema: z.object({
-    angleDeg: num(10, 85, 60),
+    angleDeg: num(10, 170, 120),
   }),
   run(params) {
-    const A = params.angleDeg
+    const A = Math.round(params.angleDeg)
     const adj = 180 - A
-    const rad = (A * Math.PI) / 180
+    const tilt = A > 90 ? 180 - A : A
+    const rad = (tilt * Math.PI) / 180
     const y1 = 112
     const y2 = 208
     const midX = 250
@@ -57,21 +58,26 @@ export const parallel_transversal: SimFile = {
     const tx2 = ix2 + extra * ux
     const ty2 = y2 + extra * uy
     const rArc = 28
-    const bisA = A / 2
+    const corrStart = A > 90 ? tilt : 0
+    const corrEnd = A > 90 ? 180 : A
+    const altStart = A > 90 ? 180 + tilt : 180
+    const altEnd = A > 90 ? 360 : 180 + A
+    const coStart = A > 90 ? 0 : A
+    const coEnd = A > 90 ? tilt : 180
     const lab = (ix: number, iy: number, deg: number, radius: number) => ({
       x: ix + radius * Math.cos((deg * Math.PI) / 180) - 8,
       y: iy + radius * Math.sin((deg * Math.PI) / 180) + 4,
     })
-    const c1 = lab(ix1, y1, bisA, 42)
-    const c2 = lab(ix2, y2, bisA, 42)
-    const alt = lab(ix2, y2, 180 + bisA, 42)
-    const co = lab(ix1, y1, (A + 180) / 2, 44)
+    const c1 = lab(ix1, y1, (corrStart + corrEnd) / 2, 42)
+    const c2 = lab(ix2, y2, (corrStart + corrEnd) / 2, 42)
+    const alt = lab(ix2, y2, (altStart + altEnd) / 2, 42)
+    const co = lab(ix1, y1, (coStart + coEnd) / 2, 44)
     return {
       stage: {
         viewBox: VIEW,
         elements: [
-          label('eq', 28, 24, `corr. = alt. int. = ${A}°`),
-          label('co', 28, 42, `co-interior = ${A}° + ${adj}° = 180°`),
+          label('eq', 28, 24, `Matching corners (same colour) = ${A}°`),
+          label('co', 28, 42, `On a straight line: ${A}° + ${adj}° = 180°`),
           line('p1', { x1: 40, y1: y1, x2: 460, y2: y1, stroke: '#334155', strokeWidth: 3 }),
           line('p2', { x1: 40, y1: y2, x2: 460, y2: y2, stroke: '#334155', strokeWidth: 3 }),
           chevron('m1', 86, y1),
@@ -79,10 +85,10 @@ export const parallel_transversal: SimFile = {
           line('tr', { x1: tx1, y1: ty1, x2: tx2, y2: ty2, stroke: '#2563eb', strokeWidth: 3 }),
           circle('v1', { cx: ix1, cy: y1, r: 4, fill: '#0f172a' }),
           circle('v2', { cx: ix2, cy: y2, r: 4, fill: '#0f172a' }),
-          pathEl('corr1', { d: arcPath(ix1, y1, 0, A, rArc), fill: 'none', stroke: '#16a34a', strokeWidth: 2.5 }),
-          pathEl('corr2', { d: arcPath(ix2, y2, 0, A, rArc), fill: 'none', stroke: '#16a34a', strokeWidth: 2.5 }),
-          pathEl('alt2', { d: arcPath(ix2, y2, 180, 180 + A, rArc), fill: 'none', stroke: '#d97706', strokeWidth: 2.5 }),
-          pathEl('co1', { d: arcPath(ix1, y1, A, 180, rArc + 6), fill: 'none', stroke: '#7c3aed', strokeWidth: 2 }),
+          pathEl('corr1', { d: arcPath(ix1, y1, corrStart, corrEnd, rArc), fill: 'none', stroke: '#16a34a', strokeWidth: 2.5 }),
+          pathEl('corr2', { d: arcPath(ix2, y2, corrStart, corrEnd, rArc), fill: 'none', stroke: '#16a34a', strokeWidth: 2.5 }),
+          pathEl('alt2', { d: arcPath(ix2, y2, altStart, altEnd, rArc), fill: 'none', stroke: '#d97706', strokeWidth: 2.5 }),
+          pathEl('co1', { d: arcPath(ix1, y1, coStart, coEnd, rArc + 6), fill: 'none', stroke: '#7c3aed', strokeWidth: 2 }),
           label('a1', c1.x, c1.y, `${A}°`, '#16a34a'),
           label('a2', c2.x, c2.y, `${A}°`, '#16a34a'),
           label('a3', alt.x, alt.y, `${A}°`, '#d97706'),
@@ -100,6 +106,7 @@ export const parallel_transversal: SimFile = {
         adjacent: adj,
       },
       warnings: [],
+      caption: 'The two long lines stay the same distance apart. Matching corners are equal.',
     }
   },
 }

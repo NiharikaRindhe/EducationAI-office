@@ -1,19 +1,19 @@
 /* Ported from pdf-simulation-master/web/src/index.css. Four deletions from
    upstream, made once here rather than by editing every rule: the Google
-   Fonts @import (Inter is already loaded app-wide via index.html; a
-   JetBrains Mono @import isn't worth a second font request — --font-mono
-   below falls through to its own SFMono-Regular/Menlo/Monaco/Consolas
-   stack instead), the `*` box-sizing/margin/padding reset (fights
-   Tailwind's own Preflight), the `html, body, #root { overflow: hidden }`
-   block (would hijack the portal's scroll and its mount node — sizing is
-   handled by the .reader-embed override in the main src/index.css
+   Fonts @import (Outfit, Inter, and Courier Prime are already loaded
+   app-wide via index.html), the `*` box-sizing/margin/padding reset
+   (fights Tailwind's own Preflight), the `html, body, #root { overflow:
+   hidden }` block (would hijack the portal's scroll and its mount node —
+   sizing is handled by the .reader-embed override in the main src/index.css
    instead, matching .lab-embed's precedent), and the global
    ::-webkit-scrollbar rules (the app already has one). :root is rescoped
    to .reader-embed — the wrapper class the batch2/batch3 layouts apply —
-   so these tokens cascade only inside the reader, never app-wide. */
+   so these tokens cascade only inside the reader, never app-wide.
+   Brand accents inherit the batch: indigo (6–8) by default, sky on
+   [data-batch="3"], amber on [data-batch="1"] if that reader is mounted. */
 
 .reader-embed {
-  /* Minimalistic Light Theme Surface Tokens */
+  /* Portal light surface tokens */
   --color-bg: #f8fafc;
   --color-bg-subtle: #f1f5f9;
   --color-surface: #ffffff;
@@ -23,32 +23,33 @@
   
   --color-border: #e2e8f0;
   --color-border-subtle: #edf2f7;
-  --color-border-focus: #0f172a;
+  --color-border-focus: #6366F1;
   
-  /* Brand matches the Simulate FAB */
-  --color-primary: #0f172a;
-  --color-primary-hover: #1e293b;
-  --color-primary-subtle: #f1f5f9;
-  --color-primary-glow: rgba(15, 23, 42, 0.12);
-  --color-accent: #1e293b;
-  --color-accent-subtle: #f1f5f9;
+  /* Batch 2 indigo — overridden per data-batch below */
+  --color-primary: #6366F1;
+  --color-primary-hover: #4F46E5;
+  --color-primary-subtle: #EEF2FF;
+  --color-primary-glow: rgba(99, 102, 241, 0.22);
+  --color-accent: #4F46E5;
+  --color-accent-subtle: #EEF2FF;
 
   /* Domain & Semantic Badges */
   --color-success: #059669;
   --color-warning: #d97706;
   --color-danger: #dc2626;
 
-  /* Minimalist High-Legibility Typography */
+  /* Portal typography */
   --color-text: #0f172a;
   --color-text-muted: #475569;
   --color-text-subtle: #94a3b8;
 
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: 'JetBrains Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-display: "Outfit", sans-serif;
+  --font-sans: "Inter", sans-serif;
+  --font-mono: "Courier Prime", monospace;
 
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
   --radius-xl: 16px;
   --radius-full: 9999px;
 
@@ -57,7 +58,7 @@
   --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
   --shadow-lg: 0 12px 28px rgba(15, 23, 42, 0.09), 0 4px 8px rgba(15, 23, 42, 0.04);
   --shadow-drawer: 0 -8px 30px rgba(15, 23, 42, 0.12);
-  --shadow-fab: 0 6px 18px rgba(15, 23, 42, 0.16);
+  --shadow-fab: 0 6px 18px var(--color-primary-glow);
 
   /* Carried over from upstream's dropped html/body/#root block — applied
      directly to the wrapper instead so the reader still paints its own
@@ -66,6 +67,26 @@
   color: var(--color-text);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+.reader-embed[data-batch="3"] {
+  --color-border-focus: #0EA5E9;
+  --color-primary: #0EA5E9;
+  --color-primary-hover: #0284C7;
+  --color-primary-subtle: #F0F9FF;
+  --color-primary-glow: rgba(14, 165, 233, 0.22);
+  --color-accent: #0284C7;
+  --color-accent-subtle: #F0F9FF;
+}
+
+.reader-embed[data-batch="1"] {
+  --color-border-focus: #F59E0B;
+  --color-primary: #F59E0B;
+  --color-primary-hover: #D97706;
+  --color-primary-subtle: #FFFBEB;
+  --color-primary-glow: rgba(245, 158, 11, 0.22);
+  --color-accent: #D97706;
+  --color-accent-subtle: #FFFBEB;
 }
 
 /* Layout Utilities */
@@ -202,8 +223,9 @@
 }
 
 .card-title {
+  font-family: var(--font-display);
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-text);
   display: flex;
   align-items: center;
@@ -275,7 +297,7 @@
   letter-spacing: 0.04em;
 }
 
-.badge-physics { background: var(--color-primary-subtle); color: var(--color-primary); border: 1px solid #cbd5e1; }
+.badge-physics { background: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; }
 .badge-chemistry { background: #fdf2f8; color: #be185d; border: 1px solid #fbcfe8; }
 .badge-math { background: #faf5ff; color: #7e22ce; border: 1px solid #e9d5ff; }
 .badge-general { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
@@ -291,7 +313,7 @@
   color: #fff;
   border: 1px solid transparent;
   font-size: 0.85rem;
-  font-weight: 500;
+  font-weight: 700;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
   transition: all 0.15s ease;
@@ -316,8 +338,8 @@
 }
 
 .action-btn-secondary:hover {
-  background: var(--color-surface-hover);
-  border-color: #cbd5e1;
+  background: var(--color-primary-subtle);
+  border-color: var(--color-border);
 }
 
 /* PDF text-selection floating actions */
@@ -1640,10 +1662,10 @@
   background: var(--color-primary);
   color: #ffffff;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-fab);
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.01em;
   cursor: pointer;
   z-index: 30;
@@ -1653,7 +1675,7 @@
 .sim-fab:hover {
   background: var(--color-primary-hover);
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.2);
+  box-shadow: 0 8px 20px var(--color-primary-glow);
 }
 
 .sim-fab.is-open {
@@ -1743,8 +1765,9 @@
 
 .sim-hub__header h3 {
   margin: 0;
+  font-family: var(--font-display);
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-text);
 }
 
@@ -2017,8 +2040,9 @@
 .sim-panel__title {
   margin: 0;
   min-width: 0;
+  font-family: var(--font-display);
   font-size: 1.05rem;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.3;
   color: var(--color-text);
   letter-spacing: -0.015em;
@@ -2121,11 +2145,16 @@
   position: relative;
 }
 
-.sim-stage__reset {
+.sim-stage__controls {
   position: absolute;
   top: 0.65rem;
   right: 0.65rem;
   z-index: 10;
+  display: flex;
+  gap: 0.35rem;
+}
+
+.sim-stage__reset {
   width: 32px;
   height: 32px;
   display: flex;
@@ -2430,11 +2459,47 @@
   color: var(--color-text-muted);
 }
 
+.sim-param__stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+  flex-shrink: 0;
+}
+
+.sim-step-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sim-step-btn:hover:not(:disabled) {
+  background: var(--color-bg);
+  border-color: var(--color-text-muted);
+}
+
+.sim-step-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .sim-param__value {
   font-family: var(--font-mono);
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--color-text);
+  min-width: 2.4rem;
+  text-align: center;
 }
 
 .sim-param input[type='range'] {

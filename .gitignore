@@ -49,3 +49,11 @@ EducationAI-Games-master/
 
 # Reference source the PDF Simulator was ported from — not app code.
 pdf-simulation-master/
+
+# Source NCERT chapter PDFs used to bulk-seed the content library — 2.2GB of
+# copyrighted textbook pages, already uploaded to Supabase Storage by the
+# ingestion script. Not app code, and far too large for GitHub either way.
+NCERT chapter Wise/
+
+# Personal working-notes backup, not a build artifact — filename says it all.
+*.local-backup.xlsx

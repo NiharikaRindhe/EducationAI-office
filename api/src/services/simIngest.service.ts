@@ -6,11 +6,7 @@
 // codebase doesn't have one (superAdminContent.service.ts, the closest
 // analogue, talks to supabaseAdmin directly too).
 //
-// The content-hash cache is the load-bearing piece for cost: two
-// ncert_ingestion_jobs rows (a platform upload and a school's re-upload of
-// the same PDF, or two different schools uploading the same file) whose
-// page text hashes identically skip classifyPage() entirely and just copy
-// the existing annotations onto the new job_id — see findAnnotationsByHash.
+// Placement is hardcoded in ncertPageTags — no curator LLM per page.
 
 import crypto from 'node:crypto';
 import * as mathjs from 'mathjs';
@@ -18,9 +14,17 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import type { AiUsageContext } from '../lib/aiUsage.js';
-import { isExpr, isTemplateId, parseTemplateParams, dropCitationParams, maskCitations, type SimSpec } from '../lib/simShared/index.js';
-import { classifyPage } from './simClassify.service.js';
-import { ensureSimBrief } from './simExplain.service.js';
+import {
+  isExpr,
+  isTemplateId,
+  parseTemplateParams,
+  dropCitationParams,
+  createTemplateSpec,
+  proceduralSimBrief,
+  mergeSimBrief,
+  type SimSpec,
+} from '../lib/simShared/index.js';
+import { lookupNcertPageTags } from '../lib/simShared/ncertPageTags.catalog.js';
 import type { Candidate } from './simCandidateSchema.js';
 
 export interface AnnotationRecord {
@@ -97,16 +101,6 @@ export function computeContentHash(pageText: string): string {
   return crypto.createHash('sha256').update(pageText.trim()).digest('hex').substring(0, 16);
 }
 
-async function findAnnotationsByHash(contentHash: string): Promise<AnnotationRecord[]> {
-  const { data, error } = await supabaseAdmin
-    .from('sim_annotations')
-    .select('*')
-    .eq('content_hash', contentHash)
-    .limit(3);
-  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to look up cached annotations', error.message);
-  return (data ?? []) as AnnotationRecord[];
-}
-
 interface CreateAnnotationInput {
   job_id: string;
   page_number: number;
@@ -127,69 +121,35 @@ export interface IngestPageParams {
   jobId: string;
   pageNumber: number;
   pageText: string;
-  /** Filters the curator's template offer to the book's own class. */
   classNum?: number;
+  subject?: string;
+  bookTitle?: string;
   skipCache?: boolean;
   usageContext?: AiUsageContext;
 }
 
 /**
- * Orchestrates one page: content-hash cache -> word-count pre-filter ->
- * LLM curation -> triage -> template normalize -> math guard -> student
- * brief (once) -> persist. Matches upstream's processPageIngestion funnel;
- * the word-count pre-filter (shouldClassify, >=100 words) is applied by
- * the caller (simWorker.job.ts) before this is invoked, since it also
- * decides the inter-page throttle.
+ * Hardcoded NCERT page tags → template spec → procedural brief → persist.
+ * Untagged pages get no simulation. No curator LLM.
  */
 export async function processPageIngestion(params: IngestPageParams): Promise<AnnotationRecord[]> {
-  const { jobId, pageNumber, pageText, classNum, skipCache = false, usageContext } = params;
+  const { jobId, pageNumber, pageText, classNum, subject = '', bookTitle = '' } = params;
   if (!pageText || pageText.trim().length === 0) return [];
+  if (!classNum) return [];
 
   const contentHash = computeContentHash(pageText);
-
-  if (!skipCache) {
-    try {
-      const cached = await findAnnotationsByHash(contentHash);
-      if (cached.length > 0) {
-        const toInsert: CreateAnnotationInput[] = [];
-        for (const c of cached) {
-          const spec = await ensureSimBrief(c.spec, c.quote, usageContext);
-          toInsert.push({
-            job_id: jobId,
-            page_number: pageNumber,
-            quote: c.quote,
-            spec,
-            spec_version: c.spec_version,
-            content_hash: contentHash,
-          });
-        }
-        return await insertAnnotations(toInsert);
-      }
-    } catch (err) {
-      logger.warn({ err }, '[simIngest] cache lookup failed — falling through to classification');
-    }
-  }
-
-  const candidates = await classifyPage(maskCitations(pageText), { classNum, usageContext });
-  if (candidates.length === 0) return [];
-
-  const triaged = triageCandidates(candidates);
-  if (triaged.length === 0) return [];
-
-  const normalized = triaged
-    .map((c) => normalizeTemplateCandidate(c, pageText))
-    .filter((c): c is Candidate => c !== null);
-  if (normalized.length === 0) return [];
-
-  const validCandidates = normalized.filter((cand) => validateMathExpressions(cand));
-  if (validCandidates.length === 0) return [];
+  const tags = lookupNcertPageTags({ classNum, subject, bookTitle, pageNumber, pageText });
+  if (tags.length === 0) return [];
 
   const annotationsToInsert: CreateAnnotationInput[] = [];
-  for (const cand of validCandidates) {
-    const { importance: _importance, ...simSpec } = cand;
-    void _importance;
-    const quote = simSpec.quote || pageText.substring(0, 200);
-    const spec = await ensureSimBrief(simSpec as SimSpec, quote, usageContext);
+  for (const tag of tags) {
+    if (!isTemplateId(tag.templateId)) {
+      logger.warn({ templateId: tag.templateId, pageNumber }, '[simIngest] tagged unknown templateId — skipped');
+      continue;
+    }
+    const quote = pageText.replace(/\s+/g, ' ').trim().slice(0, 200);
+    const spec = mergeSimBrief(createTemplateSpec(tag.templateId, tag.params, { quote }), proceduralSimBrief(createTemplateSpec(tag.templateId, tag.params), quote));
+    if (!validateMathExpressions(spec)) continue;
     annotationsToInsert.push({
       job_id: jobId,
       page_number: pageNumber,

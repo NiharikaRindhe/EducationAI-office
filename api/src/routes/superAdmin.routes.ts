@@ -34,6 +34,7 @@ import {
   deleteGlobalQuestionController,
   bulkImportGlobalQuestionsController,
   listIngestionJobsController,
+  getIngestionJobPdfUrlController,
   getUploadUsageController,
   uploadNcertPdfController,
   updateIngestionJobStatusController,
@@ -125,6 +126,7 @@ superAdminRouter.post(
 
 // ── NCERT ingestion ──────────────────────────────────────────
 superAdminRouter.get('/ncert/jobs', listIngestionJobsController);
+superAdminRouter.get('/ncert/jobs/:id/pdf-url', getIngestionJobPdfUrlController);
 superAdminRouter.get('/content/upload-usage', getUploadUsageController);
 superAdminRouter.post('/ncert/upload', upload.single('file'), uploadNcertPdfController);
 // Called by the pipeline worker to report stage progress

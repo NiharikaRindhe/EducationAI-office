@@ -18,6 +18,7 @@ export {
   type SimDomain,
   type ClassBand,
 } from './catalog.js'
+export { classBandContains } from './contract.js'
 
 export { bindTemplate, createTemplateSpec, type BindResult } from './bind.js'
 export { matchTemplateFromText, matchKnownTemplateId, type TemplateMatch } from './match.js'

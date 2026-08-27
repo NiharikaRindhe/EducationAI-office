@@ -6,10 +6,9 @@ import { useAuth, type FeatureKey } from '../../context/AuthContext';
 import { Sidebar, NavItem } from '../../components/shared/Sidebar';
 import { TopBar } from '../../components/shared/TopBar';
 
-// Removed per user request (Aug 25 2026) — hidden from nav and its route
-// blocked (App.tsx redirects /batch3/reader home), component/API/DB left
-// intact so this is a one-line revert, not a rebuild.
-const PDF_SIMULATOR_ENABLED = false;
+// Re-enabled per user request (Aug 26 2026) — was hidden from nav with its
+// route blocked (App.tsx redirected /batch3/reader home) since Aug 25 2026.
+const PDF_SIMULATOR_ENABLED = true;
 
 const LabLoading: React.FC = () => (
   <div className="h-full w-full flex items-center justify-center">
@@ -145,7 +144,7 @@ export const Batch3Layout: React.FC = () => {
 
         {/* Dynamic page container */}
         {isImmersive ? (
-          <main className={`${isLab ? 'lab-embed' : 'reader-embed'} relative flex-1 min-h-0 w-full overflow-hidden font-sans text-slate-800`}>
+          <main className={`${isLab ? 'lab-embed' : 'reader-embed'} relative flex-1 min-h-0 w-full overflow-hidden font-sans text-slate-800`} data-batch="3">
             {labFocusMode && (
               <button
                 type="button"

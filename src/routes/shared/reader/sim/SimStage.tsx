@@ -38,8 +38,8 @@ export const SimStage: React.FC<SimStageProps> = ({
   showControls = true,
   zoom = 1,
 }) => {
-  const isPlaying = autoPlay
   const speed = initialSpeed
+  const [playing, setPlaying] = useState(autoPlay)
   const [time, setTime] = useState(0)
 
   // Pre-compile expressions once when stage definition changes
@@ -62,12 +62,12 @@ export const SimStage: React.FC<SimStageProps> = ({
   }, [])
 
   useEffect(() => {
-    resetSimulation()
-  }, [stage, resetSimulation])
+    setPlaying(autoPlay)
+  }, [autoPlay])
 
   // requestAnimationFrame loop
   useEffect(() => {
-    if (!isPlaying) {
+    if (!playing) {
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current)
       }
@@ -94,7 +94,7 @@ export const SimStage: React.FC<SimStageProps> = ({
         cancelAnimationFrame(animFrameRef.current)
       }
     }
-  }, [isPlaying, speed])
+  }, [playing, speed])
 
   // Evaluate current frame
   const resolvedStage: ResolvedStage = useMemo(() => {
@@ -198,14 +198,27 @@ export const SimStage: React.FC<SimStageProps> = ({
       </svg>
 
       {showControls && (
-        <button
-          type="button"
-          className="sim-stage__reset"
-          onClick={resetSimulation}
-          title="Reset simulation"
-        >
-          ↺
-        </button>
+        <div className="sim-stage__controls">
+          <button
+            type="button"
+            className="sim-stage__reset"
+            onClick={() => setPlaying((p) => !p)}
+            title={playing ? 'Pause animation' : 'Play animation'}
+            aria-label={playing ? 'Pause animation' : 'Play animation'}
+            aria-pressed={!playing}
+          >
+            {playing ? '❚❚' : '▶'}
+          </button>
+          <button
+            type="button"
+            className="sim-stage__reset"
+            onClick={resetSimulation}
+            title="Reset simulation"
+            aria-label="Reset simulation"
+          >
+            ↺
+          </button>
+        </div>
       )}
     </div>
   )
