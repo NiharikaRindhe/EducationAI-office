@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   UploadCloud, Loader2, Download, Plus, AlertCircle, Printer, KeyRound,
   Search, X, GraduationCap, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Pencil,
-  UserCheck, UserRoundX, BookOpenCheck, LogOut, Undo2,
+  UserCheck, UserRoundX, BookOpenCheck, LogOut, Undo2, CheckSquare,
 } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 import { printCredentialSlips } from '../../lib/printSlips';
@@ -73,6 +73,7 @@ export const SchoolAdminTeachers: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [classFilter, setClassFilter] = useState('');
+  const [subjectFilter, setSubjectFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'never'>('all');
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortAsc, setSortAsc] = useState(true);
@@ -104,6 +105,10 @@ export const SchoolAdminTeachers: React.FC = () => {
   // Former staff are hidden by default so the list is who actually works here.
   const [showFormer, setShowFormer] = useState(false);
 
+  // Bulk selection — mirrors Students.tsx's bulk-action bar (#57).
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkWorking, setIsBulkWorking] = useState(false);
+
   const openEdit = (t: TeacherRow) => {
     const p = tp(t);
     setEditName(t.full_name);
@@ -126,11 +131,20 @@ export const SchoolAdminTeachers: React.FC = () => {
 
   useEffect(() => { void loadTeachers(); }, [loadTeachers]);
 
+  // Distinct specializations actually in use, for the subject filter dropdown
+  // — built from real data rather than a fixed subject list, since a school's
+  // specializations aren't a fixed enum the way class numbers are.
+  const subjectOptions = useMemo(
+    () => Array.from(new Set(teachers.map((t) => tp(t)?.specialization).filter((s): s is string => !!s))).sort(),
+    [teachers],
+  );
+
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     const rows = teachers.filter((t) => {
       const p = tp(t);
       if (classFilter && !(p?.classes_taught ?? []).includes(Number(classFilter))) return false;
+      if (subjectFilter && p?.specialization !== subjectFilter) return false;
       if (statusFilter === 'active' && !t.has_logged_in_ever) return false;
       if (statusFilter === 'never' && t.has_logged_in_ever) return false;
       if (!q) return true;
@@ -155,7 +169,7 @@ export const SchoolAdminTeachers: React.FC = () => {
       }
     });
     return rows;
-  }, [teachers, searchQuery, classFilter, statusFilter, sortKey, sortAsc]);
+  }, [teachers, searchQuery, classFilter, subjectFilter, statusFilter, sortKey, sortAsc]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -164,7 +178,10 @@ export const SchoolAdminTeachers: React.FC = () => {
   const unassignedCount = teachers.filter((teacher) => (tp(teacher)?.classes_taught ?? []).length === 0).length;
   const mappedClasses = new Set(teachers.flatMap((teacher) => tp(teacher)?.classes_taught ?? [])).size;
 
-  useEffect(() => { setPage(1); }, [searchQuery, classFilter, statusFilter]);
+  useEffect(() => { setPage(1); }, [searchQuery, classFilter, subjectFilter, statusFilter]);
+  // A page/filter change can leave a selection pointing at rows no longer on
+  // screen — drop it rather than let a bulk action silently touch hidden rows.
+  useEffect(() => { setSelectedIds(new Set()); }, [searchQuery, classFilter, subjectFilter, statusFilter, showFormer, page]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc((v) => !v);
@@ -291,13 +308,14 @@ export const SchoolAdminTeachers: React.FC = () => {
     setError('');
     setTogglingId(teacher.id);
     try {
-      const res = await api.post<{ releasedAssignments: number; releasedSections: number }>(
+      const res = await api.post<{ releasedAssignments: number; releasedSections: number; releasedSlots: number }>(
         `/school-admin/teachers/${teacher.id}/exit`,
         { reason: reason.trim() || undefined },
       );
       const bits = [
         res.releasedAssignments ? `${res.releasedAssignments} subject assignment${res.releasedAssignments === 1 ? '' : 's'}` : '',
         res.releasedSections ? `${res.releasedSections} class-teacher role${res.releasedSections === 1 ? '' : 's'}` : '',
+        res.releasedSlots ? `${res.releasedSlots} timetable period${res.releasedSlots === 1 ? '' : 's'}` : '',
       ].filter(Boolean);
       setNotice(
         bits.length
@@ -316,13 +334,13 @@ export const SchoolAdminTeachers: React.FC = () => {
     setError('');
     setTogglingId(teacher.id);
     try {
-      const res = await api.post<{ restoredAssignments: number; restoredSections: number }>(
+      const res = await api.post<{ restoredAssignments: number; restoredSections: number; restoredSlots: number }>(
         `/school-admin/teachers/${teacher.id}/reinstate`,
       );
-      const restored = (res.restoredAssignments ?? 0) + (res.restoredSections ?? 0);
+      const restored = (res.restoredAssignments ?? 0) + (res.restoredSections ?? 0) + (res.restoredSlots ?? 0);
       setNotice(
         restored
-          ? `${teacher.full_name} is back, with ${res.restoredAssignments} subject assignment(s) and ${res.restoredSections} class-teacher role(s) restored.`
+          ? `${teacher.full_name} is back, with ${res.restoredAssignments} subject assignment(s), ${res.restoredSections} class-teacher role(s), and ${res.restoredSlots} timetable period(s) restored.`
           : `${teacher.full_name} is back on the staff list.`,
       );
       await loadTeachers();
@@ -338,6 +356,85 @@ export const SchoolAdminTeachers: React.FC = () => {
       credentials.map((c) => ({ fullName: c.fullName, username: c.username, roleLine: 'Teacher', password: c.password })),
       'Teacher Login Slips',
     );
+  };
+
+  // Exports the roster as currently filtered/sorted/shown — not just the
+  // credentials of a just-created batch — so this is the "give me a copy of
+  // this list" export the toolbar was missing (#57).
+  const downloadRosterCsv = () => {
+    const header = 'Full Name,Employee ID,Specialization,Classes Taught,Status\n';
+    const rows = filtered.map((t) => {
+      const p = tp(t);
+      const status = t.exited_at ? 'Left the school' : !t.is_active ? 'Deactivated' : t.has_logged_in_ever ? 'Active' : 'Never logged in';
+      return `"${t.full_name}",${p?.employee_id ?? ''},"${p?.specialization ?? ''}","${(p?.classes_taught ?? []).join('|')}",${status}`;
+    }).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'teacher-directory.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    // Former staff have no active-account actions to bulk-apply, so they're
+    // excluded from "select all" entirely rather than counted then ignored.
+    const pageIds = pageRows.filter((t) => !t.exited_at).map((t) => t.id);
+    const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) pageIds.forEach((id) => next.delete(id));
+      else pageIds.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
+  const selectedRows = pageRows.filter((t) => selectedIds.has(t.id) && !t.exited_at);
+
+  const handleBulkActive = async (isActive: boolean) => {
+    if (selectedRows.length === 0) return;
+    if (!isActive && !window.confirm(`Deactivate ${selectedRows.length} teacher(s)? They will be signed out and cannot log in until reactivated.`)) return;
+    setIsBulkWorking(true);
+    setError('');
+    try {
+      await Promise.all(selectedRows.map((t) => api.post(`/school-admin/teachers/${t.id}/active`, { isActive })));
+      setNotice(`${isActive ? 'Reactivated' : 'Deactivated'} ${selectedRows.length} teacher(s).`);
+      setSelectedIds(new Set());
+      await loadTeachers();
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Bulk update failed for one or more teachers');
+    } finally {
+      setIsBulkWorking(false);
+    }
+  };
+
+  const handleBulkResetPasswords = async () => {
+    if (selectedRows.length === 0) return;
+    if (!window.confirm(`Reset the password for ${selectedRows.length} teacher(s)? Each will need their new password to sign in again.`)) return;
+    setIsBulkWorking(true);
+    setError('');
+    try {
+      const credentials = await Promise.all(
+        selectedRows.map((t) => api.post<TeacherCredential>(`/school-admin/teachers/${t.id}/reset-password`)),
+      );
+      // Reuses the same print/CSV banner an import shows — the shape (name,
+      // username, one-time password) is identical either way.
+      setImportResult({ created: 0, errors: [], credentials });
+      setSelectedIds(new Set());
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Password reset failed for one or more teachers');
+    } finally {
+      setIsBulkWorking(false);
+    }
   };
 
   const downloadCredentialsCsv = () => {
@@ -376,6 +473,9 @@ export const SchoolAdminTeachers: React.FC = () => {
         description="Keep faculty profiles, class mappings and account access accurate across the school."
         actions={(
           <>
+            <button onClick={downloadRosterCsv} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[13px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
+              <Download size={15} /> Export CSV
+            </button>
             <button onClick={() => setShowImport(true)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[13px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
               <UploadCloud size={15} /> Import faculty
             </button>
@@ -459,6 +559,10 @@ export const SchoolAdminTeachers: React.FC = () => {
           <option value="">All classes</option>
           {Array.from({ length: 10 }, (_, i) => i + 1).map((c) => <option key={c} value={c}>Teaches Class {c}</option>)}
         </select>
+        <select value={subjectFilter} onChange={(e) => setSubjectFilter(e.target.value)} className={selectCls} disabled={subjectOptions.length === 0}>
+          <option value="">All subjects</option>
+          {subjectOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)} className={selectCls}>
           <option value="all">All statuses</option>
           <option value="active">Has logged in</option>
@@ -480,6 +584,28 @@ export const SchoolAdminTeachers: React.FC = () => {
         </div>
       </div>
 
+      {/* Bulk action bar — same pattern as Students.tsx, scoped to the
+          current page's selection so an action never silently reaches past
+          what's actually on screen. */}
+      {selectedRows.length > 0 && (
+        <div className="flex items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5">
+          <CheckSquare size={15} className="text-indigo-600 shrink-0" />
+          <span className="text-[13px] font-semibold text-indigo-800">{selectedRows.length} selected</span>
+          <div className="flex items-center gap-2 ml-2">
+            <button onClick={() => void handleBulkActive(false)} disabled={isBulkWorking} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 px-3 py-1.5 rounded-lg cursor-pointer disabled:opacity-50">
+              <UserRoundX size={12} /> Deactivate
+            </button>
+            <button onClick={() => void handleBulkActive(true)} disabled={isBulkWorking} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 px-3 py-1.5 rounded-lg cursor-pointer disabled:opacity-50">
+              <UserCheck size={12} /> Reactivate
+            </button>
+            <button onClick={() => void handleBulkResetPasswords()} disabled={isBulkWorking} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 px-3 py-1.5 rounded-lg cursor-pointer disabled:opacity-50">
+              {isBulkWorking ? <Loader2 size={12} className="animate-spin" /> : <KeyRound size={12} />} Reset passwords
+            </button>
+          </div>
+          <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-[12px] font-semibold text-indigo-500 hover:text-indigo-700 cursor-pointer">Clear</button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="portal-panel">
         {isLoading ? (
@@ -495,6 +621,15 @@ export const SchoolAdminTeachers: React.FC = () => {
               <table className="portal-table w-full">
                 <thead>
                   <tr className="bg-slate-50 text-left text-[11px] text-slate-500">
+                    <th className="px-4 py-3 w-8">
+                      <input
+                        type="checkbox"
+                        checked={pageRows.length > 0 && pageRows.every((t) => t.exited_at || selectedIds.has(t.id))}
+                        onChange={toggleSelectAllOnPage}
+                        className="h-3.5 w-3.5 cursor-pointer accent-indigo-600"
+                        aria-label="Select all on this page"
+                      />
+                    </th>
                     <th className="px-4 py-3 whitespace-nowrap"><SortHeader label="Teacher" k="name" sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} /></th>
                     <th className="px-4 py-3 whitespace-nowrap"><SortHeader label="Employee ID" k="employee" sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} /></th>
                     <th className="px-4 py-3 whitespace-nowrap"><SortHeader label="Specialization" k="specialization" sortKey={sortKey} sortAsc={sortAsc} onSort={toggleSort} /></th>
@@ -508,6 +643,16 @@ export const SchoolAdminTeachers: React.FC = () => {
                     const p = tp(t);
                     return (
                       <tr key={t.id} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
+                        <td className="px-4 py-2.5">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(t.id)}
+                            onChange={() => toggleSelected(t.id)}
+                            disabled={!!t.exited_at}
+                            className="h-3.5 w-3.5 cursor-pointer accent-indigo-600 disabled:opacity-30"
+                            aria-label={`Select ${t.full_name}`}
+                          />
+                        </td>
                         <td className="px-4 py-2.5 text-[13px] font-semibold text-slate-800">{t.full_name}</td>
                         <td className="px-4 py-2.5 text-[13px] text-slate-600 font-mono tabular-nums">{p?.employee_id ?? '—'}</td>
                         <td className="px-4 py-2.5 text-[13px] text-slate-600">{p?.specialization ?? '—'}</td>

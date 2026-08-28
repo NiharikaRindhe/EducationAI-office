@@ -3,18 +3,12 @@ import { Link } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { TodayPanel } from '../../components/shared/TodayPanel';
-import { SUBJECT_ORDER, activitiesForClass, practicePath } from '../../data/activities';
+import { activitiesForClass } from '../../data/activities';
 
 export const Batch2Home: React.FC = () => {
   const { studentName, currentClass } = useApp();
   const { hasFeature } = useAuth();
   const classActivities = activitiesForClass(currentClass);
-  const activitySubjects = SUBJECT_ORDER
-    .map((subject) => ({
-      subject,
-      count: classActivities.filter((a) => a.subject === subject).length,
-    }))
-    .filter((row) => row.count > 0);
 
   return (
     <div className="flex flex-col gap-6 select-none anim-fade-up">
@@ -45,31 +39,6 @@ export const Batch2Home: React.FC = () => {
           <p className="text-[11px] text-slate-400 mt-1">Papers assigned by your teacher</p>
         </Link>
       </div>
-
-      {activitySubjects.length > 0 && (
-        <div className="bento-card border border-indigo-100 bg-white p-5 flex flex-col gap-4">
-          <div className="flex justify-between items-center">
-            <span className="font-display font-bold text-sm text-slate-800">Jump into a subject</span>
-            <Link to="/batch2/activities" className="text-xs font-bold text-indigo-600 hover:underline">
-              Open all
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {activitySubjects.map((row) => (
-              <Link
-                key={row.subject}
-                to={practicePath('/batch2/activities', row.subject)}
-                className="p-4 bg-indigo-50/60 border border-indigo-100 rounded-2xl hover:border-indigo-300 hover:bg-indigo-50"
-              >
-                <h4 className="font-display font-bold text-sm text-slate-800">{row.subject}</h4>
-                <span className="text-[10px] text-slate-400 font-medium">
-                  {row.count} chapter{row.count === 1 ? '' : 's'}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

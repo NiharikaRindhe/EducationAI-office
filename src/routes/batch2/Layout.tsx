@@ -1,4 +1,4 @@
-import React, { useEffect, Suspense } from 'react';
+import React, { useEffect, Suspense, useState } from 'react';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { useAuth, type FeatureKey } from '../../context/AuthContext';
@@ -26,6 +26,7 @@ export const Batch2Layout: React.FC = () => {
   const location = useLocation();
   const { batchId, currentClass, studentAvatar, studentName } = useApp();
   const { hasFeature } = useAuth();
+  const [readerNavExpanded, setReaderNavExpanded] = useState(false);
 
   useEffect(() => {
     if (currentClass < 5 || currentClass > 8) {
@@ -35,36 +36,23 @@ export const Batch2Layout: React.FC = () => {
 
   const navItems: NavItem[] = ([
     { href: '/batch2/home', label: 'Home', iconName: 'home' },
-    { href: '/batch2/subjects', label: 'Subjects', iconName: 'library_books' },
+    { href: '/batch2/activities', label: 'Activities', iconName: 'extension' },
     { href: '/batch2/chat', label: 'AI Doubt Tutor', iconName: 'chat', feature: 'ai_tutor' },
     ...(PDF_SIMULATOR_ENABLED
       ? [{ href: '/batch2/reader', label: 'PDF Simulator', iconName: 'auto_stories', feature: 'pdf_simulator' as const }]
       : []),
     { href: '/batch2/exams', label: 'Exams & Mocks', iconName: 'edit_document' },
-    { href: '/batch2/tasks', label: 'My Tasks', iconName: 'assignment_turned_in' },
-    { href: '/batch2/notes', label: 'Study Notes', iconName: 'sticky_note_2' },
-    { href: '/batch2/pyq', label: 'PYQ Hub', iconName: 'bookmark', feature: 'pyq_hub' },
-    { href: '/batch2/daily-challenges', label: 'Daily Challenges', iconName: 'electric_bolt' },
-    { href: '/batch2/streak', label: 'Streak Tracker', iconName: 'local_fire_department' },
-    { href: '/batch2/badges', label: 'My Badges', iconName: 'military_tech' },
-    { href: '/batch2/profile', label: 'Profile', iconName: 'person' },
-    { href: '/batch2/help', label: 'Report an Issue', iconName: 'confirmation_number' }
+    { href: '/batch2/profile', label: 'Profile & Streak', iconName: 'person' }
   ] as (NavItem & { feature?: FeatureKey })[])
     .filter((item) => !item.feature || hasFeature(item.feature));
 
   const getHeaderDetails = () => {
     const path = location.pathname;
-    if (path.includes('/subjects')) return { title: 'Subjects & Chapters', sub: 'Complete your NCERT syllabus and take practice sets.' };
+    if (path.includes('/activities')) return { title: 'Activities', sub: 'Practice chapters through focused learning activities.' };
     if (path.includes('/chat')) return { title: 'AI Doubt Solver', sub: 'Ask questions about mathematics and science formulas!' };
     if (path.includes('/reader')) return { title: 'PDF Simulator', sub: 'Interactive simulations from your textbooks.' };
     if (path.includes('/exams')) return { title: 'Mock Exams', sub: 'Complete term exams and test your readiness.' };
-    if (path.includes('/tasks')) return { title: 'My Tasks', sub: 'Complete work your teacher has assigned to earn XP.' };
-    if (path.includes('/notes')) return { title: 'Study Notes Manager', sub: 'Organize and review your study notes.' };
-    if (path.includes('/pyq')) return { title: 'PYQ Hub', sub: 'Attempt past board papers and review solutions.' };
-    if (path.includes('/daily-challenges')) return { title: 'Daily Challenges', sub: 'Solve CBSE pattern questions to win double XP!' };
-    if (path.includes('/streak')) return { title: 'Streak Tracker', sub: 'View daily activity records and heatmap milestones.' };
-    if (path.includes('/badges')) return { title: 'Academic Badges', sub: 'Check unlocked achievements for subject toppers.' };
-    if (path.includes('/profile')) return { title: 'Profile Settings', sub: 'Manage nickname and view performance analytics.' };
+    if (path.includes('/profile')) return { title: 'Profile & Streak', sub: 'Edit your avatar and review your lab attendance streak.' };
     return { title: 'Dashboard Home', sub: 'Ready to master your chapters today?' };
   };
 
@@ -79,13 +67,13 @@ export const Batch2Layout: React.FC = () => {
   return (
     <div className={`flex bg-slate-50/50 ${isReader ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
       {/* Sidebar Navigation */}
-      {!isReader && (
-        <Sidebar
-          navItems={navItems}
-          batchColor="indigo"
-          logoText="EduAI"
-        />
-      )}
+      <Sidebar
+        navItems={navItems}
+        batchColor="indigo"
+        logoText="EduAI"
+        collapsed={isReader && !readerNavExpanded}
+        onCollapsedChange={isReader ? (nextCollapsed) => setReaderNavExpanded(!nextCollapsed) : undefined}
+      />
 
       {/* Main content wrapper */}
       <div className="flex-1 flex flex-col min-w-0">
@@ -115,7 +103,7 @@ export const Batch2Layout: React.FC = () => {
             </Suspense>
           </main>
         ) : (
-          <main className="flex-1 p-8 overflow-y-auto max-w-7xl w-full mx-auto">
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-7xl w-full mx-auto">
             <Outlet />
           </main>
         )}

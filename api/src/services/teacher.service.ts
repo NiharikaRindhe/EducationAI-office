@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
-import { currentAcademicYear } from '../lib/academicYear.js';
+import { currentAcademicYearForSchool } from '../lib/schoolAcademicYear.js';
 
 // ─────────────────────────────────────────────────────────────
 //  TEACHING SCOPE
@@ -26,7 +26,7 @@ export interface TeachingScope {
 }
 
 export async function getTeachingScope(teacherId: string, schoolId: string): Promise<TeachingScope> {
-  const year = currentAcademicYear();
+  const year = await currentAcademicYearForSchool(schoolId);
 
   const { data: assignments, error: aError } = await supabaseAdmin
     .from('teaching_assignments')
@@ -170,13 +170,21 @@ export async function listStudentsForTeacher(
 }
 
 export async function getStudentDrillDown(teacherId: string, schoolId: string, studentId: string) {
+  // subject_progress and student_badges both carry student_id -> student_
+  // profiles(user_id), not user_profiles(id) — so PostgREST can only embed
+  // them nested under student_profiles, never as siblings of it. The
+  // previous flat select asked for a user_profiles<->subject_progress
+  // relationship that doesn't exist and PGRST200'd on every call, which the
+  // blanket `error || !data` check below then reported as a plain
+  // "Student not found" no matter which student was opened.
   const { data, error } = await supabaseAdmin
     .from('user_profiles')
     .select(
       `id, full_name, school_id,
-       student_profiles(class_num, section, roll_number, avatar, xp, level, streak, longest_streak),
-       subject_progress(subject, class_num, chapters_done, total_chapters),
-       student_badges(badge_id, earned_at, badges(name, icon))`,
+       student_profiles(class_num, section, roll_number, avatar, xp, level, streak, longest_streak,
+         subject_progress(subject, class_num, chapters_done, total_chapters),
+         student_badges(badge_id, earned_at, badges(name, icon))
+       )`,
     )
     .eq('id', studentId)
     .eq('school_id', schoolId) // reject cross-school lookups outright — section labels (e.g. "7A") repeat across schools
@@ -196,7 +204,21 @@ export async function getStudentDrillDown(teacherId: string, schoolId: string, s
     throw new ApiError('FORBIDDEN', 'This student is not in one of your classes');
   }
 
-  return data;
+  // Reshaped back to the flat shape the frontend (Students.tsx) already
+  // expects — only the query nesting changed, not the response contract.
+  return {
+    id: data.id,
+    full_name: data.full_name,
+    school_id: data.school_id,
+    student_profiles: sp
+      ? {
+          class_num: sp.class_num, section: sp.section, roll_number: sp.roll_number,
+          avatar: sp.avatar, xp: sp.xp, level: sp.level, streak: sp.streak, longest_streak: sp.longest_streak,
+        }
+      : null,
+    subject_progress: sp?.subject_progress ?? [],
+    student_badges: sp?.student_badges ?? [],
+  };
 }
 
 // At-risk = no activity logged in the last 3 days (streak reset to 0) OR

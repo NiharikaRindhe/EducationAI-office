@@ -146,7 +146,7 @@ export const PyqBrowser: React.FC<{
       {boardBanner && (
         <div className={`rounded-2xl border p-4 flex items-center gap-3 ${a.soft}`}>
           <BookOpen size={16} className={a.text} />
-          <p className={`text-xs font-bold ${a.text}`}>Board Prep Mode — Questions include examiner rubric points to help you score full marks. 📋</p>
+          <p className={`text-xs font-bold ${a.text}`}>Board Prep Mode — Questions include examiner rubric points to help you score full marks.</p>
         </div>
       )}
 

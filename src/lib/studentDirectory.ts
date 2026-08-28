@@ -27,6 +27,7 @@ export interface StudentDirectoryRow {
   level: number;
   streak: number;
   longest_streak: number;
+  graduated: boolean;
 }
 
 export interface DirectoryPage {
@@ -48,8 +49,10 @@ export interface DirectoryFilters {
   section: string;
   status: 'all' | 'active' | 'never';
   enabled: 'all' | 'enabled' | 'disabled';
-  /** Hides students who have left unless widened. Absent = 'current'. */
-  enrolment?: 'current' | 'left' | 'all';
+  /** Hides students who have left unless widened. Absent = 'current'.
+   *  'graduated' narrows to Class 10 pass-outs specifically (#53) — a
+   *  distinct sub-case of 'left' that a plain deactivation isn't. */
+  enrolment?: 'current' | 'left' | 'all' | 'graduated';
   schoolId: string;
 }
 

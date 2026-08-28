@@ -128,6 +128,7 @@ export const StudentDirectoryToolbar: React.FC<Props> = ({
         >
           <option value="current">Currently enrolled</option>
           <option value="left">Left the school</option>
+          <option value="graduated">Graduated (Class 10 pass-outs)</option>
           <option value="all">Enrolled + left</option>
         </select>
       )}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Clock, Loader2 } from 'lucide-react';
+import { Clock, Loader2, CheckCircle2, Hourglass, ClipboardList, Zap } from 'lucide-react';
 import { api } from '../../lib/api';
 
 type Accent = 'amber' | 'indigo' | 'sky';
@@ -69,17 +69,17 @@ export const TaskList: React.FC<{ accent: Accent }> = ({ accent }) => {
     <div className="flex flex-col gap-6 font-sans select-none anim-fade-up">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Completed', val: countCompleted, icon: '✅', color: 'text-emerald-500 bg-emerald-50' },
-          { label: 'In Progress', val: countInProgress, icon: '⏳', color: 'text-amber-500 bg-amber-50' },
-          { label: 'Pending', val: countPending, icon: '📋', color: 'text-purple-500 bg-purple-50' },
-          { label: 'XP Earned', val: `+${totalXPBonus}`, icon: '⚡', color: 'text-indigo-500 bg-indigo-50' },
+          { label: 'Completed', val: countCompleted, icon: <CheckCircle2 size={18} />, color: 'text-emerald-500 bg-emerald-50' },
+          { label: 'In Progress', val: countInProgress, icon: <Hourglass size={18} />, color: 'text-amber-500 bg-amber-50' },
+          { label: 'Pending', val: countPending, icon: <ClipboardList size={18} />, color: 'text-purple-500 bg-purple-50' },
+          { label: 'XP Earned', val: `+${totalXPBonus}`, icon: <Zap size={18} />, color: 'text-indigo-500 bg-indigo-50' },
         ].map((stat, idx) => (
           <div key={idx} className="bento-card border border-slate-100 bg-white p-4 flex items-center justify-between">
             <div>
               <span className="font-sans text-[10px] font-bold text-slate-400 uppercase tracking-wide">{stat.label}</span>
               <h4 className="font-display font-black text-2xl text-slate-800 mt-1">{stat.val}</h4>
             </div>
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${stat.color}`}>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${stat.color}`}>
               {stat.icon}
             </div>
           </div>
@@ -126,7 +126,7 @@ export const TaskList: React.FC<{ accent: Accent }> = ({ accent }) => {
           ))
         ) : (
           <div className="text-center py-12 bg-white border border-slate-100 rounded-3xl flex flex-col items-center gap-3">
-            <span className="text-3xl select-none">🎉</span>
+            <CheckCircle2 size={32} className="text-slate-300" />
             <h4 className="font-display font-bold text-sm text-slate-500">No tasks assigned yet!</h4>
             <p className="font-sans text-[11px] text-slate-400">Your teacher hasn't assigned anything yet.</p>
           </div>

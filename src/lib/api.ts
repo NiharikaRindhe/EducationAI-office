@@ -92,10 +92,102 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   return payload as T;
 }
 
+/** Non-text fields carried on a chat stream's closing frame — everything
+ *  the plain (non-streamed) response used to return alongside `answer`.
+ *  Generic over the source/image shapes so callers get real typing instead
+ *  of `unknown[]`. */
+export interface ChatStreamDone<TSource = unknown, TImage = unknown> {
+  sources: TSource[];
+  returnedImages: TImage[];
+  imageUrl: string | null;
+  subjectWarning: string | null;
+}
+
+/** Streaming counterpart to `api.post`, for the one endpoint (AI Doubt
+ *  Tutor chat) that responds with `text/event-stream` instead of JSON — a
+ *  streamed body can't be read with `res.json()`, so this can't go through
+ *  the shared `request()` helper above. Calls `onDelta` with each
+ *  incremental chunk of the reply as it arrives, then resolves with the
+ *  closing frame's non-text fields once the stream ends. */
+async function postStream<TSource = unknown, TImage = unknown>(
+  path: string,
+  body: unknown,
+  onDelta: (delta: string) => void,
+  signal?: AbortSignal,
+): Promise<ChatStreamDone<TSource, TImage>> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+  const res = await fetch(buildUrl(path), { method: 'POST', headers, body: JSON.stringify(body), signal });
+
+  if (!res.ok) {
+    if (res.status === 401 && accessToken) handleSessionExpired();
+    const payload = await res.json().catch(() => null);
+    const err = payload?.error;
+    throw new ApiClientError(err?.code ?? 'UNKNOWN', err?.message ?? res.statusText, res.status, err?.details);
+  }
+  if (!res.body) throw new ApiClientError('NETWORK', 'The chat stream came back empty', 0);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let doneFrame: ChatStreamDone<TSource, TImage> | null = null;
+  let streamError: string | null = null;
+
+  const applyFrame = (payload: string) => {
+    let event: { type: string; text?: string; error?: string } & Partial<ChatStreamDone<TSource, TImage>>;
+    try {
+      event = JSON.parse(payload);
+    } catch {
+      return; // a stray/partial frame — skip rather than crash the stream
+    }
+    if (event.type === 'delta' && event.text) {
+      onDelta(event.text);
+    } else if (event.type === 'done') {
+      doneFrame = {
+        sources: event.sources ?? [],
+        returnedImages: event.returnedImages ?? [],
+        imageUrl: event.imageUrl ?? null,
+        subjectWarning: event.subjectWarning ?? null,
+      };
+    } else if (event.type === 'error') {
+      streamError = event.error ?? 'Failed to generate a reply';
+    }
+  };
+
+  const consume = () => {
+    const parts = buffer.split('\n\n');
+    buffer = parts.pop() ?? '';
+    for (const block of parts) {
+      const payload = block
+        .split('\n')
+        .filter((l) => l.startsWith('data:'))
+        .map((l) => l.replace(/^data:\s?/, ''))
+        .join('\n')
+        .trim();
+      if (payload) applyFrame(payload);
+    }
+  };
+
+  while (true) {
+    const { done: readerDone, value } = await reader.read();
+    if (readerDone) break;
+    buffer += decoder.decode(value, { stream: true });
+    consume();
+  }
+  buffer += decoder.decode();
+  consume();
+
+  if (streamError) throw new ApiClientError('AI_ERROR', streamError, 0);
+  if (!doneFrame) throw new ApiClientError('NETWORK', 'The chat stream ended unexpectedly', 0);
+  return doneFrame;
+}
+
 export const api = {
   get: <T>(path: string, query?: RequestOptions['query']) => request<T>(path, { method: 'GET', query }),
   post: <T>(path: string, body?: unknown, opts?: Partial<RequestOptions>) =>
     request<T>(path, { method: 'POST', body, ...opts }),
+  postStream,
   put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),

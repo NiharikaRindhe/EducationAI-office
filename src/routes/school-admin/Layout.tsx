@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar, NavItem } from '../../components/shared/Sidebar';
 import { TopBar } from '../../components/shared/TopBar';
+import { useAuth } from '../../context/AuthContext';
 
 // Kept intact and reversible, just off the nav and blocked at the route level
 // in App.tsx (see the comment there for the sheet items behind each one):
@@ -16,6 +17,7 @@ const PRINCIPAL_REPORT_ENABLED = false;
 
 export const SchoolAdminLayout: React.FC = () => {
   const location = useLocation();
+  const { user } = useAuth();
 
   const navItems: NavItem[] = [
     { href: '/school-admin/dashboard', label: 'Dashboard', iconName: 'dashboard' },
@@ -56,8 +58,8 @@ export const SchoolAdminLayout: React.FC = () => {
     <div className="min-h-screen flex bg-slate-50/50">
       <Sidebar navItems={navItems} batchColor="schoolAdmin" logoText="EduAI" />
       <div className="flex-1 flex flex-col min-w-0">
-        <TopBar greeting="Welcome," subtitle={header.sub} batchColor="schoolAdmin" profileHref="/school-admin/profile" />
-        <main className="flex-1 p-8 overflow-y-auto max-w-7xl w-full mx-auto">
+        <TopBar greeting="Welcome," userName={user?.full_name ?? 'School Admin'} subtitle={header.sub} batchColor="schoolAdmin" profileHref="/school-admin/profile" />
+        <main className="flex-1 w-full overflow-y-auto p-5 lg:p-6 xl:p-7">
           <Outlet />
         </main>
       </div>

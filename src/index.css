@@ -488,6 +488,39 @@
   font-family: var(--font-mono) !important;
 }
 
+/* Chemistry's Lab/PeriodicTable views use Tailwind's neutral `gray-*` scale
+   throughout, while the rest of the app (and the Biology/Physics labs'
+   `slate-950` dark shells) use the cooler, slightly blue-tinted `slate-*`
+   scale — same lightness steps, different hue family, so switching between
+   labs reads as a jarring "wrong app" flash. Remapped by class rather than
+   editing the lab's source, same reasoning and scope as the font rule above:
+   a same-lightness hue nudge, not a light/dark reskin, so nothing here risks
+   a contrast regression the source's own gray-on-gray pairings didn't already
+   have. Values are Tailwind's own slate-* hex stops. */
+.lab-embed .bg-gray-50   { background-color: #f8fafc !important; }
+.lab-embed .bg-gray-100  { background-color: #f1f5f9 !important; }
+.lab-embed .bg-gray-200  { background-color: #e2e8f0 !important; }
+.lab-embed .bg-gray-300  { background-color: #cbd5e1 !important; }
+.lab-embed .bg-gray-400  { background-color: #94a3b8 !important; }
+.lab-embed .bg-gray-500  { background-color: #64748b !important; }
+.lab-embed .bg-gray-600  { background-color: #475569 !important; }
+.lab-embed .bg-gray-700  { background-color: #334155 !important; }
+.lab-embed .bg-gray-800  { background-color: #1e293b !important; }
+.lab-embed .bg-gray-900  { background-color: #0f172a !important; }
+.lab-embed .text-gray-50   { color: #f8fafc !important; }
+.lab-embed .text-gray-100  { color: #f1f5f9 !important; }
+.lab-embed .text-gray-200  { color: #e2e8f0 !important; }
+.lab-embed .text-gray-300  { color: #cbd5e1 !important; }
+.lab-embed .text-gray-400  { color: #94a3b8 !important; }
+.lab-embed .text-gray-500  { color: #64748b !important; }
+.lab-embed .text-gray-600  { color: #475569 !important; }
+.lab-embed .text-gray-700  { color: #334155 !important; }
+.lab-embed .text-gray-800  { color: #1e293b !important; }
+.lab-embed .text-gray-900  { color: #0f172a !important; }
+.lab-embed .border-gray-100 { border-color: #f1f5f9 !important; }
+.lab-embed .border-gray-200 { border-color: #e2e8f0 !important; }
+.lab-embed .border-gray-300 { border-color: #cbd5e1 !important; }
+
 /* ── Embedded PDF simulator reader ─────────────────────────────
    Same reasoning as .lab-embed above, adapted to how reader.css sizes
    itself: it isn't Tailwind-utility-classed, its own top-level rule

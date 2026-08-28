@@ -21,7 +21,7 @@ export const SuperAdminLayout: React.FC = () => {
       <Sidebar navItems={navItems} batchColor="superAdmin" logoText="EduAI" />
       <div className="flex-1 flex flex-col min-w-0">
         <TopBar greeting="Welcome," subtitle="Manage every school on the EduAI platform." batchColor="superAdmin" profileHref="/super-admin/profile" />
-        <main className="flex-1 p-8 overflow-y-auto max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-7xl w-full mx-auto">
           <Outlet />
         </main>
       </div>

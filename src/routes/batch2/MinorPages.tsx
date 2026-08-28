@@ -88,10 +88,17 @@ export const Batch2Profile: React.FC = () => {
   return (
     <div className="flex flex-col gap-6 font-sans select-none anim-fade-up">
       <div>
-        <h2 className="font-display font-extrabold text-xl text-slate-800">My Student Profile</h2>
-        <p className="text-xs text-slate-400 font-medium mt-0.5">Customize your avatar and view your stats summary.</p>
+        <h2 className="font-display font-extrabold text-xl text-slate-800">Profile &amp; Streak</h2>
+        <p className="text-xs text-slate-400 font-medium mt-0.5">Customize your avatar and review your lab attendance.</p>
       </div>
       <ProfileCard accent="indigo" />
+      <section aria-labelledby="batch2-streak-heading" className="flex flex-col gap-3">
+        <div>
+          <h3 id="batch2-streak-heading" className="font-display font-bold text-base text-slate-800">Attendance streak</h3>
+          <p className="text-xs text-slate-400 mt-0.5">Your recent active lab days and longest streak.</p>
+        </div>
+        <StreakCalendar accent="indigo" variant="calendar" />
+      </section>
     </div>
   );
 };

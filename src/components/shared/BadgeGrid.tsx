@@ -72,8 +72,8 @@ const BadgeDetail: React.FC<BadgeDetailModal & { onClose: () => void; accent: Ac
           <h3 className="font-display font-bold text-lg text-slate-800">{badge.name}</h3>
           <p className="text-xs text-slate-400 mt-1">{badge.description}</p>
           {badge.earned && badge.earned_at && (
-            <p className={`text-[11px] font-bold mt-2 ${a.text}`}>
-              🏅 Earned {new Date(badge.earned_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+            <p className={`text-[11px] font-bold mt-2 flex items-center justify-center gap-1 ${a.text}`}>
+              <Trophy size={11} className="shrink-0" /> Earned {new Date(badge.earned_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
             </p>
           )}
           {!badge.earned && badge.progress !== undefined && (

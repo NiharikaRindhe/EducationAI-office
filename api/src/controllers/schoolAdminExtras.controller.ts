@@ -20,6 +20,21 @@ export async function getPromotionPreviewController(req: Request, res: Response,
   }
 }
 
+const academicYearSettingsSchema = z.object({
+  academicYearStartMonth: z.number().int().min(1).max(12),
+});
+
+export async function updateAcademicYearSettingsController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const schoolId = requireSchoolId(req);
+    const { academicYearStartMonth } = academicYearSettingsSchema.parse(req.body);
+    const result = await promotionService.updateAcademicYearStartMonth(schoolId, academicYearStartMonth);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 const executePromotionSchema = z.object({
   /** Students repeating their current class rather than advancing. */
   holdBackIds: z.array(z.string().uuid()).max(2000).optional(),

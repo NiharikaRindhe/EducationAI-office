@@ -140,5 +140,12 @@ export const Batch3Profile: React.FC = () => (
 
     {/* ProfileCard with exam history for Batch 3 */}
     <ProfileCard accent="sky" showExamHistory />
+    <section aria-labelledby="batch3-streak-heading" className="flex flex-col gap-3">
+      <div>
+        <h2 id="batch3-streak-heading" className="font-display font-bold text-base text-slate-800">Attendance streak</h2>
+        <p className="text-xs text-slate-400 mt-0.5">Your recent active lab days and longest streak.</p>
+      </div>
+      <StreakCalendar accent="sky" variant="calendar" />
+    </section>
   </div>
 );

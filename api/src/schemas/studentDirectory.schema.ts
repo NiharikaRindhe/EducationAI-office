@@ -9,7 +9,7 @@ export const directoryQuerySchema = z.object({
   status: z.enum(['all', 'active', 'never']).optional(),
   enabled: z.enum(['all', 'enabled', 'disabled']).optional(),
   /** Omitted means 'current' — see applyFilters. */
-  enrolment: z.enum(['current', 'left', 'all']).optional(),
+  enrolment: z.enum(['current', 'left', 'all', 'graduated']).optional(),
   batchId: z.coerce.number().int().min(1).max(3).optional(),
   schoolId: z.string().uuid().optional(),
   page: z.coerce.number().int().min(1).optional(),

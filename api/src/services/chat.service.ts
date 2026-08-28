@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
-import { chatCompletion, embedText, aiConfigured } from '../lib/ai.js';
+import { chatCompletion, chatCompletionStream, StreamInterruptedError, embedText, aiConfigured } from '../lib/ai.js';
 import { withAiSlot } from '../lib/aiSlots.js';
 import { requireWhitelistedSubject } from '../lib/classSubjects.js';
 import type { CreateChatSessionInput, RenameChatSessionInput } from '../schemas/chat.schema.js';
@@ -146,7 +146,18 @@ const HISTORY_TURNS = 6;
  *  of the history budget above — trimmed, not dropped, so the gist survives. */
 const HISTORY_CHAR_CAP = 600;
 
-export async function sendMessage(studentId: string, sessionId: string, text: string, imageBase64?: string) {
+/** `onDelta` is called with each incremental chunk of the tutor's reply as
+ *  it's generated, so the client can render it token-by-token instead of
+ *  waiting for the whole answer — see ChatCenter.tsx's streaming consumer.
+ *  Everything else about the request (retrieval, grounding, persistence) is
+ *  unchanged; only the final completion call is streamed. */
+export async function sendMessage(
+  studentId: string,
+  sessionId: string,
+  text: string,
+  imageBase64: string | undefined,
+  onDelta: (delta: string) => void,
+) {
   const { data: session } = await supabaseAdmin
     .from('chat_sessions')
     .select('id, class_num, subject')
@@ -196,6 +207,7 @@ export async function sendMessage(studentId: string, sessionId: string, text: st
     const fallback =
       "I can't reach the AI tutor right now — please try again in a moment, or ask your teacher for help.";
     await supabaseAdmin.from('chat_messages').insert({ session_id: sessionId, role: 'assistant', content: fallback });
+    onDelta(fallback);
     return { answer: fallback, sources: [], returnedImages: [], imageUrl };
   }
 
@@ -301,8 +313,14 @@ export async function sendMessage(studentId: string, sessionId: string, text: st
         .join('\n')
     : 'NONE — no diagram from the textbook matched this question.';
 
-  const answer = await chatCompletion(
-    [
+  // Streamed so the student sees the reply appear as it's generated instead
+  // of a spinner for the full ~5+ retrieval-and-completion round trip. A
+  // stream interrupted mid-answer still keeps whatever text the student
+  // already saw rather than throwing it away.
+  let answer = '';
+  try {
+    await chatCompletionStream(
+      [
       {
         role: 'system',
         content: `You are a helpful NCERT tutor for Class ${session.class_num} ${session.subject} students in India.
@@ -336,10 +354,23 @@ ${imageContext}`,
         content: text.trim() || 'Please explain the problem shown in this photo step by step.',
         ...(imageBase64 ? { images: [imageBase64] } : {}),
       },
-    ],
-    // A photo needs the multimodal model; text-only stays on the cheap chat tier.
-    { tier: imageBase64 ? 'vision' : 'chat', usageContext },
-  );
+      ],
+      // A photo needs the multimodal model; text-only stays on the cheap chat tier.
+      { tier: imageBase64 ? 'vision' : 'chat', usageContext },
+      (delta) => {
+        answer += delta;
+        onDelta(delta);
+      },
+    );
+  } catch (err) {
+    if (err instanceof StreamInterruptedError && err.partialText) {
+      // The student already saw this much before the stream broke —
+      // persist and return it rather than losing it to a retry elsewhere.
+      answer = err.partialText;
+    } else {
+      throw err;
+    }
+  }
 
   const sources = textChunks.map((c) => ({
     bookTitle: c.book_title,

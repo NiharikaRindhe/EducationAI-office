@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
 import { generatePassword } from '../lib/credentials.js';
-import { sendSchoolAdminWelcomeEmail } from '../lib/mailer.js';
+import { isMailerConfigured, sendSchoolAdminWelcomeEmail } from '../lib/mailer.js';
 import { revokeUserSessions, revokeSessionsForUsers } from '../lib/sessions.js';
 import { writeAuditLog } from './auditLog.service.js';
 import {
@@ -68,6 +68,7 @@ export async function createSchool(input: CreateSchoolInput, actorId: string) {
   // Optionally provision the school's admin account in the same step —
   // the generated password is returned exactly once, for the credential slip.
   let adminCredential: { fullName: string; email: string; password: string } | null = null;
+  let adminEmailDelivery: 'queued' | 'not_configured' | null = null;
   if (input.admin) {
     const password = generatePassword(12);
     const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -94,6 +95,7 @@ export async function createSchool(input: CreateSchoolInput, actorId: string) {
     }
 
     adminCredential = { fullName: input.admin.fullName, email: input.admin.email, password };
+    adminEmailDelivery = isMailerConfigured() ? 'queued' : 'not_configured';
 
     // Fire-and-forget: the credential is also shown once in the UI, so a
     // missing/broken SMTP server never blocks school creation.
@@ -120,7 +122,7 @@ export async function createSchool(input: CreateSchoolInput, actorId: string) {
     metadata: { code: input.code, name: input.name, adminProvisioned: adminCredential !== null },
   });
 
-  return { ...school, adminCredential };
+  return { ...school, adminCredential, adminEmailDelivery };
 }
 
 export const SCHOOLS_PAGE_SIZE = 25;

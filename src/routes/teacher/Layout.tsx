@@ -68,7 +68,7 @@ export const TeacherLayout: React.FC = () => {
         />
 
         {/* Dynamic page container */}
-        <main className="flex-1 p-8 overflow-y-auto max-w-7xl w-full mx-auto">
+        <main className="flex-1 w-full overflow-y-auto p-5 lg:p-6 xl:p-7">
           <Outlet />
         </main>
       </div>

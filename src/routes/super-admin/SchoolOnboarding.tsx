@@ -53,6 +53,7 @@ interface CreatedSchool {
   name: string;
   code: string;
   adminCredential: AdminCredential | null;
+  adminEmailDelivery: 'queued' | 'not_configured' | null;
 }
 
 export const SuperAdminSchoolOnboarding: React.FC = () => {
@@ -187,7 +188,10 @@ export const SuperAdminSchoolOnboarding: React.FC = () => {
                 <ShieldCheck size={14} className="shrink-0 mt-0.5" />
                 <span>
                   This password is shown <strong>once</strong> and is not recoverable — it is not stored in readable
-                  form. Copy or print it now. A welcome email has also been sent to the administrator.
+                  form. Copy or print it now.{' '}
+                  {created.adminEmailDelivery === 'queued'
+                    ? 'The welcome email has been queued; delivery status is recorded in the audit log.'
+                    : 'Email delivery is not configured, so share these credentials securely.'}
                 </span>
               </div>
 

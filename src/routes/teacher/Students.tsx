@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { ArrowLeft, Loader2, AlertCircle, X, Users, TriangleAlert, Flame } from 'lucide-react';
+import { ArrowLeft, Loader2, AlertCircle, X, Users, TriangleAlert, Flame, Medal } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 import { MetricCard, PortalPageHeader } from '../../components/shared/PortalPageHeader';
 import { DataTable, type DataTableColumn } from '../../components/shared/DataTable';
@@ -143,7 +143,7 @@ export const TeacherStudents: React.FC = () => {
             <div className="grid grid-cols-3 gap-4">
               <div className="bento-card border border-slate-100 bg-white p-4 text-center">
                 <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Streak</span>
-                <h4 className="mt-1 font-display text-xl font-black text-slate-800">🔥 {detail.student_profiles?.streak} Days</h4>
+                <h4 className="mt-1 flex items-center justify-center gap-1.5 font-display text-xl font-black text-slate-800"><Flame size={18} className="text-orange-500" /> {detail.student_profiles?.streak} Days</h4>
               </div>
               <div className="bento-card border border-slate-100 bg-white p-4 text-center">
                 <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Longest Streak</span>
@@ -151,7 +151,7 @@ export const TeacherStudents: React.FC = () => {
               </div>
               <div className="bento-card border border-slate-100 bg-white p-4 text-center">
                 <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Badges Earned</span>
-                <h4 className="mt-1 font-display text-xl font-black text-indigo-600">🏅 {detail.student_badges.length}</h4>
+                <h4 className="mt-1 flex items-center justify-center gap-1.5 font-display text-xl font-black text-indigo-600"><Medal size={18} /> {detail.student_badges.length}</h4>
               </div>
             </div>
 

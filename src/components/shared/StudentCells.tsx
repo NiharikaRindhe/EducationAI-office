@@ -24,8 +24,17 @@ export const ClassCell: React.FC<{ row: StudentDirectoryRow }> = ({ row }) => (
 
 /** Login readiness — the number a School Admin chases at term start.
  *  A deactivated account outranks "never logged in": it explains the
- *  absence, so showing both would just be noise. */
+ *  absence, so showing both would just be noise. Graduated outranks a plain
+ *  deactivation in turn — a Class 10 pass-out isn't a suspended account,
+ *  and the two used to be indistinguishable here (#53). */
 export const LoginStatusCell: React.FC<{ row: StudentDirectoryRow }> = ({ row }) => {
+  if (row.graduated) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-indigo-600">
+        <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" /> Graduated
+      </span>
+    );
+  }
   if (!row.is_active) {
     return (
       <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-slate-500">

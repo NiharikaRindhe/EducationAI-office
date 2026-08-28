@@ -75,14 +75,14 @@ const CalendarView: React.FC<{ data: StreakData; accent: Accent; showPercent?: b
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <div className={`rounded-2xl border p-4 flex flex-col gap-1 ${a.soft}`}>
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Current Streak</span>
-          <span className={`font-display font-black text-2xl ${a.text}`}>🔥 {data.current_streak}</span>
+          <span className={`font-display font-black text-2xl ${a.text}`}>{data.current_streak}</span>
           <span className="text-[10px] text-slate-400">
             lab {data.current_streak === 1 ? 'day' : 'days'} in a row
           </span>
         </div>
         <div className="rounded-2xl border border-slate-100 bg-white p-4 flex flex-col gap-1">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Best Ever</span>
-          <span className="font-display font-black text-2xl text-slate-800">⚡ {data.longest_streak}</span>
+          <span className="font-display font-black text-2xl text-slate-800">{data.longest_streak}</span>
           <span className="text-[10px] text-slate-400">longest streak</span>
         </div>
         {showPercent && (
@@ -137,7 +137,7 @@ const CalendarView: React.FC<{ data: StreakData; accent: Accent; showPercent?: b
         </div>
 
         <p className="text-[10px] text-slate-400 font-medium">
-          💡 Your streak survives normal gaps between lab days — we know you don't come every single day.
+          Your streak survives normal gaps between lab days — we know you don't come every single day.
         </p>
       </div>
     </div>

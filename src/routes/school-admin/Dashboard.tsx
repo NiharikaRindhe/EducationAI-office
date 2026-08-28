@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Users, GraduationCap, LayoutGrid, Radio, AlertCircle, ArrowRight, Cast } from 'lucide-react';
+import { Loader2, Users, GraduationCap, LayoutGrid, Radio, AlertCircle, ArrowRight, Cast, Building2, UserPlus, CalendarDays, CircleCheck } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 
 interface StudentRow {
@@ -95,35 +95,60 @@ export const SchoolAdminDashboard: React.FC = () => {
   const neverLoggedIn = students.filter((s) => !s.has_logged_in_ever).length;
 
   const stats = [
-    { label: 'Total Students', value: students.length, sub: `${neverLoggedIn} never logged in`, icon: Users },
-    { label: 'Total Teachers', value: teachers.length, sub: `${teachers.filter((t) => t.is_active).length} active`, icon: GraduationCap },
-    { label: 'Sections', value: activeSections.length, sub: `across ${new Set(activeSections.map((s) => s.class_num)).size} classes`, icon: LayoutGrid },
-    { label: 'Active Right Now', value: activity.activeNow.length, sub: `${activity.todayLoginCount} logins today`, icon: Radio },
+    { label: 'Total Students', value: students.length, sub: `${neverLoggedIn} never logged in`, icon: Users, tone: 'bg-rose-50 text-rose-600 ring-rose-100', accent: 'bg-rose-500' },
+    { label: 'Total Teachers', value: teachers.length, sub: `${teachers.filter((t) => t.is_active).length} active`, icon: GraduationCap, tone: 'bg-indigo-50 text-indigo-600 ring-indigo-100', accent: 'bg-indigo-500' },
+    { label: 'Active Sections', value: activeSections.length, sub: `Across ${new Set(activeSections.map((s) => s.class_num)).size} classes`, icon: LayoutGrid, tone: 'bg-sky-50 text-sky-600 ring-sky-100', accent: 'bg-sky-500' },
+    { label: 'Active Right Now', value: activity.activeNow.length, sub: `${activity.todayLoginCount} logins today`, icon: Radio, tone: 'bg-emerald-50 text-emerald-600 ring-emerald-100', accent: 'bg-emerald-500' },
   ];
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Stat tiles */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        {stats.map((s) => (
-          <div key={s.label} className="bg-white border border-slate-200 rounded-xl shadow-sm px-5 py-4">
-            <div className="flex items-center justify-between">
-              <span className="text-[12px] font-medium text-slate-500">{s.label}</span>
-              <s.icon size={16} className="text-slate-400" />
+      <section className="relative overflow-hidden rounded-2xl border border-rose-100 bg-gradient-to-r from-slate-900 via-slate-900 to-rose-950 px-6 py-5 text-white shadow-lg shadow-slate-900/10">
+        <div className="absolute -right-10 -top-16 h-48 w-48 rounded-full bg-rose-500/15 blur-2xl" aria-hidden="true" />
+        <div className="relative flex items-center justify-between gap-8">
+          <div>
+            <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-rose-200">
+              <Building2 size={13} /> School operations overview
             </div>
-            <span className="block text-2xl font-semibold text-slate-900 mt-1.5 tabular-nums">{s.value}</span>
-            <span className="block text-[12px] text-slate-400 mt-0.5">{s.sub}</span>
+            <h2 className="text-xl font-bold tracking-tight">Your school at a glance.</h2>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-300">Monitor enrollment, staffing and live classroom activity, then jump directly into the work that needs attention.</p>
+          </div>
+          <div className="relative flex shrink-0 items-center gap-2">
+            <Link to="/school-admin/students" className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-white/20">
+              <UserPlus size={14} /> Manage students
+            </Link>
+            <Link to="/school-admin/timetable" className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-slate-900 shadow-sm transition-transform hover:-translate-y-0.5">
+              <CalendarDays size={14} /> Open timetable
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-4 gap-4">
+        {stats.map((s) => (
+          <div key={s.label} className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+            <span className={`absolute inset-x-0 top-0 h-1 ${s.accent}`} aria-hidden="true" />
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{s.label}</span>
+                <span className="mt-2 block text-2xl font-bold text-slate-900 tabular-nums">{s.value}</span>
+                <span className="mt-1 block text-[11px] text-slate-400">{s.sub}</span>
+              </div>
+              <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 ${s.tone}`}>
+                <s.icon size={19} />
+              </span>
+            </div>
           </div>
         ))}
       </div>
 
       <div className="grid grid-cols-12 gap-5 items-start">
         {/* Sections table */}
-        <div className="col-span-12 xl:col-span-8">
-          <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="col-span-8">
+          <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <div>
-                <h2 className="text-[14px] font-semibold text-slate-800">Sections &amp; staffing</h2>
+                <h2 className="text-[14px] font-bold text-slate-800">Sections &amp; staffing</h2>
                 <p className="text-[12px] text-slate-400 mt-0.5">Students and assigned teachers per section</p>
               </div>
               <Link to="/school-admin/classes" className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-500 hover:text-slate-800 transition-colors">
@@ -177,12 +202,12 @@ export const SchoolAdminDashboard: React.FC = () => {
         </div>
 
         {/* Activity panel */}
-        <div className="col-span-12 xl:col-span-4 flex flex-col gap-5">
+        <div className="col-span-4 flex flex-col gap-5">
           {/* Live sessions */}
-          <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
+          <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-              <Cast size={15} className="text-slate-400" />
-              <h2 className="text-[14px] font-semibold text-slate-800">Live class sessions</h2>
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600"><Cast size={15} /></span>
+              <h2 className="text-[14px] font-bold text-slate-800">Live class sessions</h2>
               {activity.liveSessions.length > 0 && (
                 <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> {activity.liveSessions.length} running
@@ -211,9 +236,9 @@ export const SchoolAdminDashboard: React.FC = () => {
           </div>
 
           {/* Active users */}
-          <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
+          <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm">
             <div className="px-5 py-4 border-b border-slate-100">
-              <h2 className="text-[14px] font-semibold text-slate-800">Active in the last 15 minutes</h2>
+              <h2 className="flex items-center gap-2 text-[14px] font-bold text-slate-800"><CircleCheck size={15} className="text-emerald-500" /> Active in the last 15 minutes</h2>
             </div>
             <div className="p-4">
               {activity.activeNow.length === 0 ? (
@@ -238,7 +263,7 @@ export const SchoolAdminDashboard: React.FC = () => {
           </div>
 
           {/* Quick links */}
-          <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-2">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-2 shadow-sm">
             {[
               { to: '/school-admin/students', label: 'Manage students', desc: 'Import, credentials, resets' },
               { to: '/school-admin/teachers', label: 'Manage teachers', desc: 'Accounts and passwords' },

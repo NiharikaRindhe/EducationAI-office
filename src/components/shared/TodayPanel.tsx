@@ -298,7 +298,7 @@ export const TodayPanel: React.FC<{ accent: Accent; tasksHref?: string; examsHre
           ) : tasks === null ? (
             <Loader2 size={14} className={`animate-spin ${a.spinner}`} />
           ) : pendingTasks.length === 0 ? (
-            <p className="text-xs text-slate-400">All caught up — no pending tasks 🎉</p>
+            <p className="text-xs text-slate-400">All caught up — no pending tasks.</p>
           ) : (
             <div className="flex flex-col gap-2">
               {pendingTasks.map((t) => (

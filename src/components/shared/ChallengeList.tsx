@@ -53,7 +53,7 @@ export const ChallengeList: React.FC<{ accent: Accent; dense?: boolean }> = ({ a
         const updated = await api.get<Challenge[]>('/student/daily-challenges');
         setChallenges(updated);
         confetti({ particleCount: 60, spread: 50, origin: { y: 0.6 } });
-        showToast(`+${ch.xp_reward} XP unlocked! 🎉`);
+        showToast(`+${ch.xp_reward} XP unlocked!`);
       } catch { /* silent */ }
     }
   };
@@ -80,7 +80,7 @@ export const ChallengeList: React.FC<{ accent: Accent; dense?: boolean }> = ({ a
 
       {allDone ? (
         <div className={`rounded-3xl border p-8 text-center flex flex-col items-center gap-3 ${a.soft}`}>
-          <span className="text-5xl">🎉</span>
+          <CheckCircle2 size={40} className={a.text} />
           <h3 className="font-display font-bold text-base text-slate-800">All done for today!</h3>
           <p className="text-xs text-slate-400">Come back tomorrow for new challenges.</p>
         </div>

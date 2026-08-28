@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
-import { currentAcademicYear } from '../lib/academicYear.js';
+import { currentAcademicYearForSchool } from '../lib/schoolAcademicYear.js';
 
 export interface SectionRow {
   id: string;
@@ -17,7 +17,7 @@ export interface SectionRow {
 //  SECTIONS
 // ─────────────────────────────────────────────────────────────
 export async function listSections(schoolId: string): Promise<SectionRow[]> {
-  const year = currentAcademicYear();
+  const year = await currentAcademicYearForSchool(schoolId);
 
   const { data: sections, error } = await supabaseAdmin
     .from('class_sections')
@@ -63,10 +63,11 @@ export async function listSections(schoolId: string): Promise<SectionRow[]> {
 
 export async function addSection(schoolId: string, classNum: number, sectionLabel: string) {
   const label = sectionLabel.trim().toUpperCase();
+  const academicYear = await currentAcademicYearForSchool(schoolId);
 
   const { data, error } = await supabaseAdmin
     .from('class_sections')
-    .insert({ school_id: schoolId, class_num: classNum, section_label: label })
+    .insert({ school_id: schoolId, academic_year: academicYear, class_num: classNum, section_label: label })
     .select()
     .single();
 
@@ -82,12 +83,13 @@ export async function addSection(schoolId: string, classNum: number, sectionLabe
 /** Idempotent: called whenever a student is created, so a class+section
  *  that arrives via import always exists as a section row too. */
 export async function ensureSectionExists(schoolId: string, classNum: number, sectionLabel: string) {
+  const academicYear = await currentAcademicYearForSchool(schoolId);
   await supabaseAdmin
     .from('class_sections')
     .upsert(
       {
         school_id: schoolId,
-        academic_year: currentAcademicYear(),
+        academic_year: academicYear,
         class_num: classNum,
         section_label: sectionLabel.trim().toUpperCase(),
       },

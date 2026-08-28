@@ -71,21 +71,21 @@ export const TopBar: React.FC<TopBarProps> = ({
   };
 
   return (
-    <header className="h-20 border-b border-slate-100 bg-white/80 backdrop-blur-md px-8 flex items-center justify-between sticky top-0 z-40">
+    <header className="min-h-20 border-b border-slate-100 bg-white/80 backdrop-blur-md px-4 py-3 sm:px-6 lg:px-8 flex items-center justify-between gap-3 sticky top-0 z-40">
       {/* Greetings */}
-      <div>
-        <h1 className="font-display font-bold text-xl text-slate-800 flex items-center gap-2">
-          <span>{greeting}</span>
-          {userName && <span className={`${themeColors[batchColor]}`}>{userName}!</span>}
+      <div className="min-w-0 flex-1">
+        <h1 className="font-display font-bold text-base sm:text-xl text-slate-800 flex items-center gap-1.5 sm:gap-2 min-w-0">
+          <span className={userName ? 'hidden sm:inline' : undefined}>{greeting}</span>
+          {userName && <span className={`${themeColors[batchColor]} truncate`}>{userName}!</span>}
         </h1>
-        <p className="font-sans text-xs text-slate-400 font-medium">{subtitle}</p>
+        <p className="hidden sm:block font-sans text-xs text-slate-400 font-medium truncate">{subtitle}</p>
       </div>
 
       {/* Right controls */}
-      <div className="flex items-center gap-6">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-4 lg:gap-6">
         {/* Streak / XP summary for student portals */}
         {!NO_XP_STRIP_PORTALS.has(batchColor) && !rightSlot && (
-          <div className="flex items-center gap-4 bg-slate-50 border border-slate-100 p-1.5 px-3 rounded-xl select-none">
+          <div className="hidden lg:flex items-center gap-4 bg-slate-50 border border-slate-100 p-1.5 px-3 rounded-xl select-none">
             {/* Streak */}
             <div className="flex items-center gap-1.5">
               <span className="material-symbols-outlined text-amber-500 font-fill text-lg animate-pulse">local_fire_department</span>
@@ -109,6 +109,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         {STUDENT_PORTALS.has(batchColor) && (
           <button
             onClick={handleLogout}
+            aria-label="Log out"
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-100 text-slate-400 hover:text-red-500 hover:bg-red-50 hover:border-red-100 font-sans text-xs font-bold transition-all cursor-pointer"
           >
             <LogOut size={14} />
@@ -125,6 +126,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           {userAvatar ? (
             <Link
               to={profileHref}
+              aria-label="Open profile"
               className="w-10 h-10 rounded-xl hover:bg-slate-50 border border-slate-100 flex items-center justify-center text-xl shadow-xs hover:scale-105 transition-all select-none cursor-pointer"
             >
               {userAvatar}

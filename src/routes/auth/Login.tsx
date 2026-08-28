@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, ArrowRight, Loader2, ArrowLeft, Info } from 'lucide-react';
 import { useAuth, friendlyAuthError } from '../../context/AuthContext';
 import { api } from '../../lib/api';
+import { getRememberedClass, rememberClass, forgetClass } from '../../lib/pinDevice';
 
 interface RosterStudent {
   id: string;
@@ -23,7 +24,7 @@ export const Login: React.FC = () => {
   const location = useLocation();
   const { login, pinLogin } = useAuth();
 
-  const [mode, setMode] = useState<Mode>('password');
+  const [mode, setMode] = useState<Mode>(() => (getRememberedClass() ? 'pin-setup' : 'password'));
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   // A mid-session 401 (lib/api.ts) can't navigate here with router state the
@@ -42,13 +43,17 @@ export const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // PIN mode
-  const [schoolCode, setSchoolCode] = useState('');
-  const [classNum, setClassNum] = useState(1);
-  const [section, setSection] = useState('A');
+  // PIN mode — seeded from whatever class this shared device was last set up
+  // for, so a returning Class 1-4 student skips straight past the
+  // school-code/class/section step (see lib/pinDevice.ts).
+  const remembered = getRememberedClass();
+  const [schoolCode, setSchoolCode] = useState(remembered?.schoolCode ?? '');
+  const [classNum, setClassNum] = useState(remembered?.classNum ?? 1);
+  const [section, setSection] = useState(remembered?.section ?? 'A');
   const [roster, setRoster] = useState<RosterStudent[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<RosterStudent | null>(null);
   const [pin, setPin] = useState('');
+  const [deviceSetupDone] = useState(() => remembered !== null);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,8 +72,7 @@ export const Login: React.FC = () => {
     }
   };
 
-  const handleLoadRoster = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const loadRoster = async () => {
     setError('');
     setIsLoading(true);
     try {
@@ -78,12 +82,37 @@ export const Login: React.FC = () => {
       } else {
         setRoster(students);
         setMode('pin-roster');
+        // Remembers the *classroom*, not the child — see lib/pinDevice.ts.
+        // Next time this device loads the login page it skips straight here.
+        rememberClass({ schoolCode, classNum, section });
       }
     } catch (err) {
       setError(friendlyAuthError(err));
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleLoadRoster = (e: React.FormEvent) => {
+    e.preventDefault();
+    void loadRoster();
+  };
+
+  // A device already set up for a class jumps straight to the roster fetch
+  // instead of making a Class 1-4 student wait through the setup form.
+  useEffect(() => {
+    if (deviceSetupDone) void loadRoster();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleForgetDevice = () => {
+    forgetClass();
+    setSchoolCode('');
+    setClassNum(1);
+    setSection('A');
+    setRoster([]);
+    setError('');
+    setMode('pin-setup');
   };
 
   const handlePinDigit = (digit: string) => {
@@ -261,6 +290,14 @@ export const Login: React.FC = () => {
 
             {mode === 'pin-setup' && (
               <form onSubmit={handleLoadRoster} className="flex flex-col gap-4">
+                {deviceSetupDone && (
+                  <div className="flex items-center justify-between -mt-1 -mb-1">
+                    <p className="text-[10px] text-slate-400">This computer is set up for Class {classNum}-{section}.</p>
+                    <button type="button" onClick={handleForgetDevice} className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer">
+                      Not this class?
+                    </button>
+                  </div>
+                )}
                 <div className="flex flex-col gap-1.5">
                   <label className="font-label-caps text-[9px] font-bold text-slate-400 ml-1">SCHOOL CODE</label>
                   <input

@@ -32,6 +32,7 @@ import {
 import {
   getPromotionPreviewController,
   executePromotionController,
+  updateAcademicYearSettingsController,
   exportGraduatesController,
   getClassFeaturesController,
   updateClassFeaturesController,
@@ -142,6 +143,7 @@ schoolAdminRouter.post('/lab-incharges/:id/reinstate', reinstateStaffController)
 schoolAdminRouter.post('/lab-incharges/:id/reset-password', resetLabInchargePasswordController);
 
 schoolAdminRouter.get('/promotion/preview', getPromotionPreviewController);
+schoolAdminRouter.put('/promotion/settings', updateAcademicYearSettingsController);
 schoolAdminRouter.post('/promotion/execute', executePromotionController);
 schoolAdminRouter.get('/promotion/graduates.csv', exportGraduatesController);
 schoolAdminRouter.get('/features', getClassFeaturesController);

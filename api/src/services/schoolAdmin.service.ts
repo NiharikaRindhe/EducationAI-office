@@ -554,6 +554,7 @@ export async function exitStaff(
   // telling them what to put back, and it makes reinstate unable to undo.
   let released: { classSectionId: string; subject: string }[] = [];
   let releasedSectionIds: string[] = [];
+  let releasedSlotIds: string[] = [];
   if (staff.role === 'teacher') {
     const { data: assignments } = await supabaseAdmin
       .from('teaching_assignments')
@@ -572,6 +573,20 @@ export async function exitStaff(
       .eq('school_id', schoolId);
     releasedSectionIds = (sections ?? []).map((s) => s.id as string);
 
+    // timetable_slots.teacher_id has no trigger of its own to clear it here —
+    // the FK's ON DELETE SET NULL only fires if the teacher_profiles row
+    // itself is deleted, which an exit deliberately doesn't do (the account
+    // is kept, just deactivated). Left alone, a departed teacher's name
+    // silently stays on every period they used to teach until an admin
+    // reopens each cell by hand. Cleared here instead, by id so reinstate
+    // can put the same slots back rather than guessing from day/period.
+    const { data: slots } = await supabaseAdmin
+      .from('timetable_slots')
+      .select('id')
+      .eq('teacher_id', userId)
+      .eq('school_id', schoolId);
+    releasedSlotIds = (slots ?? []).map((s) => s.id as string);
+
     if (released.length) {
       await supabaseAdmin
         .from('teaching_assignments')
@@ -585,6 +600,12 @@ export async function exitStaff(
         .update({ class_teacher_id: null })
         .eq('class_teacher_id', userId)
         .eq('school_id', schoolId);
+    }
+    if (releasedSlotIds.length) {
+      await supabaseAdmin
+        .from('timetable_slots')
+        .update({ teacher_id: null })
+        .in('id', releasedSlotIds);
     }
   }
 
@@ -605,6 +626,7 @@ export async function exitStaff(
       // The detail reinstate reads back to restore the teacher's timetable.
       assignments: released,
       sectionIds: releasedSectionIds,
+      slotIds: releasedSlotIds,
     },
   });
 
@@ -616,6 +638,7 @@ export async function exitStaff(
     role: staff.role,
     releasedAssignments,
     releasedSections,
+    releasedSlots: releasedSlotIds.length,
   };
 }
 
@@ -652,6 +675,7 @@ export async function reinstateStaff(schoolId: string, userId: string, actorId: 
 
   let restoredAssignments = 0;
   let restoredSections = 0;
+  let restoredSlots = 0;
 
   if (staff.role === 'teacher') {
     const { data: lastExit } = await supabaseAdmin
@@ -666,6 +690,7 @@ export async function reinstateStaff(schoolId: string, userId: string, actorId: 
     const meta = (lastExit?.metadata ?? {}) as {
       assignments?: { classSectionId: string; subject: string }[];
       sectionIds?: string[];
+      slotIds?: string[];
     };
 
     const assignments = meta.assignments ?? [];
@@ -698,6 +723,24 @@ export async function reinstateStaff(schoolId: string, userId: string, actorId: 
         .eq('school_id', schoolId);
       restoredSections = count ?? 0;
     }
+
+    const slotIds = meta.slotIds ?? [];
+    if (slotIds.length) {
+      // One at a time, not a single batch update: a teacher can't hold two
+      // slots in the same period (timetable_slots_teacher_period_uq), so if
+      // they've since been booked elsewhere at a time that collides with one
+      // of their old slots, that one row has to fail without taking every
+      // other restorable slot down with it in the same statement.
+      for (const slotId of slotIds) {
+        const { count, error: slotError } = await supabaseAdmin
+          .from('timetable_slots')
+          .update({ teacher_id: userId }, { count: 'exact' })
+          .eq('id', slotId)
+          .is('teacher_id', null) // still vacant — someone else's reassignment since the exit wins
+          .eq('school_id', schoolId);
+        if (!slotError) restoredSlots += count ?? 0;
+      }
+    }
   }
 
   await writeAuditLog({
@@ -706,7 +749,7 @@ export async function reinstateStaff(schoolId: string, userId: string, actorId: 
     action: 'staff.reinstated',
     entity: staff.role as string,
     entityId: userId,
-    metadata: { fullName: staff.full_name, restoredAssignments, restoredSections },
+    metadata: { fullName: staff.full_name, restoredAssignments, restoredSections, restoredSlots },
   });
 
   return {
@@ -715,6 +758,7 @@ export async function reinstateStaff(schoolId: string, userId: string, actorId: 
     role: staff.role,
     restoredAssignments,
     restoredSections,
+    restoredSlots,
   };
 }
 

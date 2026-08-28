@@ -271,7 +271,7 @@ export const BookUploader: React.FC<Props> = ({
             </div>
 
             {noSubjects && (
-              <p className="rounded-lg bg-amber-50 px-3 py-2 text-[12px] leading-5 text-amber-800">
+              <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] leading-5 text-slate-600">
                 Class {classNum} has no subjects enabled yet, so there's nothing to file a book under.
                 Ask the Super Admin to enable its subjects first.
               </p>

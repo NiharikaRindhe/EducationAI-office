@@ -261,33 +261,47 @@ export const ChatCenter: React.FC<{ accent: Accent }> = ({ accent }) => {
     };
     setMessages((prev) => [...prev, optimisticUser]);
     setIsSending(true);
-    try {
-      const result = await api.post<{
-        answer: string;
-        sources: { bookTitle: string; chapter: string | null; page: number | null; excerpt: string }[];
-        returnedImages: { url: string; caption: string | null; chapter: string | null; page: number | null }[];
-        subjectWarning: string | null;
-      }>(`/student/chat/sessions/${activeSessionId}/message`, {
-        text,
-        ...(imageToSend ? { imageBase64: imageToSend.base64 } : {}),
-      });
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `local-ai-${Date.now()}`,
-          role: 'assistant',
-          content: result.answer,
-          sources: result.sources,
-          returned_images: result.returnedImages,
-          subject_warning: result.subjectWarning,
-          created_at: new Date().toISOString(),
+    // Streamed in token-by-token (see api.postStream / chat.service.ts) —
+    // this placeholder's content grows in place as chunks arrive, rather
+    // than the student watching a spinner for the whole retrieval-plus-
+    // completion round trip before anything appears.
+    const replyId = `local-ai-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      { id: replyId, role: 'assistant', content: '', sources: null, returned_images: null, created_at: new Date().toISOString() },
+    ]);
+
+    try {
+      const done = await api.postStream<
+        { bookTitle: string; chapter: string | null; page: number | null; excerpt: string },
+        { url: string; caption: string | null; chapter: string | null; page: number | null }
+      >(
+        `/student/chat/sessions/${activeSessionId}/message`,
+        { text, ...(imageToSend ? { imageBase64: imageToSend.base64 } : {}) },
+        (delta) => {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === replyId ? { ...m, content: (m.content ?? '') + delta } : m)),
+          );
         },
-      ]);
+      );
+
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === replyId
+            ? { ...m, sources: done.sources, returned_images: done.returnedImages, subject_warning: done.subjectWarning }
+            : m,
+        ),
+      );
       setSessions((prev) =>
         prev.map((s) => (s.id === activeSessionId ? { ...s, updated_at: new Date().toISOString() } : s)),
       );
     } catch (err) {
+      // A failure before any token ever streamed leaves nothing worth
+      // showing in the placeholder bubble — drop it rather than leave an
+      // empty assistant turn sitting in the transcript. One that failed
+      // mid-stream keeps whatever text the student already saw.
+      setMessages((prev) => prev.filter((m) => !(m.id === replyId && !m.content)));
       const message =
         err instanceof ApiClientError && err.code === 'RATE_LIMITED'
           ? "You've reached today's question limit (50/day) — try again tomorrow."
@@ -439,7 +453,11 @@ export const ChatCenter: React.FC<{ accent: Accent }> = ({ accent }) => {
                   </div>
                 );
               })}
-              {isSending && (
+              {/* Once the reply starts streaming in, the growing text bubble
+                  above is itself the "it's working" signal — showing both
+                  that and a spinner reads as stuck even while text is
+                  actively appearing. */}
+              {isSending && !(messages[messages.length - 1]?.role === 'assistant' && messages[messages.length - 1]?.content) && (
                 <div className="self-start flex items-center gap-2 text-[11px] text-slate-400 font-bold">
                   <Loader2 size={12} className="animate-spin" /> Thinking…
                 </div>

@@ -48,8 +48,11 @@ export interface DirectoryFilters {
    * Whether students who have left the school are included. Defaults to
    * 'current' everywhere — a roster that quietly counts leavers is wrong for
    * headcount, section capacity and every report built on top of it.
+   * 'graduated' is a leaver sub-case: a Class 10 pass-out from Academic Year
+   * Rollover, which sets student_enrollments.outcome (not exited_at) — see
+   * the student_directory view's `graduated` column.
    */
-  enrolment?: 'current' | 'left' | 'all';
+  enrolment?: 'current' | 'left' | 'all' | 'graduated';
   schoolId?: string;
   batchId?: number;
 }
@@ -85,6 +88,7 @@ export interface DirectoryRow {
   level: number;
   streak: number;
   longest_streak: number;
+  graduated: boolean;
 }
 
 /** Minimal structural view of a PostgREST builder. Selecting '*' vs 'id'
@@ -115,6 +119,7 @@ function applyFilters<Q extends FilterableQuery<Q>>(query: Q, filters: Directory
   // behaviour when the caller sends nothing, so existing clients keep the
   // roster they expect without being updated.
   if (filters.enrolment === 'left') q = q.eq('has_left', true);
+  else if (filters.enrolment === 'graduated') q = q.eq('graduated', true);
   else if (filters.enrolment !== 'all') q = q.eq('has_left', false);
 
   if (filters.search) {

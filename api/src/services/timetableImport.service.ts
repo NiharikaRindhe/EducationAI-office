@@ -2,7 +2,7 @@ import ExcelJS from 'exceljs';
 import { parse as parseCsv } from 'csv-parse/sync';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
-import { currentAcademicYear } from '../lib/academicYear.js';
+import { currentAcademicYearForSchool } from '../lib/schoolAcademicYear.js';
 import { writeAuditLog } from './auditLog.service.js';
 
 /**
@@ -167,7 +167,7 @@ export async function importTimetable(
     throw new ApiError('VALIDATION_ERROR', 'That file has no rows under its header line');
   }
 
-  const year = currentAcademicYear();
+  const year = await currentAcademicYearForSchool(schoolId);
   const errors: TimetableImportError[] = [];
 
   // Resolve the school's own sections, teachers and labs once. Names in the

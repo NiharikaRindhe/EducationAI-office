@@ -34,7 +34,7 @@ export const LabInchargeLayout: React.FC = () => {
           batchColor="labIncharge"
           profileHref="/lab-incharge/dashboard"
         />
-        <main className="flex-1 p-8 overflow-y-auto max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-7xl w-full mx-auto">
           <Outlet />
         </main>
       </div>

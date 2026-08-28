@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Zap, Flame, Award, BookOpen, FileText, Star, AlertTriangle } from 'lucide-react';
+import { Loader2, Zap, Flame, Award, BookOpen, FileText, Star, AlertTriangle, Pencil, Lock } from 'lucide-react';
 import { api } from '../../lib/api';
 
 type Accent = 'amber' | 'indigo' | 'sky';
@@ -163,7 +163,9 @@ export const ProfileCard: React.FC<{
           className={`relative w-20 h-20 rounded-3xl flex items-center justify-center text-5xl bg-white shadow-md ring-4 ${a.ring} ring-offset-2 cursor-pointer hover:scale-105 transition-transform`}
         >
           {profile.avatar || '🦊'}
-          <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-white rounded-full text-xs flex items-center justify-center shadow border border-slate-200">✏️</span>
+          <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow border border-slate-200 text-slate-500">
+            <Pencil size={11} />
+          </span>
         </button>
 
         <div className="text-center">
@@ -199,8 +201,8 @@ export const ProfileCard: React.FC<{
 
       {/* Credential note (non-PIN) */}
       {!pinMode && (
-        <p className="text-[11px] text-slate-400 text-center font-medium">
-          🔒 Forgot your password? Ask your teacher or lab in-charge to reset it.
+        <p className="text-[11px] text-slate-400 text-center font-medium flex items-center justify-center gap-1">
+          <Lock size={11} className="shrink-0" /> Forgot your password? Ask your teacher or lab in-charge to reset it.
         </p>
       )}
 

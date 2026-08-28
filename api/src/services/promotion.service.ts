@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../lib/supabase.js';
 import { ApiError } from '../lib/errors.js';
-import { currentAcademicYear } from '../lib/academicYear.js';
+import { getSchoolAcademicYearSettings } from '../lib/schoolAcademicYear.js';
 import { generatePassword } from '../lib/credentials.js';
 
 function getNextAcademicYear(currentYear: string): string {
@@ -11,6 +11,32 @@ function getNextAcademicYear(currentYear: string): string {
   const nextStart = start + 1;
   const nextEnd = (parseInt(endStr, 10) + 1) % 100;
   return `${nextStart}-${String(nextEnd).padStart(2, '0')}`;
+}
+
+async function getSchoolYearSettings(schoolId: string) {
+  const settings = await getSchoolAcademicYearSettings(schoolId);
+  return { ...settings, nextYear: getNextAcademicYear(settings.currentYear) };
+}
+
+export async function updateAcademicYearStartMonth(schoolId: string, academicYearStartMonth: number) {
+  const currentSettings = await getSchoolYearSettings(schoolId);
+  const { count: runCount, error: runError } = await supabaseAdmin
+    .from('promotion_runs')
+    .select('id', { count: 'exact', head: true })
+    .eq('school_id', schoolId)
+    .eq('from_year', currentSettings.currentYear)
+    .in('status', ['running', 'completed']);
+  if (runError) throw new ApiError('INTERNAL_ERROR', 'Failed to verify rollover history', runError.message);
+  if ((runCount ?? 0) > 0 && academicYearStartMonth !== currentSettings.academicYearStartMonth) {
+    throw new ApiError('CONFLICT', 'The session start month cannot be changed after this academic year has been rolled over.');
+  }
+
+  const { error } = await supabaseAdmin
+    .from('schools')
+    .update({ academic_year_start_month: academicYearStartMonth })
+    .eq('id', schoolId);
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to save the academic session start month', error.message);
+  return getSchoolYearSettings(schoolId);
 }
 
 export type PromotionAction = 'promote' | 'pass_out' | 'convert_credentials';
@@ -64,8 +90,7 @@ export interface SectionMapEntry {
  * entire feature was unreachable.
  */
 export async function getPromotionPreview(schoolId: string) {
-  const currentYear = currentAcademicYear();
-  const nextYear = getNextAcademicYear(currentYear);
+  const { currentYear, nextYear, academicYearStartMonth } = await getSchoolYearSettings(schoolId);
 
   const { data: students, error } = await supabaseAdmin
     .from('user_profiles')
@@ -168,6 +193,7 @@ export async function getPromotionPreview(schoolId: string) {
   return {
     currentYear,
     nextYear,
+    academicYearStartMonth,
     byClass,
     summary,
     roster,
@@ -243,8 +269,7 @@ export async function executePromotion(
   /** Where sections with no counterpart in the class above should land. */
   sectionMap: SectionMapEntry[] = [],
 ) {
-  const currentYear = currentAcademicYear();
-  const nextYear = getNextAcademicYear(currentYear);
+  const { currentYear, nextYear } = await getSchoolYearSettings(schoolId);
   const holdBack = new Set(holdBackIds);
 
   // Normalised once, and reused for the credential slips below so a printed

@@ -69,7 +69,7 @@ export const Batch3Home: React.FC = () => {
         {hasFeature('virtual_labs') && (
           <Link to="/batch3/labs" className="bento-card border border-sky-200 bg-white p-5 hover:border-sky-400">
             <h3 className="font-display font-bold text-sm text-slate-800">Science Labs</h3>
-            <p className="text-[11px] text-slate-400 mt-1">Physics, Chemistry and Biology — full screen, no sidebar.</p>
+            <p className="text-[11px] text-slate-400 mt-1">Physics, Chemistry and Biology in a focused workspace with navigation kept available.</p>
           </Link>
         )}
       </div>

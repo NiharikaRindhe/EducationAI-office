@@ -3,10 +3,9 @@ import { Link } from 'react-router-dom';
 import {
   Loader2, AlertTriangle, ChevronRight, CheckCircle, Download, Search,
   ArrowLeft, GraduationCap, RotateCcw, UserPlus, Split,
-  Users, ArrowUpRight, LogOut, SplitSquareHorizontal,
+  CalendarRange,
 } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
-import { MetricCard, PortalPageHeader } from '../../components/shared/PortalPageHeader';
 
 /**
  * Academic-year rollover.
@@ -50,6 +49,7 @@ interface SectionMoveRow {
 interface PreviewResponse {
   currentYear: string;
   nextYear: string;
+  academicYearStartMonth: number;
   summary: PreviewRow[];
   roster: RosterStudent[];
   sectionPlan: SectionMoveRow[];
@@ -99,26 +99,44 @@ const ACTION_LABEL: Record<PromotionAction, string> = {
 const moveKey = (fromClass: number, fromSection: string) => `${fromClass}|${fromSection}`;
 
 type StepKey = 'review' | 'sections' | 'holdbacks' | 'confirm';
+const ROSTER_PAGE_SIZE = 25;
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+const STEP_DESCRIPTION: Record<StepKey, string> = {
+  review: 'Check automatic class moves',
+  sections: 'Choose destination sections',
+  holdbacks: 'Manage students in bulk',
+  confirm: 'Verify and run once',
+};
 
 export const SchoolAdminPromotion: React.FC = () => {
   const [stepIdx, setStepIdx] = useState(0);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [execResult, setExecResult] = useState<ExecuteResponse | null>(null);
   const [holdBack, setHoldBack] = useState<Set<string>>(new Set());
+  const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
   const [holdSearch, setHoldSearch] = useState('');
+  const [holdClass, setHoldClass] = useState('all');
+  const [holdSection, setHoldSection] = useState('all');
+  const [holdPage, setHoldPage] = useState(1);
   /** moveKey -> destination section label. */
   const [sectionChoices, setSectionChoices] = useState<Record<string, string>>({});
 
   const [loading, setLoading] = useState(true);
   const [executing, setExecuting] = useState(false);
+  const [savingSessionMonth, setSavingSessionMonth] = useState(false);
+  const [sessionStartMonth, setSessionStartMonth] = useState(4);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const isApril = new Date().getMonth() === 3; // 0-indexed
+  const isSessionStartMonth = new Date().getMonth() + 1 === sessionStartMonth;
 
   useEffect(() => {
     api.get<PreviewResponse>('/school-admin/promotion/preview')
       .then((res) => {
         setPreview(res);
+        setSessionStartMonth(res.academicYearStartMonth);
         // Default every unresolved move to keeping its own label, which means
         // "create that section in the class above". It's the answer that
         // preserves the school's existing grouping, and it's always valid —
@@ -143,7 +161,7 @@ export const SchoolAdminPromotion: React.FC = () => {
   const steps = useMemo(() => {
     const list: { key: StepKey; label: string }[] = [{ key: 'review', label: 'Review' }];
     if (pendingMoves.length > 0) list.push({ key: 'sections', label: 'Sections' });
-    list.push({ key: 'holdbacks', label: 'Hold-backs' });
+    list.push({ key: 'holdbacks', label: 'Student outcomes' });
     list.push({ key: 'confirm', label: 'Confirm' });
     return list;
   }, [pendingMoves]);
@@ -152,22 +170,78 @@ export const SchoolAdminPromotion: React.FC = () => {
   const goNext = () => setStepIdx((i) => Math.min(i + 1, steps.length - 1));
   const goBack = () => setStepIdx((i) => Math.max(i - 1, 0));
 
-  const toggleHold = (id: string) =>
+  const setStudentOutcome = (id: string, repeat: boolean) =>
     setHoldBack((prev) => {
+      const next = new Set(prev);
+      if (repeat) next.add(id); else next.delete(id);
+      return next;
+    });
+
+  const toggleStudentSelection = (id: string) =>
+    setSelectedStudents((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
 
+  const classOptions = useMemo(
+    () => [...new Set((preview?.roster ?? []).map((student) => student.classNum))].sort((a, b) => a - b),
+    [preview],
+  );
+
+  const sectionOptions = useMemo(() => {
+    const roster = preview?.roster ?? [];
+    return [...new Set(roster
+      .filter((student) => holdClass === 'all' || student.classNum === Number(holdClass))
+      .map((student) => student.section))].sort();
+  }, [preview, holdClass]);
+
   const filteredRoster = useMemo(() => {
     const rows = preview?.roster ?? [];
     const q = holdSearch.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((s) =>
-      s.fullName.toLowerCase().includes(q) ||
-      (s.rollNumber ?? '').toLowerCase().includes(q) ||
-      `${s.classNum}-${s.section}`.toLowerCase().includes(q));
-  }, [preview, holdSearch]);
+    return rows
+      .filter((student) => holdClass === 'all' || student.classNum === Number(holdClass))
+      .filter((student) => holdSection === 'all' || student.section === holdSection)
+      .filter((student) => !q ||
+        student.fullName.toLowerCase().includes(q) ||
+        (student.rollNumber ?? '').toLowerCase().includes(q) ||
+        `${student.classNum}-${student.section}`.toLowerCase().includes(q))
+      .sort((a, b) => a.classNum - b.classNum || a.section.localeCompare(b.section) || a.fullName.localeCompare(b.fullName));
+  }, [preview, holdSearch, holdClass, holdSection]);
+
+  const rosterPageCount = Math.max(1, Math.ceil(filteredRoster.length / ROSTER_PAGE_SIZE));
+  const activeRosterPage = Math.min(holdPage, rosterPageCount);
+  const visibleRoster = filteredRoster.slice(
+    (activeRosterPage - 1) * ROSTER_PAGE_SIZE,
+    activeRosterPage * ROSTER_PAGE_SIZE,
+  );
+  const allVisibleSelected = visibleRoster.length > 0 && visibleRoster.every((student) => selectedStudents.has(student.id));
+
+  const setVisibleSelection = (selected: boolean) =>
+    setSelectedStudents((prev) => {
+      const next = new Set(prev);
+      for (const student of visibleRoster) {
+        if (selected) next.add(student.id); else next.delete(student.id);
+      }
+      return next;
+    });
+
+  const selectAllFiltered = () => setSelectedStudents((prev) => {
+    const next = new Set(prev);
+    for (const student of filteredRoster) next.add(student.id);
+    return next;
+  });
+
+  const applyBulkOutcome = (repeat: boolean) => setHoldBack((prev) => {
+    const next = new Set(prev);
+    for (const id of selectedStudents) {
+      if (repeat) next.add(id); else next.delete(id);
+    }
+    return next;
+  });
+
+  const movingUpCount = (preview?.roster ?? []).filter((student) => student.classNum < 10 && !holdBack.has(student.id)).length;
+  const passingOutCount = (preview?.roster ?? []).filter((student) => student.classNum === 10 && !holdBack.has(student.id)).length;
 
   const handleExecute = async () => {
     setExecuting(true);
@@ -186,6 +260,29 @@ export const SchoolAdminPromotion: React.FC = () => {
       setErrorMsg(err instanceof ApiClientError ? err.message : 'Rollover failed');
     } finally {
       setExecuting(false);
+    }
+  };
+
+  const saveSessionStartMonth = async () => {
+    setSavingSessionMonth(true);
+    setErrorMsg('');
+    try {
+      await api.put<{ academicYearStartMonth: number; currentYear: string; nextYear: string }>(
+        '/school-admin/promotion/settings',
+        { academicYearStartMonth: sessionStartMonth },
+      );
+      const refreshed = await api.get<PreviewResponse>('/school-admin/promotion/preview');
+      setPreview(refreshed);
+      setSessionStartMonth(refreshed.academicYearStartMonth);
+      const defaults: Record<string, string> = {};
+      for (const row of refreshed.sectionPlan ?? []) {
+        if (row.needsDecision) defaults[moveKey(row.fromClass, row.fromSection)] = row.fromSection;
+      }
+      setSectionChoices(defaults);
+    } catch (err) {
+      setErrorMsg(err instanceof ApiClientError ? err.message : 'Could not save the session start month');
+    } finally {
+      setSavingSessionMonth(false);
     }
   };
 
@@ -332,43 +429,75 @@ export const SchoolAdminPromotion: React.FC = () => {
 
   // ── Wizard ─────────────────────────────────────────────────
   return (
-    <div className="flex flex-col gap-5 font-sans text-left anim-fade-up">
-      <PortalPageHeader
-        eyebrow="Academic operations"
-        title="Academic Year Rollover"
-        description={
-          preview
-            ? `Moves every class up one level for ${preview.nextYear}. Class 10 passes out; Class 1 empties for the new intake.`
-            : 'Loading…'
-        }
-      >
-        {preview && (
-          <div className="portal-metrics-grid">
-            <MetricCard label="Active roster" value={preview.eligibleCount} hint="students affected" icon={<Users size={18} />} />
-            <MetricCard label="Moving up a class" value={preview.eligibleCount - preview.class10Count} hint="Classes 1–9" icon={<ArrowUpRight size={18} />} tone="indigo" />
-            <MetricCard label="Class 10 leavers" value={preview.class10Count} hint="pass out this run" icon={<LogOut size={18} />} tone="rose" />
-            <MetricCard
-              label="Section decisions"
-              value={preview.sectionDecisionsNeeded}
-              hint={preview.sectionDecisionsNeeded > 0 ? 'need your input' : 'all sections line up'}
-              icon={<SplitSquareHorizontal size={18} />}
-              tone={preview.sectionDecisionsNeeded > 0 ? 'amber' : 'emerald'}
-            />
+    <div className="flex w-full flex-col gap-4 font-sans text-left anim-fade-up">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
+          <div className="flex min-w-0 items-center gap-4">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
+              <CalendarRange size={20} />
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-slate-900">Academic Year Rollover</h2>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">Dry run</span>
+              </div>
+              <p className="mt-0.5 text-xs text-slate-500">
+                {preview
+                  ? `${preview.currentYear} → ${preview.nextYear}. Review the complete flow before applying changes.`
+                  : 'Preparing the rollover preview…'}
+              </p>
+            </div>
           </div>
-        )}
-      </PortalPageHeader>
 
-      <div className="flex flex-col gap-5 max-w-4xl w-full mx-auto">
+          <div className="flex items-end gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <label className="block">
+              <span className="mb-1 block text-[9px] font-bold uppercase tracking-wider text-slate-400">New session starts in</span>
+              <select
+                value={sessionStartMonth}
+                onChange={(event) => setSessionStartMonth(Number(event.target.value))}
+                className="min-w-36 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-700 outline-none focus:border-rose-300"
+              >
+                {MONTHS.map((month, index) => <option key={month} value={index + 1}>{month}</option>)}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => void saveSessionStartMonth()}
+              disabled={savingSessionMonth || sessionStartMonth === preview?.academicYearStartMonth}
+              className="rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-bold text-white hover:bg-slate-800 disabled:cursor-default disabled:opacity-40 cursor-pointer"
+            >
+              {savingSessionMonth ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+
+        {preview && (
+          <dl className="grid grid-cols-4 divide-x divide-slate-200 border-t border-slate-100 bg-slate-50/70">
+            {[
+              { label: 'Students', value: preview.eligibleCount, detail: 'active roster', color: 'text-slate-900' },
+              { label: 'Moving up', value: preview.eligibleCount - preview.class10Count, detail: 'Classes 1–9', color: 'text-indigo-600' },
+              { label: 'Leaving', value: preview.class10Count, detail: 'Class 10', color: 'text-rose-600' },
+              { label: 'Section decisions', value: preview.sectionDecisionsNeeded, detail: preview.sectionDecisionsNeeded ? 'need input' : 'all aligned', color: preview.sectionDecisionsNeeded > 0 ? 'text-amber-600' : 'text-emerald-600' },
+            ].map((metric) => (
+              <div key={metric.label} className="flex items-baseline justify-center gap-2 px-3 py-3">
+                <dt className="text-[9px] font-bold uppercase tracking-wider text-slate-400">{metric.label}</dt>
+                <dd className={`text-sm font-bold tabular-nums ${metric.color}`}>{metric.value}</dd>
+                <span className="text-[10px] text-slate-400">{metric.detail}</span>
+              </div>
+            ))}
+          </dl>
+        )}
+      </section>
 
       {errorMsg && (
-        <div className="bg-rose-50 border border-rose-100 text-rose-800 rounded-2xl p-4 flex gap-2.5 text-xs font-bold">
+        <div className="flex gap-2.5 rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-800">
           <AlertTriangle className="text-rose-600 shrink-0 mt-0.5" size={16} />
           <span>{errorMsg}</span>
         </div>
       )}
 
       {preview?.alreadyRun && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-2.5 text-xs text-amber-800">
+        <div className="flex gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
           <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={16} />
           <span>
             <span className="font-bold">Already rolled over.</span> {preview.currentYear} has been promoted for this
@@ -378,60 +507,74 @@ export const SchoolAdminPromotion: React.FC = () => {
         </div>
       )}
 
-      {!isApril && !preview?.alreadyRun && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 text-xs text-amber-800">
-          <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={16} />
-          <div>
-            <span className="font-bold">Not April yet</span>
-            <p className="mt-0.5">
-              The Indian academic year turns over in April. Running this now promotes every current roster immediately.
-            </p>
-          </div>
+      {!isSessionStartMonth && !preview?.alreadyRun && (
+        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+          <AlertTriangle className="shrink-0 text-amber-600" size={16} />
+          <p><span className="font-bold">Outside your configured rollover period.</span> This school’s new session starts in {MONTHS[sessionStartMonth - 1]}. Running now updates the roster immediately.</p>
         </div>
       )}
 
       {/* Step indicator */}
-      <div className="flex items-center gap-2 text-[11px] font-bold flex-wrap">
+      <nav
+        aria-label="Rollover progress"
+        className={`grid gap-1.5 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm ${steps.length === 4 ? 'grid-cols-4' : 'grid-cols-3'}`}
+      >
         {steps.map((s, i) => (
-          <React.Fragment key={s.key}>
-            <span className={`px-3 py-1.5 rounded-full ${i === stepIdx ? 'bg-slate-900 text-white' : i < stepIdx ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
-              {i + 1}. {s.label}
+          <div
+            key={s.key}
+            aria-current={i === stepIdx ? 'step' : undefined}
+            className={`flex min-w-0 items-center gap-3 rounded-lg px-3 py-3 transition-colors ${
+              i === stepIdx
+                ? 'bg-slate-900 text-white shadow-sm'
+                : i < stepIdx
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : 'text-slate-400'
+            }`}
+          >
+            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${i === stepIdx ? 'bg-white/15' : i < stepIdx ? 'bg-emerald-100' : 'bg-slate-100'}`}>
+              {i < stepIdx ? '✓' : i + 1}
             </span>
-            {i < steps.length - 1 && <ChevronRight size={12} className="text-slate-300" />}
-          </React.Fragment>
+            <span className="min-w-0">
+              <span className="block truncate text-[11px] font-bold">{s.label}</span>
+              <span className={`mt-0.5 block truncate text-[9px] font-medium ${i === stepIdx ? 'text-slate-300' : i < stepIdx ? 'text-emerald-600' : 'text-slate-400'}`}>{STEP_DESCRIPTION[s.key]}</span>
+            </span>
+          </div>
         ))}
-      </div>
+      </nav>
 
       {/* STEP — per-class plan */}
       {step === 'review' && preview && (
-        <div className="bento-card border border-slate-100 bg-white p-5 flex flex-col gap-4">
-          <div className="flex justify-between items-center">
-            <span className="font-display font-bold text-sm text-slate-800">What will happen</span>
-            <span className="badge pill-rose text-[9px] font-black uppercase">Dry run</span>
+        <div className="flex flex-col gap-4 overflow-hidden rounded-2xl border border-slate-200 bg-white pb-5 shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+            <div>
+              <h3 className="font-display text-sm font-bold text-slate-800">Review class changes</h3>
+              <p className="mt-0.5 text-[11px] text-slate-400">Nothing is changed until the final confirmation.</p>
+            </div>
+            <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-indigo-600">Step 1 of {steps.length}</span>
           </div>
 
           {preview.summary.length === 0 ? (
-            <p className="text-xs text-slate-400 py-4">No active students to roll over.</p>
+            <p className="px-5 py-4 text-xs text-slate-400">No active students to roll over.</p>
           ) : (
             <div className="overflow-x-auto text-xs">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-100 text-slate-400 font-bold text-[11px] uppercase tracking-wider">
-                    <th className="pb-2">Class</th>
-                    <th className="pb-2">Students</th>
-                    <th className="pb-2">Becomes</th>
-                    <th className="pb-2">Action</th>
+              <table className="w-full table-fixed border-collapse text-left">
+                <thead className="bg-slate-50">
+                  <tr className="border-y border-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <th className="px-5 py-3">Current class</th>
+                    <th className="px-5 py-3">Students</th>
+                    <th className="px-5 py-3">Next session</th>
+                    <th className="px-5 py-3">Default action</th>
                   </tr>
                 </thead>
                 <tbody className="font-semibold">
                   {preview.summary.map((row) => (
                     <tr key={row.classNum} className="border-b border-slate-50">
-                      <td className="py-2.5">Class {row.classNum}</td>
-                      <td className="py-2.5 text-slate-500">{row.studentsCount}</td>
-                      <td className="py-2.5 text-slate-500">
+                      <td className="px-5 py-3">Class {row.classNum}</td>
+                      <td className="px-5 py-3 text-slate-500">{row.studentsCount}</td>
+                      <td className="px-5 py-3 text-slate-500">
                         {row.nextClassNum ? `Class ${row.nextClassNum}` : <span className="text-rose-600">Leaves school</span>}
                       </td>
-                      <td className="py-2.5">
+                      <td className="px-5 py-3">
                         <span className={`px-2 py-0.5 rounded-lg font-bold text-[9px] uppercase ${ACTION_STYLE[row.action]}`}>
                           {ACTION_LABEL[row.action]}
                         </span>
@@ -443,7 +586,7 @@ export const SchoolAdminPromotion: React.FC = () => {
             </div>
           )}
 
-          <p className="text-[11px] text-slate-400 leading-relaxed border-t border-slate-100 pt-3">
+          <p className="mx-5 border-t border-slate-100 pt-3 text-[11px] leading-relaxed text-slate-500">
             Class 1 will be empty afterwards — you'll be prompted to admit the new intake once this finishes.
             {preview.class4Count > 0 && ` ${preview.class4Count} Class 4 student${preview.class4Count === 1 ? '' : 's'} will switch from PIN to password login and need printed slips.`}
             {' '}Class teachers, subject assignments and the timetable carry over to {preview.nextYear}.
@@ -452,7 +595,7 @@ export const SchoolAdminPromotion: React.FC = () => {
           <button
             onClick={goNext}
             disabled={preview.alreadyRun || preview.eligibleCount === 0}
-            className="w-fit rounded-lg bg-slate-900 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            className="ml-5 w-fit rounded-lg bg-slate-900 px-4 py-2.5 text-[12px] font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
           >
             Next: {steps[1]?.label.toLowerCase() ?? 'continue'} →
           </button>
@@ -463,7 +606,7 @@ export const SchoolAdminPromotion: React.FC = () => {
           Only rendered when the roster forces a choice: a section whose label
           exists in the class above needs no input and is not shown. */}
       {step === 'sections' && preview && (
-        <div className="bento-card border border-slate-100 bg-white p-5 flex flex-col gap-4">
+        <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div>
             <span className="font-display font-bold text-sm text-slate-800 flex items-center gap-2">
               <Split size={15} className="text-indigo-500" /> Where do these sections go?
@@ -527,7 +670,7 @@ export const SchoolAdminPromotion: React.FC = () => {
               onClick={goNext}
               className="rounded-lg bg-slate-900 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-slate-800 cursor-pointer"
             >
-              Next: hold-backs →
+              Next: student outcomes →
             </button>
           </div>
         </div>
@@ -535,49 +678,120 @@ export const SchoolAdminPromotion: React.FC = () => {
 
       {/* STEP — hold-backs */}
       {step === 'holdbacks' && preview && (
-        <div className="bento-card border border-slate-100 bg-white p-5 flex flex-col gap-4">
+        <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div>
             <span className="font-display font-bold text-sm text-slate-800 flex items-center gap-2">
-              <RotateCcw size={15} className="text-amber-500" /> Students repeating the year
+              <RotateCcw size={15} className="text-amber-500" /> Manage student outcomes
             </span>
             <p className="text-[11px] text-slate-400 mt-1">
-              Optional. Anyone ticked here stays in their current class instead of moving up. Class 4 students kept back
-              keep their PIN login. Leave empty if everyone advances.
+              Everyone advances by default. Filter or select multiple students, then update them together. Students marked to repeat remain in their current class; Class 4 repeaters keep PIN login.
             </p>
           </div>
 
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              value={holdSearch}
-              onChange={(e) => setHoldSearch(e.target.value)}
-              placeholder="Search by name, roll number or class…"
-              className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 text-[13px] outline-none focus:border-slate-400"
-            />
+          <div className="grid grid-cols-[minmax(260px,1fr)_160px_160px] gap-2">
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={holdSearch}
+                onChange={(e) => { setHoldSearch(e.target.value); setHoldPage(1); }}
+                placeholder="Search name, roll number or class…"
+                className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-[13px] outline-none focus:border-slate-400"
+              />
+            </div>
+            <select
+              value={holdClass}
+              onChange={(e) => { setHoldClass(e.target.value); setHoldSection('all'); setHoldPage(1); }}
+              aria-label="Filter students by class"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-600 outline-none focus:border-slate-400"
+            >
+              <option value="all">All classes</option>
+              {classOptions.map((classNum) => <option key={classNum} value={classNum}>Class {classNum}</option>)}
+            </select>
+            <select
+              value={holdSection}
+              onChange={(e) => { setHoldSection(e.target.value); setHoldPage(1); }}
+              aria-label="Filter students by section"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-600 outline-none focus:border-slate-400"
+            >
+              <option value="all">All sections</option>
+              {sectionOptions.map((section) => <option key={section} value={section}>Section {section}</option>)}
+            </select>
           </div>
 
-          <div className="max-h-72 overflow-y-auto flex flex-col gap-1 border border-slate-100 rounded-xl p-2">
-            {filteredRoster.length === 0 ? (
-              <p className="text-[12px] text-slate-400 p-3">No students match.</p>
-            ) : filteredRoster.map((s) => (
-              <label
-                key={s.id}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-[13px] transition ${
-                  holdBack.has(s.id) ? 'bg-amber-50 border border-amber-200' : 'hover:bg-slate-50 border border-transparent'
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={holdBack.has(s.id)}
-                  onChange={() => toggleHold(s.id)}
-                  className="accent-amber-500"
-                />
-                <span className="font-semibold text-slate-700 flex-1 truncate">{s.fullName}</span>
-                <span className="text-[11px] text-slate-400 shrink-0">
-                  {s.rollNumber ? `#${s.rollNumber} · ` : ''}Class {s.classNum}-{s.section}
-                </span>
-              </label>
-            ))}
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <div className="flex items-center gap-3 text-[11px] text-slate-500">
+              <span><strong className="text-slate-800">{selectedStudents.size}</strong> selected</span>
+              <span><strong className="text-amber-700">{holdBack.size}</strong> repeating</span>
+              <button type="button" onClick={() => void selectAllFiltered()} disabled={filteredRoster.length === 0} className="font-semibold text-indigo-600 hover:text-indigo-700 disabled:opacity-40 cursor-pointer">
+                Select all {filteredRoster.length} filtered
+              </button>
+              {selectedStudents.size > 0 && (
+                <button type="button" onClick={() => setSelectedStudents(new Set())} className="font-semibold text-slate-500 hover:text-slate-700 cursor-pointer">Clear selection</button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => applyBulkOutcome(false)} disabled={selectedStudents.size === 0} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 cursor-pointer">
+                Move selected up
+              </button>
+              <button type="button" onClick={() => applyBulkOutcome(true)} disabled={selectedStudents.size === 0} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-bold text-amber-800 hover:bg-amber-100 disabled:opacity-40 cursor-pointer">
+                Repeat current class
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-xl border border-slate-200">
+            <table className="w-full table-fixed text-left text-[12px]">
+              <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <tr>
+                  <th className="w-11 px-3 py-2.5">
+                    <input type="checkbox" checked={allVisibleSelected} onChange={(e) => setVisibleSelection(e.target.checked)} aria-label="Select all students on this page" className="accent-indigo-600" />
+                  </th>
+                  <th className="px-3 py-2.5">Student</th>
+                  <th className="w-32 px-3 py-2.5">Roll number</th>
+                  <th className="w-32 px-3 py-2.5">Current class</th>
+                  <th className="w-36 px-3 py-2.5">Next year</th>
+                  <th className="w-52 px-3 py-2.5">Decision</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {visibleRoster.length === 0 ? (
+                  <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">No students match these filters.</td></tr>
+                ) : visibleRoster.map((student) => {
+                  const repeats = holdBack.has(student.id);
+                  return (
+                    <tr key={student.id} className={repeats ? 'bg-amber-50/50' : 'hover:bg-slate-50/70'}>
+                      <td className="px-3 py-2.5">
+                        <input type="checkbox" checked={selectedStudents.has(student.id)} onChange={() => toggleStudentSelection(student.id)} aria-label={`Select ${student.fullName}`} className="accent-indigo-600" />
+                      </td>
+                      <td className="truncate px-3 py-2.5 font-semibold text-slate-800" title={student.fullName}>{student.fullName}</td>
+                      <td className="px-3 py-2.5 text-slate-500">{student.rollNumber || '—'}</td>
+                      <td className="px-3 py-2.5 text-slate-600">Class {student.classNum}-{student.section}</td>
+                      <td className="px-3 py-2.5 font-medium text-slate-700">{repeats ? `Class ${student.classNum}` : student.classNum === 10 ? 'Leaves school' : `Class ${student.classNum + 1}`}</td>
+                      <td className="px-3 py-2">
+                        <select
+                          value={repeats ? 'repeat' : 'advance'}
+                          onChange={(e) => setStudentOutcome(student.id, e.target.value === 'repeat')}
+                          aria-label={`Rollover decision for ${student.fullName}`}
+                          className={`w-full rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold outline-none ${repeats ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white text-slate-700'}`}
+                        >
+                          <option value="advance">{student.classNum === 10 ? 'Pass out' : 'Move up'}</option>
+                          <option value="repeat">Repeat current class</option>
+                        </select>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex items-center justify-between text-[11px] text-slate-500">
+            <span>Showing {filteredRoster.length === 0 ? 0 : (activeRosterPage - 1) * ROSTER_PAGE_SIZE + 1}–{Math.min(activeRosterPage * ROSTER_PAGE_SIZE, filteredRoster.length)} of {filteredRoster.length}</span>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setHoldPage((page) => Math.max(1, page - 1))} disabled={activeRosterPage === 1} className="rounded-lg border border-slate-200 px-3 py-1.5 font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 cursor-pointer">Previous</button>
+              <span className="font-medium text-slate-600">Page {activeRosterPage} of {rosterPageCount}</span>
+              <button type="button" onClick={() => setHoldPage((page) => Math.min(rosterPageCount, page + 1))} disabled={activeRosterPage === rosterPageCount} className="rounded-lg border border-slate-200 px-3 py-1.5 font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 cursor-pointer">Next</button>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -599,13 +813,13 @@ export const SchoolAdminPromotion: React.FC = () => {
 
       {/* STEP — confirm */}
       {step === 'confirm' && preview && (
-        <div className="bento-card border border-rose-100 bg-white p-5 flex flex-col gap-4">
+        <div className="flex flex-col gap-4 rounded-2xl border border-rose-200 bg-white p-5 shadow-sm">
           <span className="font-display font-bold text-sm text-slate-800">Confirm rollover</span>
 
           <div className="rounded-xl bg-slate-50 border border-slate-100 p-4 text-[13px] text-slate-700 flex flex-col gap-1.5">
-            <div><span className="font-semibold">{preview.eligibleCount - holdBack.size}</span> students move up one class</div>
+            <div><span className="font-semibold">{movingUpCount}</span> students move up one class</div>
             {holdBack.size > 0 && <div><span className="font-semibold">{holdBack.size}</span> repeat their current class</div>}
-            <div><span className="font-semibold">{preview.class10Count}</span> Class 10 students pass out and are deactivated</div>
+            <div><span className="font-semibold">{passingOutCount}</span> Class 10 students pass out and are deactivated</div>
             {pendingMoves.map((row) => {
               const choice = sectionChoices[moveKey(row.fromClass, row.fromSection)] ?? row.fromSection;
               return (
@@ -648,7 +862,6 @@ export const SchoolAdminPromotion: React.FC = () => {
           </div>
         </div>
       )}
-      </div>
     </div>
   );
 };
