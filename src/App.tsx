@@ -21,23 +21,42 @@ import { Batch1Stories } from './routes/batch1/Stories';
 import { Batch1Games } from './routes/batch1/Games';
 import { Batch1MyStuff } from './routes/batch1/MyStuff';
 import { Batch1Syllabus } from './routes/batch1/Syllabus';
+import { Batch1Tasks } from './routes/batch1/Tasks';
 
 // Import Batch 2 Pages
 import { Batch2Layout } from './routes/batch2/Layout';
 import { Batch2Home } from './routes/batch2/Home';
+import { Batch2Subjects } from './routes/batch2/Subjects';
 import { Batch2Chat } from './routes/batch2/Chat';
 import { Batch2Exams } from './routes/batch2/Exams';
+import { Batch2Tasks } from './routes/batch2/Tasks';
+import { Batch2Help } from './routes/batch2/Help';
 import { Batch2Activities } from './routes/batch2/Activities';
-import { Batch2Profile } from './routes/batch2/MinorPages';
+import {
+  Batch2Notes,
+  Batch2Pyq,
+  Batch2DailyChallenges,
+  Batch2Streak,
+  Batch2Badges,
+  Batch2Profile
+} from './routes/batch2/MinorPages';
 
-// PDF Simulator reader — re-enabled (see PDF_SIMULATOR_ENABLED in
-// Layout.tsx). See src/routes/shared/reader/ for the port itself.
+// PDF Simulator reader — re-enabled per user request (Aug 26 2026); see
+// PDF_SIMULATOR_ENABLED in batch2/batch3 Layout.tsx (nav tab) and
+// api/src/worker.ts (sim generation). See src/routes/shared/reader/ for the
+// port itself.
 const ReaderLibrary = lazy(() => import('./routes/shared/reader/routes/ReaderLibrary').then((m) => ({ default: m.ReaderLibrary })));
+const ReaderSubjectChapters = lazy(() => import('./routes/shared/reader/routes/ReaderSubjectChapters').then((m) => ({ default: m.ReaderSubjectChapters })));
 const ReaderBookPage = lazy(() => import('./routes/shared/reader/routes/ReaderBookPage').then((m) => ({ default: m.ReaderBookPage })));
 
 // Import Batch 3 Pages
 import { Batch3Layout } from './routes/batch3/Layout';
 import { Batch3Home } from './routes/batch3/Home';
+import { Batch3BoardPrep } from './routes/batch3/BoardPrep';
+import { Batch3ConceptMap } from './routes/batch3/ConceptMap';
+import { Batch3Pomodoro } from './routes/batch3/Pomodoro';
+import { Batch3Tasks } from './routes/batch3/Tasks';
+import { Batch3Help } from './routes/batch3/Help';
 import { Batch3ScienceLabs } from './routes/batch3/ScienceLabs';
 /* Class 9-10 science labs — ported from EducationAI-Games-master. They render
    inside Batch3Layout so the dashboard sidebar/topbar stay in place; the
@@ -56,9 +75,13 @@ const PhysicsLab = lazy(() => import('./routes/batch3/labs/Physics/PhysicsLab'))
 const FrictionSimulator = lazy(() => import('./routes/batch3/labs/Physics/FrictionSimulator/FrictionSimulator'));
 const SoundWaveTank = lazy(() => import('./routes/batch3/labs/Physics/SoundWave/SoundWaveTank'));
 import {
+  Batch3Subjects,
   Batch3Chat,
+  Batch3DailyChallenges,
   Batch3Exams,
+  Batch3Notes,
   Batch3Pyq,
+  Batch3Streak,
   Batch3Profile
 } from './routes/batch3/MinorPages';
 
@@ -73,6 +96,7 @@ import { SuperAdminSchoolDetail } from './routes/super-admin/SchoolDetail';
 import { SuperAdminSchoolOnboarding } from './routes/super-admin/SchoolOnboarding';
 import { SuperAdminAuditLog } from './routes/super-admin/AuditLog';
 import { SuperAdminSupportLookup } from './routes/super-admin/SupportLookup';
+import { SuperAdminSimQa } from './routes/super-admin/SimQa';
 import { AccountSettings } from './components/shared/AccountSettings';
 
 // Import Teacher Pages
@@ -138,8 +162,11 @@ function App() {
               <Route index element={<Navigate to="/batch1/home" replace />} />
               <Route path="home" element={<Batch1Home />} />
               <Route path="stories" element={<Batch1Stories />} />
+              {/* No Exams & Mocks component exists for Class 1-4 — genuinely
+                  not built (age-appropriate exams weren't in scope), unlike
+                  the batch2/batch3 redirects that were fixed alongside this. */}
               <Route path="exams" element={<Navigate to="/batch1/home" replace />} />
-              <Route path="tasks" element={<Navigate to="/batch1/home" replace />} />
+              <Route path="tasks" element={<Batch1Tasks />} />
               <Route path="games" element={<Batch1Games />} />
               <Route path="my-stuff" element={<Batch1MyStuff />} />
               <Route path="syllabus" element={<Batch1Syllabus />} />
@@ -156,21 +183,21 @@ function App() {
             >
               <Route index element={<Navigate to="/batch2/home" replace />} />
               <Route path="home" element={<Batch2Home />} />
+              <Route path="subjects" element={<Batch2Subjects />} />
               <Route path="activities" element={<Batch2Activities />} />
               <Route path="chat" element={<Batch2Chat />} />
               <Route path="exams" element={<Batch2Exams />} />
-              <Route path="subjects" element={<Navigate to="/batch2/activities" replace />} />
-              <Route path="tasks" element={<Navigate to="/batch2/home" replace />} />
-              <Route path="notes" element={<Navigate to="/batch2/home" replace />} />
-              <Route path="pyq" element={<Navigate to="/batch2/home" replace />} />
-              <Route path="daily-challenges" element={<Navigate to="/batch2/home" replace />} />
-              <Route path="streak" element={<Navigate to="/batch2/profile" replace />} />
-              <Route path="badges" element={<Navigate to="/batch2/profile" replace />} />
+              <Route path="tasks" element={<Batch2Tasks />} />
+              <Route path="notes" element={<Batch2Notes />} />
+              <Route path="pyq" element={<Batch2Pyq />} />
+              <Route path="daily-challenges" element={<Batch2DailyChallenges />} />
+              <Route path="streak" element={<Batch2Streak />} />
+              <Route path="badges" element={<Batch2Badges />} />
               <Route path="profile" element={<Batch2Profile />} />
-              <Route path="help" element={<Navigate to="/batch2/home" replace />} />
-              {/* PDF Simulator — re-enabled (see PDF_SIMULATOR_ENABLED in
-                  Layout.tsx, which also gates the nav entry). */}
+              <Route path="help" element={<Batch2Help />} />
+              {/* PDF Simulator — re-enabled per user request (Aug 26 2026). */}
               <Route path="reader" element={<ReaderLibrary />} />
+              <Route path="reader/subject/:subject" element={<ReaderSubjectChapters />} />
               <Route path="reader/:bookId" element={<ReaderBookPage />} />
             </Route>
 
@@ -185,22 +212,22 @@ function App() {
             >
               <Route index element={<Navigate to="/batch3/home" replace />} />
               <Route path="home" element={<Batch3Home />} />
+              <Route path="board-prep" element={<Batch3BoardPrep />} />
+              <Route path="concept-map" element={<Batch3ConceptMap />} />
+              <Route path="pomodoro" element={<Batch3Pomodoro />} />
+              <Route path="subjects" element={<Batch3Subjects />} />
               <Route path="chat" element={<Batch3Chat />} />
+              <Route path="daily-challenges" element={<Batch3DailyChallenges />} />
               <Route path="exams" element={<Batch3Exams />} />
+              <Route path="tasks" element={<Batch3Tasks />} />
+              <Route path="notes" element={<Batch3Notes />} />
               <Route path="pyq" element={<Batch3Pyq />} />
+              <Route path="streak" element={<Batch3Streak />} />
               <Route path="profile" element={<Batch3Profile />} />
-              <Route path="board-prep" element={<Navigate to="/batch3/home" replace />} />
-              <Route path="concept-map" element={<Navigate to="/batch3/home" replace />} />
-              <Route path="pomodoro" element={<Navigate to="/batch3/home" replace />} />
-              <Route path="subjects" element={<Navigate to="/batch3/home" replace />} />
-              <Route path="daily-challenges" element={<Navigate to="/batch3/home" replace />} />
-              <Route path="tasks" element={<Navigate to="/batch3/home" replace />} />
-              <Route path="notes" element={<Navigate to="/batch3/home" replace />} />
-              <Route path="streak" element={<Navigate to="/batch3/profile" replace />} />
-              <Route path="help" element={<Navigate to="/batch3/home" replace />} />
-              {/* PDF Simulator — re-enabled (see PDF_SIMULATOR_ENABLED in
-                  Layout.tsx, which also gates the nav entry). */}
+              <Route path="help" element={<Batch3Help />} />
+              {/* PDF Simulator — re-enabled per user request (Aug 26 2026). */}
               <Route path="reader" element={<ReaderLibrary />} />
+              <Route path="reader/subject/:subject" element={<ReaderSubjectChapters />} />
               <Route path="reader/:bookId" element={<ReaderBookPage />} />
 
               {/* Class 9-10 science labs. Rendered inside this layout so the
@@ -292,6 +319,8 @@ function App() {
                   SuperAdminStudents.tsx is left unused rather than deleted. */}
               <Route path="students" element={<Navigate to="/super-admin/overview" replace />} />
               <Route path="content" element={<SuperAdminContentPortal />} />
+              <Route path="sim-qa" element={<SuperAdminSimQa />} />
+              <Route path="sim-qa/:templateId" element={<SuperAdminSimQa />} />
               <Route path="ai-console" element={<SuperAdminAiConsole />} />
               <Route path="tickets" element={<SuperAdminTickets />} />
               <Route path="support" element={<SuperAdminSupportLookup />} />

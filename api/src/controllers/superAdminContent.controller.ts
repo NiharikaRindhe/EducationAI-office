@@ -117,6 +117,17 @@ export async function listIngestionJobsController(req: Request, res: Response, n
   }
 }
 
+export async function getIngestionJobPdfUrlController(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.user) throw new ApiError('UNAUTHORIZED', 'Not authenticated');
+    const { id } = req.params;
+    if (!id) throw new ApiError('VALIDATION_ERROR', 'Missing job id');
+    res.json(await contentService.getSuperAdminSignedPdfUrl(id, req.user.id));
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getUploadUsageController(req: Request, res: Response, next: NextFunction) {
   try {
     const schoolId = typeof req.query.schoolId === 'string' ? req.query.schoolId : undefined;

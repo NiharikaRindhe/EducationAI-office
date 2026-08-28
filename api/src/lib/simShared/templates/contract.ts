@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 // shared/templates/contract.ts
 // One-file-per-sim contract. A sim file only needs params to produce a stage.
 
@@ -6,7 +5,7 @@ import { z } from 'zod'
 import type { SimStage } from '../simSpec.js'
 
 export type SimDomain = 'physics' | 'math' | 'chemistry'
-export type ClassBand = '6-8' | '9-10' | '6-10' | '7-10' | '8-9' | '8-10'
+export type ClassBand = '5-6' | '5-8' | '6-6' | '6-8' | '7-7' | '8-8' | '9-9' | '10-10' | '9-10' | '6-10' | '7-10' | '8-9' | '8-10'
 
 export interface ParamOption {
   value: number
@@ -82,6 +81,12 @@ export function choice(
 }
 
 export function classBandToNcert(band: ClassBand): number {
+  if (band === '5-6' || band === '5-8') return 5
+  if (band === '6-6') return 6
+  if (band === '7-7') return 7
+  if (band === '8-8') return 8
+  if (band === '9-9') return 9
+  if (band === '10-10') return 10
   if (band === '6-8') return 7
   if (band === '9-10') return 9
   if (band === '7-10') return 8
@@ -94,6 +99,7 @@ export function classBandToNcert(band: ClassBand): number {
  *  own class instead of always showing all 74 (e.g. a Class 5 Maths book
  *  should never be offered '9-10' electromagnetism templates). */
 export function classBandContains(band: ClassBand, classNum: number): boolean {
-  const [min, max] = band.split('-').map(Number)
+  // Every ClassBand literal is exactly "min-max" — split always yields 2 parts.
+  const [min, max] = band.split('-').map(Number) as [number, number]
   return classNum >= min && classNum <= max
 }

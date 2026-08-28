@@ -26,7 +26,7 @@ export interface ResolvedElement {
   id: string
   type: SimElement['type']
   role: SimElement['role']
-  props: Record<string, any>
+  props: Record<string, unknown>
   text?: string | number
 }
 
@@ -107,7 +107,7 @@ export function createCompiledSpec(stage: SimStage): CompiledStage {
 /**
  * Evaluates a single compiled property value against the current time and scope.
  */
-export function evaluateProp(prop: CompiledProp, scope: Record<string, any>): any {
+export function evaluateProp(prop: CompiledProp, scope: Record<string, unknown>): unknown {
   if (!prop.isExpression) {
     return prop.literalValue
   }
@@ -138,7 +138,7 @@ export function evaluateProp(prop: CompiledProp, scope: Record<string, any>): an
 export function evalSpec(
   compiledStage: CompiledStage,
   time: number,
-  extraScope: Record<string, any> = {}
+  extraScope: Record<string, unknown> = {}
 ): ResolvedStage {
   const scope = {
     time,
@@ -146,7 +146,7 @@ export function evalSpec(
     pi: Math.PI,
     PI: Math.PI,
     e: Math.E,
-    concat: (...args: any[]) => args.map((a) => (typeof a === 'number' ? a : String(a))).join(''),
+    concat: (...args: unknown[]) => args.map((a) => (typeof a === 'number' ? a : String(a))).join(''),
     round: (val: number, decimals = 0) => {
       const factor = Math.pow(10, decimals)
       return Math.round(val * factor) / factor
@@ -155,7 +155,7 @@ export function evalSpec(
   }
 
   const resolvedElements: ResolvedElement[] = compiledStage.elements.map((elem) => {
-    const resolvedProps: Record<string, any> = {}
+    const resolvedProps: Record<string, unknown> = {}
 
     for (const [key, prop] of Object.entries(elem.props)) {
       resolvedProps[key] = evaluateProp(prop, scope)

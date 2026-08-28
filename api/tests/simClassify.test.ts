@@ -118,10 +118,81 @@ describe('simClassify: classifyPage over chatCompletion', () => {
     await classifyPage('Class 5 arithmetic page text.', { classNum: 5 });
     const [messages] = vi.mocked(chatCompletion).mock.calls[0]!;
     const systemPrompt = (messages as { role: string; content: string }[])[0]!.content;
-    // Class 5 sits below every catalog classBand's minimum (they start at 6),
-    // so the class-5 prompt should offer no templateId lines at all.
-    expect(systemPrompt).not.toMatch(/`projectile_2d`/);
-  });
+    // Class 5 now has its own 5-8 catalog (place value, fractions as turns, …)
+    // and must still never be offered Class 9–10 electromagnetism.
+    expect(systemPrompt).not.toMatch(/`projectile_2d`/)
+    expect(systemPrompt).toMatch(/`place_value_chart`/)
+    expect(systemPrompt).toMatch(/`fraction_kit`/)
+    expect(systemPrompt).toMatch(/`water_cycle`/)
+    expect(systemPrompt).not.toMatch(/`lakh_crore_chart`/)
+  })
+
+  it('Class 7 curator catalog is dedicated 7-7, not Class 5 or Ohm', async () => {
+    vi.mocked(chatCompletion).mockResolvedValue(JSON.stringify({ candidates: [] }))
+    await classifyPage('Class 7 Ganita Prakash page text.', { classNum: 7 })
+    const [messages] = vi.mocked(chatCompletion).mock.calls[0]!
+    const systemPrompt = (messages as { role: string; content: string }[])[0]!.content
+    expect(systemPrompt).toMatch(/`lakh_crore_chart`/)
+    expect(systemPrompt).toMatch(/`litmus_lab`/)
+    expect(systemPrompt).not.toMatch(/`place_value_chart`/)
+    expect(systemPrompt).not.toMatch(/`ohm_circuit`/)
+    expect(systemPrompt).not.toMatch(/`projectile_2d`/)
+  })
+
+  it('Class 8 curator catalog is dedicated 8-8, not Ohm or Class 7', async () => {
+    vi.mocked(chatCompletion).mockResolvedValue(JSON.stringify({ candidates: [] }))
+    await classifyPage('Class 8 Ganita Prakash page text.', { classNum: 8 })
+    const [messages] = vi.mocked(chatCompletion).mock.calls[0]!
+    const systemPrompt = (messages as { role: string; content: string }[])[0]!.content
+    expect(systemPrompt).toMatch(/`locker_squares`/)
+    expect(systemPrompt).toMatch(/`electromagnet_nail`/)
+    expect(systemPrompt).toMatch(/`two_lenses`/)
+    expect(systemPrompt).toMatch(/`wind_spin`/)
+    expect(systemPrompt).not.toMatch(/`ohm_circuit`/)
+    expect(systemPrompt).not.toMatch(/`lakh_crore_chart`/)
+    expect(systemPrompt).not.toMatch(/`place_value_chart`/)
+    expect(systemPrompt).not.toMatch(/`pythagoras`/)
+  })
+
+  it('Class 6 curator catalog is dedicated 6-6, not Class 5 or Pythagoras', async () => {
+    vi.mocked(chatCompletion).mockResolvedValue(JSON.stringify({ candidates: [] }))
+    await classifyPage('Class 6 Ganita Prakash page text.', { classNum: 6 })
+    const [messages] = vi.mocked(chatCompletion).mock.calls[0]!
+    const systemPrompt = (messages as { role: string; content: string }[])[0]!.content
+    expect(systemPrompt).toMatch(/`seq_pictures`/)
+    expect(systemPrompt).toMatch(/`stick_magnet`/)
+    expect(systemPrompt).toMatch(/`rotate_arms`/)
+    expect(systemPrompt).toMatch(/`kind_of_move`/)
+    expect(systemPrompt).not.toMatch(/`place_value_chart`/)
+    expect(systemPrompt).not.toMatch(/`animal_jumps`/)
+    expect(systemPrompt).not.toMatch(/`pythagoras`/)
+    expect(systemPrompt).not.toMatch(/`lakh_crore_chart`/)
+  })
+
+  it('Class 9 curator catalog is dedicated 9-9, not Ohm or Class 10 lenses', async () => {
+    vi.mocked(chatCompletion).mockResolvedValue(JSON.stringify({ candidates: [] }))
+    await classifyPage('Class 9 Ganita Manjari page text.', { classNum: 9 })
+    const [messages] = vi.mocked(chatCompletion).mock.calls[0]!
+    const systemPrompt = (messages as { role: string; content: string }[])[0]!.content
+    expect(systemPrompt).toMatch(/`four_quadrant`/)
+    expect(systemPrompt).toMatch(/`gold_foil`/)
+    expect(systemPrompt).not.toMatch(/`ohm_circuit`/)
+    expect(systemPrompt).not.toMatch(/`convex_lens`/)
+    expect(systemPrompt).not.toMatch(/`place_value_chart`/)
+    expect(systemPrompt).not.toMatch(/`locker_squares`/)
+  })
+
+  it('Class 10 curator catalog is dedicated 10-10, not Ohm or Class 9 leftover', async () => {
+    vi.mocked(chatCompletion).mockResolvedValue(JSON.stringify({ candidates: [] }))
+    await classifyPage('Class 10 Science page text.', { classNum: 10 })
+    const [messages] = vi.mocked(chatCompletion).mock.calls[0]!
+    const systemPrompt = (messages as { role: string; content: string }[])[0]!.content
+    expect(systemPrompt).toMatch(/`ohm_line`/)
+    expect(systemPrompt).toMatch(/`prime_share`/)
+    expect(systemPrompt).not.toMatch(/`ohm_circuit`/)
+    expect(systemPrompt).not.toMatch(/`convex_lens`/)
+    expect(systemPrompt).not.toMatch(/`four_quadrant`/)
+  })
 });
 
 describe('simClassify: generateCustomSimulation matcher path (no LLM call needed)', () => {

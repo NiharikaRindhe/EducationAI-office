@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 // shared/templates/catalog.ts
 // Registry assembled from sim files. Param clamp + provenance live here.
 
@@ -80,10 +79,38 @@ export function allowedTemplateIdList(): string {
  *  Maths book should never be offered '9-10' electromagnetism templates.
  *  Omit to list the full catalog (used by the on-demand /generate path,
  *  which has no book/class context). */
+function templateIdsForClass(classNum?: number): TemplateId[] {
+  if (classNum === undefined) return TEMPLATE_IDS
+  // Dedicated Class 7 (2026–27) catalog only — do not inherit Class 5 (5-6)
+  // or old 6–8 templates that were tagged Class 7 from earlier books.
+  // Dedicated Class 6 (2026–27) catalog only — do not inherit Class 5 (5-6)
+  // or old 6–8 templates (Pythagoras, pendulum, s=vt, T-cutoff states, …).
+  if (classNum === 6) {
+    return TEMPLATE_IDS.filter((id) => TEMPLATE_CATALOG[id].classBand === '6-6')
+  }
+  if (classNum === 7) {
+    return TEMPLATE_IDS.filter((id) => TEMPLATE_CATALOG[id].classBand === '7-7')
+  }
+  // Dedicated Class 8 (2026–27) catalog only — do not inherit Class 5/7
+  // or old 6–8 / 8–10 templates (Ohm, Joule heat, generic Pythagoras, …).
+  if (classNum === 8) {
+    return TEMPLATE_IDS.filter((id) => TEMPLATE_CATALOG[id].classBand === '8-8')
+  }
+  // Dedicated Class 9 (2026–27) catalog only — do not inherit old 9–10
+  // templates (lenses, Ohm, AP formulae, tangents, generic F=ma, …).
+  if (classNum === 9) {
+    return TEMPLATE_IDS.filter((id) => TEMPLATE_CATALOG[id].classBand === '9-9')
+  }
+  // Dedicated Class 10 catalog only — do not inherit old 9–10 / 8–10
+  // templates (lenses, Ohm, AP formulae, generic tangents, Class 9 leftover motion).
+  if (classNum === 10) {
+    return TEMPLATE_IDS.filter((id) => TEMPLATE_CATALOG[id].classBand === '10-10')
+  }
+  return TEMPLATE_IDS.filter((id) => classBandContains(TEMPLATE_CATALOG[id].classBand, classNum))
+}
+
 export function allowedTemplatePrompt(classNum?: number): string {
-  const ids = classNum === undefined
-    ? TEMPLATE_IDS
-    : TEMPLATE_IDS.filter((id) => classBandContains(TEMPLATE_CATALOG[id].classBand, classNum))
+  const ids = templateIdsForClass(classNum)
   return ids.map((id) => {
     const d = TEMPLATE_CATALOG[id]
     const ps = d.params
@@ -105,7 +132,8 @@ export function randomizeTemplateParams(templateId: TemplateId): Record<string, 
   const params: Record<string, number> = {}
   for (const def of defs) {
     if (def.options?.length) {
-      params[def.key] = def.options[Math.floor(Math.random() * def.options.length)].value
+      // Math.floor(random * length) is always a valid index into def.options.
+      params[def.key] = def.options[Math.floor(Math.random() * def.options.length)]!.value
       continue
     }
     const span = def.max - def.min
@@ -117,8 +145,10 @@ export function randomizeTemplateParams(templateId: TemplateId): Record<string, 
     params[def.key] = Number(clamped.toFixed(decimals))
   }
   if (templateId === 'collision_1d') {
-    params.u1 = Math.abs(params.u1)
-    params.u2 = -Math.abs(params.u2 === 0 ? 2 : params.u2)
+    // The loop above always fills a key for every def in collision_1d's own
+    // params array, which includes u1/u2 — both are set by this point.
+    params.u1 = Math.abs(params.u1!)
+    params.u2 = -Math.abs(params.u2 === 0 ? 2 : params.u2!)
   }
   return parseTemplateParams(templateId, params).params
 }

@@ -173,7 +173,9 @@ export const ExamTaking: React.FC<{ accent: Accent; examId: string; onExit: () =
   // whether every answer had actually reached the server.
   const [unsavedIds, setUnsavedIds] = useState<Set<string>>(new Set());
   const answersRef = useRef(answers);
-  answersRef.current = answers;
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
 
   // Load (or resume) the paper.
   useEffect(() => {

@@ -1,7 +1,7 @@
 import { hostname } from 'node:os';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { logger } from '../lib/logger.js';
-import { extractPageTexts, shouldClassify } from '../lib/pdfExtract.js';
+import { extractPageTexts } from '../lib/pdfExtract.js';
 import { NCERT_BUCKET } from '../services/superAdminContent.service.js';
 import { upsertSimPage, processPageIngestion } from '../services/simIngest.service.js';
 
@@ -11,31 +11,14 @@ import { upsertSimPage, processPageIngestion } from '../services/simIngest.servi
 //
 //  Deliberately NOT folded into the RAG ingestion pipeline: a book's
 //  `status` reaching 'done' means "the AI tutor can answer from this
-//  book" and must not wait on a ~9-minute, page-by-page classification
-//  pass. `sim_status` is its own lane with its own claim/requeue pair
-//  (claim_next_sim_job / requeue_stale_sim_jobs, 20250101000186) so RAG
-//  readiness and simulation readiness can never block each other.
+//  book" and must not wait on simulation tagging. `sim_status` is its
+//  own lane (claim_next_sim_job / requeue_stale_sim_jobs).
 //
-//  Single concurrency, same reasoning as the RAG worker: classification
-//  is LLM-call-heavy per page, not CPU-heavy, but the pipeline is still
-//  delete-then-insert per (book, page) via the content-hash cache path,
-//  so two workers racing the same book is still worth avoiding.
+//  Placement is hardcoded page metadata (ncertPageTags) — no LLM per page.
 // ─────────────────────────────────────────────────────────────
 
 const POLL_INTERVAL_MS = 15_000;
-/** Sleep after each classified page on a given lane — matches upstream's
- *  600ms inter-page throttle, easing pressure on the AI provider during a
- *  big book. Applied per lane, not per page, now that pages run concurrently
- *  (see PAGE_CONCURRENCY) — the aggregate request rate is what the provider
- *  actually sees, and that scales with lane count same as before. */
-const INTER_PAGE_DELAY_MS = 600;
-/** How many pages of the same book are classified at once. Pages are fully
- *  independent (own text, own content-hash cache entry, own annotation
- *  rows) so there's nothing to coordinate — this is a pure throughput lever.
- *  4 was picked to comfortably undercut the AI provider's real concurrency
- *  headroom (this deployment rotates 14 keys) while still cutting a
- *  200-page book's wall-clock time roughly 4x over one-at-a-time. */
-const PAGE_CONCURRENCY = 4;
+const PAGE_CONCURRENCY = 8;
 const WORKER_ID = `${hostname()}:${process.pid}`;
 
 let busy = false;
@@ -112,15 +95,19 @@ async function runSimPipeline(job: ClaimedSimJob): Promise<void> {
       if (!page) continue;
       await upsertSimPage(job.id, page.pageNumber, page.text, page.wordCount);
 
-      if (shouldClassify(page.text)) {
+      if (page.text.trim()) {
         try {
-          await processPageIngestion({ jobId: job.id, pageNumber: page.pageNumber, pageText: page.text, classNum: job.class_num });
+          await processPageIngestion({
+            jobId: job.id,
+            pageNumber: page.pageNumber,
+            pageText: page.text,
+            classNum: job.class_num,
+            subject: job.subject,
+            bookTitle: job.book_title,
+          });
         } catch (err) {
-          // One bad page shouldn't sink the whole book — log and keep going,
-          // same tolerance the RAG figure-upload loop applies per-figure.
-          logger.warn({ err, jobId: job.id, pageNumber: page.pageNumber }, '[sim-worker] page ingestion failed — continuing');
+          logger.warn({ err, jobId: job.id, pageNumber: page.pageNumber }, '[sim-worker] page tagging failed — continuing');
         }
-        await new Promise((resolve) => setTimeout(resolve, INTER_PAGE_DELAY_MS));
       }
 
       done += 1;

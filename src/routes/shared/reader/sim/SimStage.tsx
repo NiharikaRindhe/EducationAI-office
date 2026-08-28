@@ -38,8 +38,8 @@ export const SimStage: React.FC<SimStageProps> = ({
   showControls = true,
   zoom = 1,
 }) => {
-  const isPlaying = autoPlay
   const speed = initialSpeed
+  const [playing, setPlaying] = useState(autoPlay)
   const [time, setTime] = useState(0)
 
   // Pre-compile expressions once when stage definition changes
@@ -62,12 +62,12 @@ export const SimStage: React.FC<SimStageProps> = ({
   }, [])
 
   useEffect(() => {
-    resetSimulation()
-  }, [stage, resetSimulation])
+    setPlaying(autoPlay)
+  }, [autoPlay])
 
   // requestAnimationFrame loop
   useEffect(() => {
-    if (!isPlaying) {
+    if (!playing) {
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current)
       }
@@ -94,9 +94,22 @@ export const SimStage: React.FC<SimStageProps> = ({
         cancelAnimationFrame(animFrameRef.current)
       }
     }
-  }, [isPlaying, speed])
+  }, [playing, speed])
 
-  // Evaluate current frame
+  // Evaluate current frame.
+  //
+  // This deliberately mutates historyMapRef/lastTimeRef inside useMemo, and
+  // reads historyMapRef.current during render below — both flagged by
+  // react-hooks/refs, which assumes render purity. The trade-off is
+  // intentional: trail history is per-animation-frame, append-only state
+  // driven by a requestAnimationFrame loop already running outside React
+  // (see the effect above), not by props/state a re-render could recompute
+  // from scratch. Moving it to real React state would double the re-renders
+  // per frame (once for `time`, once for the history update) and introduce
+  // a one-frame lag in every rendered trail across every physics/motion
+  // template — a real behavior change to sign off on, not a lint fix, for a
+  // pattern ported working as-is from pdf-simulation-master.
+  /* eslint-disable react-hooks/refs */
   const resolvedStage: ResolvedStage = useMemo(() => {
     const resolved = evalSpec(compiledStage, time)
 
@@ -195,17 +208,31 @@ export const SimStage: React.FC<SimStageProps> = ({
             />
           )
         })}
+        {/* eslint-enable react-hooks/refs */}
       </svg>
 
       {showControls && (
-        <button
-          type="button"
-          className="sim-stage__reset"
-          onClick={resetSimulation}
-          title="Reset simulation"
-        >
-          ↺
-        </button>
+        <div className="sim-stage__controls">
+          <button
+            type="button"
+            className="sim-stage__reset"
+            onClick={() => setPlaying((p) => !p)}
+            title={playing ? 'Pause animation' : 'Play animation'}
+            aria-label={playing ? 'Pause animation' : 'Play animation'}
+            aria-pressed={!playing}
+          >
+            {playing ? '❚❚' : '▶'}
+          </button>
+          <button
+            type="button"
+            className="sim-stage__reset"
+            onClick={resetSimulation}
+            title="Reset simulation"
+            aria-label="Reset simulation"
+          >
+            ↺
+          </button>
+        </div>
       )}
     </div>
   )

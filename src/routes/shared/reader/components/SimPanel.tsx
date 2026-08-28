@@ -54,7 +54,26 @@ const RESULT_META: Record<string, { label: string; unit?: string }> = {
   state: { label: 'state' },
   phase: { label: 'phase' },
   duration: { label: 't', unit: 's' },
-  E: { label: 'E', unit: 'eV' },
+  lcm: { label: 'First common multiple' },
+  gcd: { label: 'Common factor' },
+  hcf: { label: 'Largest square tile' },
+  mean: { label: 'Typical value' },
+  kg: { label: 'Mass', unit: 'kg' },
+  eachSack: { label: 'Each sack', unit: 'kg' },
+  angleSum: { label: 'Angle sum', unit: '°' },
+  product: { label: 'Product' },
+  sameValue: { label: 'Same value' },
+  area: { label: 'Area' },
+  perimeter: { label: 'Perimeter' },
+  quotient: { label: 'Each group' },
+  remainder: { label: 'Left over' },
+  totalGrams: { label: 'Total', unit: 'g' },
+  totalMl: { label: 'Total', unit: 'ml' },
+  percentFresh: { label: 'Fresh water', unit: '%' },
+  tessellates: { label: 'No gaps' },
+  looksSame: { label: 'Looks the same' },
+  indiaInDay: { label: 'India in day' },
+  cycleSeconds: { label: 'Cycle', unit: 's' },
 }
 
 function formatMetricKey(key: string): string {
@@ -78,6 +97,15 @@ function formatMetricValue(value: number | string | boolean): string {
     return Math.abs(value) >= 100 ? value.toFixed(1) : value.toFixed(2)
   }
   return String(value)
+}
+
+function nudgeParam(def: ParamDef, current: number, dir: -1 | 1): number {
+  const step = def.step > 0 ? def.step : 1
+  const raw = current + dir * step
+  const snapped = def.min + Math.round((raw - def.min) / step) * step
+  const digits = step < 1 ? Math.min(6, String(step).split('.')[1]?.length ?? 2) : 0
+  const rounded = Number(snapped.toFixed(digits))
+  return Math.min(def.max, Math.max(def.min, rounded))
 }
 
 function metricLabel(key: string, paramDefs: ParamDef[]): { label: string; unit?: string } {
@@ -328,7 +356,7 @@ export const SimPanel: React.FC<SimPanelProps> = ({
           <div className="sim-panel__stage-wrap">
             <div className="sim-panel__stage">
               <SimStage
-                key={`${spec.templateId || spec.title}:${JSON.stringify(sliderParams)}`}
+                key={spec.templateId || spec.title}
                 stage={stage}
                 autoPlay={true}
                 initialSpeed={1}
@@ -392,15 +420,39 @@ export const SimPanel: React.FC<SimPanelProps> = ({
               )
             }
 
+            const atMin = raw <= def.min
+            const atMax = raw >= def.max
             return (
-              <label key={def.key} className="sim-param">
+              <div key={def.key} className="sim-param">
                 <span className="sim-param__row">
                   <span className="sim-param__label">
                     {def.label}
                     {def.unit ? <span className="sim-param__unit">{def.unit}</span> : null}
                   </span>
-                  <span className="sim-param__value">
-                    {raw.toFixed(def.step < 1 ? 2 : 0)}
+                  <span className="sim-param__stepper">
+                    <button
+                      type="button"
+                      className="sim-step-btn"
+                      onClick={() => setValue(nudgeParam(def, raw, -1))}
+                      disabled={atMin}
+                      title={`Decrease ${def.label}`}
+                      aria-label={`Decrease ${def.label}`}
+                    >
+                      −
+                    </button>
+                    <span className="sim-param__value">
+                      {raw.toFixed(def.step < 1 ? Math.min(3, String(def.step).split('.')[1]?.length ?? 2) : 0)}
+                    </span>
+                    <button
+                      type="button"
+                      className="sim-step-btn"
+                      onClick={() => setValue(nudgeParam(def, raw, 1))}
+                      disabled={atMax}
+                      title={`Increase ${def.label}`}
+                      aria-label={`Increase ${def.label}`}
+                    >
+                      +
+                    </button>
                   </span>
                 </span>
                 <input
@@ -411,7 +463,7 @@ export const SimPanel: React.FC<SimPanelProps> = ({
                   value={raw}
                   onChange={(e) => setValue(Number(e.target.value))}
                 />
-              </label>
+              </div>
             )
           })}
         </div>

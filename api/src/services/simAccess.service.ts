@@ -161,13 +161,25 @@ export async function getAnnotations(jobId: string, student: StudentIdentity, pa
   const { data, error } = await query.order('page_number');
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to load annotations', error.message);
 
-  return (data ?? []).map((row) => ({
-    id: row.id as string,
-    pageNumber: row.page_number as number,
-    quote: row.quote as string,
-    spec: row.spec as SimSpec,
-    specVersion: row.spec_version as string,
-  }));
+  // Bulk classification (simClassify.service.ts) is instructed to say
+  // isSimulatable:false rather than invent a stage when nothing in the
+  // template catalog fits a page — but it still writes a row so the page
+  // isn't reclassified every run. That row has neither templateId nor a
+  // stage, so it's not launchable; showing it as a "Launch" card was a
+  // guaranteed dead end (UI feedback Aug 27 2026). Filtered out here so
+  // every caller (book counts, per-page badge, the drawer list) agrees.
+  return (data ?? [])
+    .filter((row) => {
+      const spec = row.spec as SimSpec & { stage?: unknown };
+      return Boolean(spec.templateId) || Boolean(spec.stage);
+    })
+    .map((row) => ({
+      id: row.id as string,
+      pageNumber: row.page_number as number,
+      quote: row.quote as string,
+      spec: row.spec as SimSpec,
+      specVersion: row.spec_version as string,
+    }));
 }
 
 /** One annotation, scoped to a readable book — the /explain endpoint's

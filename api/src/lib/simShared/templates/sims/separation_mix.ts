@@ -1,7 +1,10 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { choice, num, type SimFile } from '../contract.js'
 import { VIEW, circle, label, line, n, particles, pathEl, rect, tLoop } from '../stage.js'
+
+const schema = z.object({
+  method: num(0, 2, 0),
+})
 
 export const separation_mix: SimFile = {
   id: 'separation_mix',
@@ -19,10 +22,9 @@ export const separation_mix: SimFile = {
       { value: 2, label: 'Magnetic' },
     ], 0),
   ],
-  schema: z.object({
-    method: num(0, 2, 0),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const method = Math.round(Math.max(0, Math.min(2, params.method)))
     const names = ['sedimentation', 'filtration', 'magnetic separation'] as const
     const ink = '#334155'
@@ -30,7 +32,8 @@ export const separation_mix: SimFile = {
     const water = '#7dd3fc'
     const t = tLoop(3.6, 3.2)
     const frac = `(${t}) / 3.2`
-    const elements = [label('m', 24, 22, names[method], ink)]
+    // method is clamped to 0-2 just above, always in bounds for names' 3 entries.
+    const elements = [label('m', 24, 22, names[method]!, ink)]
 
     if (method === 0) {
       const x = 170
@@ -174,7 +177,7 @@ export const separation_mix: SimFile = {
 
     return {
       stage: { viewBox: VIEW, elements },
-      metrics: { method, name: names[method] },
+      metrics: { method, name: names[method]! },
       warnings: [],
     }
   },

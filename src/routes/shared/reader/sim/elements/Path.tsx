@@ -15,6 +15,7 @@ export const Path: React.FC<{ element: ResolvedElement }> = ({ element }) => {
       strokeLinecap={props.strokeLinecap ?? 'round'}
       strokeLinejoin={props.strokeLinejoin ?? 'round'}
       opacity={props.opacity ?? 1}
+      transform={props.transform ?? undefined}
     />
   )
 }

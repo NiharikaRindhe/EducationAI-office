@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, label, rect } from '../stage.js'
@@ -19,6 +18,10 @@ function phKind(pH: number): 'acid' | 'base' | 'neutral' {
   return 'neutral'
 }
 
+const schema = z.object({
+  pH: num(0, 14, 7),
+})
+
 export const ph_strip: SimFile = {
   id: 'ph_strip',
   domain: 'chemistry',
@@ -29,10 +32,9 @@ export const ph_strip: SimFile = {
   equations: ['\\text{acid } pH < 7,\\; \\text{neutral } pH = 7,\\; \\text{base } pH > 7'],
   keywords: ['ph scale', 'ph value', 'ph strip', 'universal indicator', 'acids bases salts', 'litmus'],
   params: [param('pH', 'pH', '', 0, 14, 0.5, 7)],
-  schema: z.object({
-    pH: num(0, 14, 7),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const pH = params.pH
     const kind = phKind(pH)
     const bands = [

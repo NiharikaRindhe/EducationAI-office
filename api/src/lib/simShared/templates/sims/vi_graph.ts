@@ -1,8 +1,12 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { ohmCurrent } from '../physics.js'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, circle, label, line, n, tLoop } from '../stage.js'
+
+const schema = z.object({
+  R: num(0.1, 200, 4),
+  Vmax: num(0.5, 100, 12),
+})
 
 export const vi_graph: SimFile = {
   id: 'vi_graph',
@@ -17,11 +21,9 @@ export const vi_graph: SimFile = {
     param('R', 'Resistance R', 'Ω', 1, 50, 0.5, 4),
     param('Vmax', 'Max voltage', 'V', 1, 24, 0.5, 12),
   ],
-  schema: z.object({
-    R: num(0.1, 200, 4),
-    Vmax: num(0.5, 100, 12),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const { R, Vmax } = params
     const Imax = ohmCurrent(Vmax, R)
     const slope = 1 / Math.max(R, 1e-9)

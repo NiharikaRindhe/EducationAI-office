@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, label, pathEl } from '../stage.js'
@@ -11,6 +10,11 @@ function fmt(x: number): string {
   const r = Math.round(x * 1000) / 1000
   return Number.isInteger(r) ? String(r) : r.toFixed(2)
 }
+
+const schema = z.object({
+  a: num(0.5, 40, 3),
+  b: num(0.5, 40, 4),
+})
 
 export const pythagoras: SimFile = {
   id: 'pythagoras',
@@ -25,11 +29,9 @@ export const pythagoras: SimFile = {
     param('a', 'Leg a', '', 1, 12, 0.5, 3),
     param('b', 'Leg b', '', 1, 12, 0.5, 4),
   ],
-  schema: z.object({
-    a: num(0.5, 40, 3),
-    b: num(0.5, 40, 4),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const { a, b } = params
     const c = Math.hypot(a, b)
     const a2 = a * a

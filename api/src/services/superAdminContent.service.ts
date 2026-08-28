@@ -290,6 +290,45 @@ export async function listIngestionJobs(
   return data ?? [];
 }
 
+const SIGNED_URL_TTL_SECONDS = 15 * 60;
+
+/** Super Admin QA — same short-lived Storage URL students get, without the
+ *  class/school gate. The PDF never streams through this process. */
+export async function getSuperAdminSignedPdfUrl(
+  jobId: string,
+  actorId: string,
+): Promise<{ url: string; expiresAt: string }> {
+  const { data: job, error } = await supabaseAdmin
+    .from('ncert_ingestion_jobs')
+    .select('id, storage_path, school_id')
+    .eq('id', jobId)
+    .maybeSingle();
+  if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to load book', error.message);
+  if (!job) throw new ApiError('NOT_FOUND', 'Book not found');
+  if (!job.storage_path) throw new ApiError('NOT_FOUND', 'This book has no stored PDF');
+
+  const { data, error: urlError } = await supabaseAdmin.storage
+    .from(NCERT_BUCKET)
+    .createSignedUrl(job.storage_path as string, SIGNED_URL_TTL_SECONDS);
+  if (urlError || !data) {
+    throw new ApiError('INTERNAL_ERROR', 'Failed to create a download link', urlError?.message);
+  }
+
+  await writeAuditLog({
+    schoolId: (job.school_id as string | null) ?? null,
+    actorId,
+    action: 'sim.pdf_url_issued',
+    entity: 'ncert_ingestion_job',
+    entityId: jobId,
+    metadata: { source: 'super_admin_sim_qa' },
+  });
+
+  return {
+    url: data.signedUrl,
+    expiresAt: new Date(Date.now() + SIGNED_URL_TTL_SECONDS * 1000).toISOString(),
+  };
+}
+
 /** School Admin's own-upload quota, per (class, subject) — keeps their
  *  supplementary library small and curated; more than a couple of competing
  *  books for one subject muddies retrieval instead of improving it. A failed
@@ -634,7 +673,15 @@ export async function runIngestionPipeline(jobId: string) {
     // Science: the sim template catalog only covers STEM. Never blocks RAG
     // readiness above — this is a separate queue (sim_status), picked up by
     // the sim worker on its own schedule.
-    if (!job.school_id && job.class_num >= 5 && job.class_num <= 10 && ['Mathematics', 'Science'].includes(job.subject)) {
+    //
+    // Re-enabled (Aug 26 2026) alongside the sim worker itself, after being
+    // off since Aug 25/briefly Aug 26 per user request — see worker.ts.
+    if (
+      !job.school_id &&
+      job.class_num >= 5 &&
+      job.class_num <= 10 &&
+      ['Mathematics', 'Science', 'EVS', 'World Around Us'].includes(job.subject)
+    ) {
       const { error: queueError } = await supabaseAdmin
         .from('ncert_ingestion_jobs')
         .update({ sim_status: 'queued' })

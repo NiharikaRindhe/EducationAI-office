@@ -1,15 +1,19 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar, NavItem } from '../../components/shared/Sidebar';
 import { TopBar } from '../../components/shared/TopBar';
 
 export const SuperAdminLayout: React.FC = () => {
+  const location = useLocation();
+  const isSimQa = location.pathname.includes('/sim-qa');
+
   // Cross-school student browsing stays off the nav. Support lookup (#2) is
   // the replacement: one school + a search term, audited, no XP dump.
   const navItems: NavItem[] = [
     { href: '/super-admin/overview', label: 'Overview', iconName: 'dashboard' },
     { href: '/super-admin/schools', label: 'Schools', iconName: 'apartment' },
     { href: '/super-admin/content', label: 'Content Portal', iconName: 'upload_file' },
+    { href: '/super-admin/sim-qa', label: 'Test simulations', iconName: 'science' },
     { href: '/super-admin/ai-console', label: 'AI Console', iconName: 'smart_toy' },
     { href: '/super-admin/tickets', label: 'Support Tickets', iconName: 'confirmation_number' },
     { href: '/super-admin/support', label: 'Support Lookup', iconName: 'search' },
@@ -17,11 +21,17 @@ export const SuperAdminLayout: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen flex bg-slate-50/50">
+    <div className={`flex bg-slate-50/50 ${isSimQa ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
       <Sidebar navItems={navItems} batchColor="superAdmin" logoText="EduAI" />
       <div className="flex-1 flex flex-col min-w-0">
         <TopBar greeting="Welcome," subtitle="Manage every school on the EduAI platform." batchColor="superAdmin" profileHref="/super-admin/profile" />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-7xl w-full mx-auto">
+        <main
+          className={
+            isSimQa
+              ? 'reader-embed relative flex-1 min-h-0 w-full overflow-hidden'
+              : 'flex-1 p-8 overflow-y-auto max-w-7xl w-full mx-auto'
+          }
+        >
           <Outlet />
         </main>
       </div>

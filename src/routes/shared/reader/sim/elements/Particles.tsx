@@ -4,7 +4,7 @@ import type { ResolvedElement } from '../evalSpec.js'
 
 // Deterministic pseudo-random sequence for stable particle offsets
 function seededRandom(seed: number): number {
-  const x = Math.sin(seed++) * 10000
+  const x = Math.sin(seed) * 10000
   return x - Math.floor(x)
 }
 

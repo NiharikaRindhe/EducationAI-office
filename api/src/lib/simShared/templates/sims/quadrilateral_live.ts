@@ -1,4 +1,3 @@
-// @ts-nocheck -- vendored from pdf-simulation-master/shared, kept diffable against upstream; compiled without noUncheckedIndexedAccess there. Runtime-correct: every access here is guarded by a zod .default()/.catch() upstream of this code, TS just cannot see that.
 import { z } from 'zod'
 import { num, param, type SimFile } from '../contract.js'
 import { VIEW, label, line, pathEl } from '../stage.js'
@@ -14,7 +13,7 @@ function dist(p: Pt, q: Pt): number {
 }
 
 function arcD(ox: number, oy: number, startDeg: number, endDeg: number, radius: number): string {
-  let a0 = (startDeg * Math.PI) / 180
+  const a0 = (startDeg * Math.PI) / 180
   let span = endDeg - startDeg
   while (span < 0) span += 360
   while (span >= 360) span -= 360
@@ -74,6 +73,12 @@ function convexQuad(A: number, B: number, C: number): { A: Pt; B: Pt; C: Pt; D: 
   return null
 }
 
+const schema = z.object({
+  A: num(10, 200, 80),
+  B: num(10, 200, 100),
+  C: num(10, 200, 90),
+})
+
 export const quadrilateral_live: SimFile = {
   id: 'quadrilateral_live',
   domain: 'math',
@@ -88,12 +93,9 @@ export const quadrilateral_live: SimFile = {
     param('B', 'Angle B', 'deg', 40, 160, 1, 100),
     param('C', 'Angle C', 'deg', 40, 160, 1, 90),
   ],
-  schema: z.object({
-    A: num(10, 200, 80),
-    B: num(10, 200, 100),
-    C: num(10, 200, 90),
-  }),
-  run(params) {
+  schema,
+  run(rawParams: Record<string, number>) {
+    const params = schema.parse(rawParams)
     const A = params.A
     const B = params.B
     const C = params.C

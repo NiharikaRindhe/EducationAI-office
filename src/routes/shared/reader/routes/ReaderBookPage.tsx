@@ -8,10 +8,12 @@
 
 import React, { useEffect, useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
+import { useApp } from '../../../../context/AppContext.js'
 import { simApiClient } from '../api.js'
 import { ReaderRoute } from './ReaderRoute.js'
 
 export const ReaderBookPage: React.FC = () => {
+  const { batchId } = useApp()
   const { bookId } = useParams<{ bookId: string }>()
   const location = useLocation()
   const stateTitle = (location.state as { title?: string } | null)?.title
@@ -68,7 +70,7 @@ export const ReaderBookPage: React.FC = () => {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-7 h-7 rounded-full border-2 border-indigo-500/40 border-t-indigo-500 animate-spin" />
+          <div className={`w-7 h-7 rounded-full border-2 animate-spin ${batchId === 3 ? 'border-sky-500/40 border-t-sky-500' : 'border-indigo-500/40 border-t-indigo-500'}`} />
           <p className="text-xs font-semibold text-slate-400">Opening book…</p>
         </div>
       </div>

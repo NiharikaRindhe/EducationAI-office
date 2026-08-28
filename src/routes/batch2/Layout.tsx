@@ -91,7 +91,7 @@ export const Batch2Layout: React.FC = () => {
 
         {/* Dynamic page container */}
         {isReader ? (
-          <main className="reader-embed relative flex-1 min-h-0 w-full overflow-hidden font-sans text-slate-800">
+          <main className="reader-embed relative flex-1 min-h-0 w-full overflow-hidden font-sans text-slate-800" data-batch="2">
             <Link
               to="/batch2/home"
               className="absolute left-4 top-4 z-[100] inline-flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/90 px-3 py-2 text-xs font-bold text-white backdrop-blur"

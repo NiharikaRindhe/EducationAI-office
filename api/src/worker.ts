@@ -37,7 +37,8 @@ import { startExamSweeper, stopExamSweeper } from './jobs/examSweeper.job.js';
 startStreakResetJob();
 startLeaderboardRecomputeJob();
 startIngestionWorker();
-// Re-enabled (Aug 26 2026) — see Layout.tsx's PDF_SIMULATOR_ENABLED comment.
+// PDF Simulator re-enabled per user request (Aug 26 2026) — was disabled
+// Aug 25 2026 (see git history); App.tsx/Layout.tsx flags flipped back too.
 startSimWorker();
 startExamSweeper();
 

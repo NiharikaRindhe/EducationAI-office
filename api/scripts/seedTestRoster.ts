@@ -1,6 +1,7 @@
 /**
- * Creates a fixed-credential local test roster: one teacher and three
- * students (class 3 / 6 / 10, one per batch) under an existing school.
+ * Creates a fixed-credential local test roster: one teacher and one student
+ * per class 1-10 under an existing school (classes 1-4 log in by PIN,
+ * matching the CLASS 1-4 (PIN) login tab; classes 5-10 by email/password).
  * Companion to seedSuperAdmin.ts / seedSchoolAdmin.ts — together the four
  * scripts give you all the role logins needed to test every portal without
  * random per-run passwords getting in the way.
@@ -28,7 +29,10 @@ function arg(name: string): string | undefined {
 const TEACHER = { email: 'teacher@demo.eduai.local', password: 'Teacher-Test-1', fullName: 'Test Teacher' };
 
 const STUDENTS = [
+  { classNum: 1, section: 'A', email: 'student1@demo.eduai.local', pin: '1111', fullName: 'Test Student 1A' },
+  { classNum: 2, section: 'A', email: 'student2@demo.eduai.local', pin: '2222', fullName: 'Test Student 2A' },
   { classNum: 3, section: 'A', email: 'student3@demo.eduai.local', pin: '3333', fullName: 'Test Student 3A' },
+  { classNum: 4, section: 'A', email: 'student4@demo.eduai.local', pin: '4444', fullName: 'Test Student 4A' },
   {
     classNum: 5,
     section: 'A',
@@ -73,7 +77,7 @@ const STUDENTS = [
   },
 ] as const;
 
-const TEACHING_SUBJECT = 'Mathematics'; // whitelisted for classes 3, 6 and 10 alike
+const TEACHING_SUBJECT = 'Mathematics'; // whitelisted for every class 1-10 alike
 
 async function main() {
   const schoolCode = arg('school-code') ?? 'DEMO-2024';

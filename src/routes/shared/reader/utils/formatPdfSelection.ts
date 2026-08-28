@@ -22,7 +22,7 @@ const TEXT_LAYER_SELECTOR = '.react-pdf__Page__textContent, .textLayer'
 function needsSpace(prev: string, next: string): boolean {
   if (!prev || !next) return false
   if (/\s$/.test(prev) || /^\s/.test(next)) return false
-  if (/[(\[{“"']$/.test(prev) || /^[.,;:!?%°)\]}”"']/.test(next)) return false
+  if (/[([{“"']$/.test(prev) || /^[.,;:!?%°)\]}”"']/.test(next)) return false
   if (/[-–—/]$/.test(prev) || /^[-–—/]/.test(next)) return false
   return true
 }

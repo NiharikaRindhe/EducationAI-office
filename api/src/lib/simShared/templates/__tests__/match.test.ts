@@ -135,4 +135,179 @@ describe('matchTemplateFromText — NCERT-like quotes', () => {
     expect(m?.params.R2).toBe(3)
     expect(Object.values(m?.params ?? {})).not.toContain(8.4)
   })
+
+  it('Class 5 equivalent fractions use the fraction kit, not the generic bar', () => {
+    const m = matchTemplateFromText(
+      'These are called equivalent fractions. 1/2 is equivalent to 2/4 when the same whole is shaded.'
+    )
+    expect(m?.templateId).toBe('fraction_kit')
+    expect(m?.params.numerator).toBe(1)
+    expect(m?.params.denominator).toBe(2)
+  })
+
+  it('Class 5 rabbit and frog jumps land on common multiples', () => {
+    const m = matchTemplateFromText(
+      'A rabbit takes a jump of 4 each time. A frog takes a jump of 3 each time. Use the number line to find the common multiples of 3 and 4.'
+    )
+    expect(m?.templateId).toBe('animal_jumps')
+    expect(m?.params.jumpA).toBe(4)
+    expect(m?.params.jumpB).toBe(3)
+  })
+
+  it('Class 5 water cycle beats generic states of matter', () => {
+    const m = matchTemplateFromText(
+      'Follow the water cycle: evaporation, condensation, and rain return water to the river.'
+    )
+    expect(m?.templateId).toBe('water_cycle')
+  })
+
+  it('Class 5 pictograph uses one picture for every 5 items', () => {
+    const m = matchTemplateFromText(
+      'Dipesh used a pictograph. One picture stands for every 5 toys. Data through pictures helps record a large number of things.'
+    )
+    expect(m?.templateId).toBe('picture_data')
+    expect(m?.params.scale).toBe(5)
+  })
+
+  it('Class 7 lakh is not the Class 5 ten-thousand chart', () => {
+    const m = matchTemplateFromText('One lakh is 1,00,000. Large numbers around us use Indian place value.')
+    expect(m?.templateId).toBe('lakh_crore_chart')
+    expect(m?.params.lakhs).toBe(1)
+  })
+
+  it('Class 7 12 ft × 16 ft room uses square tiles, not animal jumps', () => {
+    const m = matchTemplateFromText(
+      'A 12 ft × 16 ft room is tiled with the largest square tile. Finding common ground: HCF.'
+    )
+    expect(m?.templateId).toBe('hcf_tiles')
+    expect(m?.params.width).toBe(12)
+    expect(m?.params.length).toBe(16)
+  })
+
+  it('Class 7 100 m sprint is not a pendulum', () => {
+    const m = matchTemplateFromText(
+      'A 100 m race is timed with a stopwatch. Speed = distance ÷ time. Measurement of time and motion.'
+    )
+    expect(m?.templateId).toBe('sprint_speed')
+    expect(m?.params.distance).toBe(100)
+  })
+
+  it('Class 8 lockers are square numbers, not a square grid', () => {
+    const m = matchTemplateFromText(
+      '100 lockers. A locker stays open only if it has an odd number of factors. A square and a cube.'
+    )
+    expect(m?.templateId).toBe('locker_squares')
+  })
+
+  it('Class 8 Baudhāyana doubling is not the old 3-4-5 Pythagoras drop-in', () => {
+    const m = matchTemplateFromText(
+      'Baudhāyana considers doubling a square. The diagonal of a square produces a square of double the area. Sulba-Sūtra.'
+    )
+    expect(m?.templateId).toBe('baudhayana_square')
+  })
+
+  it('Class 8 electromagnet is not Ohm or Joule heat', () => {
+    const m = matchTemplateFromText(
+      'An iron nail wrapped with wire picked up iron paper clips when the circuit closed. An electromagnet.'
+    )
+    expect(m?.templateId).toBe('electromagnet_nail')
+  })
+
+  it('Class 6 idli-vada is not rabbit and frog jumps', () => {
+    const m = matchTemplateFromText(
+      'Prime Time. Players say idli instead of multiples of 3 and vada instead of multiples of 5. The first idli-vada is 15.'
+    )
+    expect(m?.templateId).toBe('idli_vada')
+  })
+
+  it('Class 6 roti shares are not the Class 5 fraction kit', () => {
+    const m = matchTemplateFromText(
+      'One roti is divided equally between two children. Each child gets one half. Four children share 1/4 roti.'
+    )
+    expect(m?.templateId).toBe('roti_share')
+  })
+
+  it('Class 9 gold foil is not Bohr energy levels', () => {
+    const m = matchTemplateFromText(
+      'Journey inside the atom. The gold foil experiment. Rutherford. Most particles go through.'
+    )
+    expect(m?.templateId).toBe('gold_foil')
+  })
+
+  it('Class 9 wheat bag work is not the old W=Fs lab', () => {
+    const m = matchTemplateFromText(
+      'A wheat bag of 5 kg is lifted 1 m. Work, energy and simple machines. W = mgh.'
+    )
+    expect(m?.templateId).toBe('lift_work')
+  })
+
+  it('Class 9 relay stagger is not a circle sector', () => {
+    const m = matchTemplateFromText(
+      'Athletes at the start of a 4 × 100 m relay. The stagger on a 400 m track. C/D ratio.'
+    )
+    expect(m?.templateId).toBe('track_stagger')
+  })
+
+  it('Class 10 two dice theoretical is fair_chance, not maybe_chance', () => {
+    const m = matchTemplateFromText(
+      'Probability — a theoretical approach. Two dice. Fig. 14.3. Outcomes (2,6) (3,5) (4,4) (5,3) (6,2).'
+    )
+    expect(m?.templateId).toBe('fair_chance')
+  })
+
+  it('Class 10 24 cm 7 cm right triangle is not the unit circle', () => {
+    const m = matchTemplateFromText(
+      'Introduction to trigonometry. In triangle ABC right-angled at B, AB = 24 cm, BC = 7 cm. Trigonometric ratios.'
+    )
+    expect(m?.templateId).toBe('right_trig')
+  })
+
+  it('Class 10 four 1.5 V cells is ohm_line, not ohm_circuit', () => {
+    const m = matchTemplateFromText(
+      'Electricity. Activity 11.1. Four cells of 1.5 V each. Nichrome wire. Plot V–I.'
+    )
+    expect(m?.templateId).toBe('ohm_line')
+  })
+
+  it('Class 6 two rays with a common starting point is rotate_arms', () => {
+    const m = matchTemplateFromText(
+      'An angle is formed by two rays having a common starting point. Making rotating arms using two paper straws.'
+    )
+    expect(m?.templateId).toBe('rotate_arms')
+  })
+
+  it('Class 6 flower beds 120 sq m is not perimeter tape', () => {
+    const m = matchTemplateFromText(
+      'Area of the whole land = 12 m × 10 m = 120 sq m. Four square flower beds of side 4 m.'
+    )
+    expect(m?.templateId).toBe('flower_beds')
+  })
+
+  it('Class 6 oscillatory swing is kind_of_move, not a stopwatch sprint', () => {
+    const m = matchTemplateFromText(
+      'Types of motion. Oscillatory motion. A swing moving to and fro. Merry-go-round is circular motion.'
+    )
+    expect(m?.templateId).toBe('kind_of_move')
+  })
+
+  it('Class 8 magnifying glass is two_lenses, not a spoon or the lens formula', () => {
+    const m = matchTemplateFromText(
+      'A convex lens is thicker at the middle. A magnifying glass. Converging lens. No 1/v − 1/u.'
+    )
+    expect(m?.templateId).toBe('two_lenses')
+  })
+
+  it('Class 8 sea breeze is wind_spin, not picnic straps', () => {
+    const m = matchTemplateFromText(
+      'How do winds form? Land gets heated faster. Sea breeze. Cyclones form over warm ocean waters.'
+    )
+    expect(m?.templateId).toBe('wind_spin')
+  })
+
+  it('Class 5 Vasanta six seasons is india_seasons, not day and night', () => {
+    const m = matchTemplateFromText(
+      'Rhythms of nature. Saba and Aparna keep a seasons journal. India hosts six seasons. Vasanta is spring.'
+    )
+    expect(m?.templateId).toBe('india_seasons')
+  })
 })

@@ -27,8 +27,8 @@ export const Batch3Layout: React.FC = () => {
   const location = useLocation();
   const { batchId, currentClass, studentAvatar, studentName } = useApp();
   const { hasFeature } = useAuth();
-  const [navCollapsed, setNavCollapsed] = useState(true);
-  const [focusModePath, setFocusModePath] = useState<string | null>(null);
+  const [navCollapsed, setNavCollapsed] = useState(false);
+  const [labFocusMode, setLabFocusMode] = useState(false);
 
   useEffect(() => {
     if (currentClass < 9 || currentClass > 10) {
@@ -41,14 +41,23 @@ export const Batch3Layout: React.FC = () => {
   // This is presentation only; each route's API is gated independently.
   const navItems: NavItem[] = ([
     { href: '/batch3/home', label: 'Home', iconName: 'home' },
+    { href: '/batch3/subjects', label: 'Subjects', iconName: 'library_books' },
+    { href: '/batch3/concept-map', label: 'Concept Map', iconName: 'schema' },
     { href: '/batch3/labs', label: 'Science Labs', iconName: 'science', feature: 'virtual_labs' },
     ...(PDF_SIMULATOR_ENABLED
       ? [{ href: '/batch3/reader', label: 'PDF Simulator', iconName: 'auto_stories', feature: 'pdf_simulator' as const }]
       : []),
+    { href: '/batch3/board-prep', label: 'Board Prep', iconName: 'event_upcoming' },
     { href: '/batch3/chat', label: 'AI Doubt Tutor', iconName: 'chat', feature: 'ai_tutor' },
+    { href: '/batch3/daily-challenges', label: 'Daily Challenges', iconName: 'electric_bolt' },
     { href: '/batch3/exams', label: 'Exams & Mocks', iconName: 'edit_document' },
+    { href: '/batch3/tasks', label: 'My Tasks', iconName: 'assignment_turned_in' },
+    { href: '/batch3/notes', label: 'Study Notes', iconName: 'sticky_note_2' },
     { href: '/batch3/pyq', label: 'Board PYQ Hub', iconName: 'bookmark', feature: 'pyq_hub' },
-    { href: '/batch3/profile', label: 'Profile & Streak', iconName: 'person' }
+    { href: '/batch3/pomodoro', label: 'Pomodoro Timer', iconName: 'timer' },
+    { href: '/batch3/streak', label: 'Streak', iconName: 'local_fire_department' },
+    { href: '/batch3/profile', label: 'Profile', iconName: 'person' },
+    { href: '/batch3/help', label: 'Report an Issue', iconName: 'confirmation_number' }
   ] as (NavItem & { feature?: FeatureKey })[])
     .filter((item) => !item.feature || hasFeature(item.feature));
 
@@ -61,10 +70,18 @@ export const Batch3Layout: React.FC = () => {
     if (path.includes('/labs/chemistry')) return { title: 'Chemistry Lab', sub: 'Balance reactions, craft compounds, and run the free lab.' };
     if (path.includes('/labs/biology')) return { title: 'Biology Lab', sub: 'NCERT diagram hub, cell sandbox, and spatial recall quizzes.' };
     if (path.includes('/reader')) return { title: 'PDF Simulator', sub: 'Interactive simulations from your textbooks.' };
+    if (path.includes('/subjects')) return { title: 'Subjects & Units', sub: 'NCERT CBSE syllabus checklist with Board tags.' };
+    if (path.includes('/concept-map')) return { title: 'Interactive Concept Maps', sub: 'Visualize logical connections between chapter topics.' };
+    if (path.includes('/board-prep')) return { title: 'CBSE Board Prep Zone', sub: 'Syllabus weightage trends, past papers, and answer tips.' };
     if (path.includes('/chat')) return { title: 'AI Doubt Solver', sub: 'Step-by-step problem solver with LaTeX support.' };
+    if (path.includes('/daily-challenges')) return { title: 'CBSE Daily Challenges', sub: 'Practice HOTS, Case Study, and Assertion & Reason questions.' };
     if (path.includes('/exams')) return { title: 'Practice Exams', sub: 'CBSE Board exam pattern mock tests.' };
+    if (path.includes('/tasks')) return { title: 'My Tasks', sub: 'Complete work your teacher has assigned to earn XP.' };
+    if (path.includes('/notes')) return { title: 'Board Study Notes', sub: 'Create notes and tag board topics.' };
     if (path.includes('/pyq')) return { title: 'Board PYQ Papers', sub: 'CBSE past year papers with examiner schemes.' };
-    if (path.includes('/profile')) return { title: 'Profile & Streak', sub: 'Edit your avatar and review your lab attendance streak.' };
+    if (path.includes('/pomodoro')) return { title: 'Pomodoro Focus Timer', sub: 'Utilize 25/5 or 50/10 focus intervals to track study times.' };
+    if (path.includes('/streak')) return { title: 'Streak tracker', sub: 'Streak calendar tied to board prep milestones.' };
+    if (path.includes('/profile')) return { title: 'Syllabus Profile', sub: 'View board readiness progress levels.' };
     return { title: 'Board prep dashboard', sub: 'Ready to prepare for Class 10 Board Exams?' };
   };
 
@@ -79,17 +96,21 @@ export const Batch3Layout: React.FC = () => {
   const isReaderRoute = PDF_SIMULATOR_ENABLED && location.pathname.startsWith('/batch3/reader');
   const isLab = location.pathname.includes('/labs/');
   const isImmersive = isLab || isReaderRoute;
-  // Focus mode belongs to the exact immersive route that enabled it. Route
-  // changes automatically restore the portal chrome without a state-reset
-  // effect or a one-frame flash of hidden navigation.
-  const isFocusMode = isImmersive && focusModePath === location.pathname;
+
+  // Must stay ABOVE the class guard below: this effect used to sit after an
+  // early `return null`, so a student whose class moved in or out of 9-10
+  // changed the hook count between renders, which React treats as an error.
+  useEffect(() => {
+    setNavCollapsed(isLabRoute || isReaderRoute);
+    if (!isLabRoute && !isReaderRoute) setLabFocusMode(false);
+  }, [isLabRoute, isReaderRoute]);
 
   if (currentClass < 9 || currentClass > 10) return null;
 
   return (
     <div className={`flex bg-slate-50/50 ${isImmersive ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
       {/* Sidebar Navigation */}
-      {!isFocusMode && (
+      {!labFocusMode && (
         <Sidebar
           navItems={navItems}
           batchColor="sky"
@@ -102,7 +123,7 @@ export const Batch3Layout: React.FC = () => {
       {/* Main content wrapper */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header TopBar */}
-        {!isFocusMode && (
+        {!labFocusMode && (
           <TopBar
             greeting="Study Workspace,"
             userName={studentName}
@@ -114,7 +135,7 @@ export const Batch3Layout: React.FC = () => {
               <div className="hidden items-center gap-2 lg:flex">
                 <button
                   type="button"
-                  onClick={() => setFocusModePath(location.pathname)}
+                  onClick={() => setLabFocusMode(true)}
                   className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800"
                 >
                   <Maximize2 size={14} /> Focus mode
@@ -126,16 +147,12 @@ export const Batch3Layout: React.FC = () => {
 
         {/* Dynamic page container */}
         {isImmersive ? (
-          <main className={`${isLab ? 'lab-embed' : 'reader-embed'} relative flex-1 min-h-0 w-full overflow-hidden font-sans text-slate-800`}>
-            {isFocusMode && (
-              // Same corner "Focus mode" enters from (top-right, via the
-              // TopBar's rightSlot above) — the TopBar is hidden while focus
-              // mode is on, so this floats in its place, but the control
-              // shouldn't jump corners just because its container changed (#139).
+          <main className={`${isLab ? 'lab-embed' : 'reader-embed'} relative flex-1 min-h-0 w-full overflow-hidden font-sans text-slate-800`} data-batch="3">
+            {labFocusMode && (
               <button
                 type="button"
-                onClick={() => setFocusModePath(null)}
-                className="absolute right-4 top-4 z-[100] inline-flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/90 px-3 py-2 text-xs font-bold text-white shadow-xl backdrop-blur transition hover:bg-slate-800"
+                onClick={() => setLabFocusMode(false)}
+                className="absolute left-4 top-4 z-[100] inline-flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/90 px-3 py-2 text-xs font-bold text-white shadow-xl backdrop-blur transition hover:bg-slate-800"
               >
                 <Minimize2 size={14} /> Exit focus mode
               </button>
@@ -145,7 +162,7 @@ export const Batch3Layout: React.FC = () => {
             </Suspense>
           </main>
         ) : (
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-7xl w-full mx-auto">
+          <main className="flex-1 p-8 overflow-y-auto max-w-7xl w-full mx-auto">
             <Outlet />
           </main>
         )}

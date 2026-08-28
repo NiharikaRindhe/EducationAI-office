@@ -435,7 +435,6 @@ function tryStats(q: PracticeQuestion): PracticeQuestion | null {
   const next = newList(kind);
   if (kind === 'mean' && !Number.isInteger(next.answer)) {
     const target = randInt(5, 12);
-    const n = 4;
     const values = [target - 2, target, target + 1, target + 1];
     next.values = values;
     next.answer = target;
