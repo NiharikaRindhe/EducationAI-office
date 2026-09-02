@@ -131,9 +131,18 @@ export const Batch1Layout: React.FC = () => {
                 </span>
               </div>
             ) : (
-              <IconButton to="/batch1/home" label="Go to Home">
-                <HomeIcon size={22} />
-              </IconButton>
+              <div className="flex items-center gap-2.5">
+                <IconButton to="/batch1/home" label="Go to Home">
+                  <HomeIcon size={22} />
+                </IconButton>
+                <span
+                  className="inline-flex items-center gap-1.5 px-3 py-2 font-display text-xs font-black text-white"
+                  style={{ borderRadius: 999, background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentDark})` }}
+                >
+                  <GraduationCap size={14} />
+                  Class {currentClass}
+                </span>
+              </div>
             )}
 
             <div className="flex-1" />

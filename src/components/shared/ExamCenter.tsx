@@ -6,11 +6,12 @@ import { api, ApiClientError } from '../../lib/api';
 // List of assigned exams → take the paper (timer, autosave, tab-switch
 // proctoring, resume after a crash) → submitted state with score.
 
-type Accent = 'amber' | 'indigo' | 'sky';
+type Accent = 'amber' | 'indigo' | 'teal' | 'sky';
 
 const ACCENT = {
   amber: { text: 'text-amber-600', bg: 'bg-amber-500 hover:bg-amber-600', ring: 'border-amber-300', soft: 'bg-amber-50', spinner: 'text-amber-400' },
   indigo: { text: 'text-indigo-600', bg: 'bg-indigo-600 hover:bg-indigo-700', ring: 'border-indigo-300', soft: 'bg-indigo-50', spinner: 'text-indigo-400' },
+  teal: { text: 'text-teal-700', bg: 'bg-teal-700 hover:bg-teal-800', ring: 'border-teal-300', soft: 'bg-teal-50', spinner: 'text-teal-500' },
   sky: { text: 'text-sky-600', bg: 'bg-sky-500 hover:bg-sky-600', ring: 'border-sky-300', soft: 'bg-sky-50', spinner: 'text-sky-400' },
 } as const;
 

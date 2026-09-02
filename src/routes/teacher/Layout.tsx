@@ -47,7 +47,7 @@ export const TeacherLayout: React.FC = () => {
   const header = getHeaderDetails();
 
   return (
-    <div className="min-h-screen flex bg-slate-50/50">
+    <div className="min-h-screen flex bg-[#f5f6f8]">
       {/* Sidebar Navigation */}
       <Sidebar
         navItems={navItems}
@@ -68,7 +68,7 @@ export const TeacherLayout: React.FC = () => {
         />
 
         {/* Dynamic page container */}
-        <main className="flex-1 w-full overflow-y-auto p-5 lg:p-6 xl:p-7">
+        <main className="mx-auto flex-1 w-full max-w-[1600px] overflow-y-auto p-4 sm:p-5 lg:p-7">
           <Outlet />
         </main>
       </div>

@@ -8,19 +8,20 @@ interface TopBarProps {
   greeting: string;
   userName?: string;
   subtitle: string;
-  batchColor: 'amber' | 'indigo' | 'sky' | 'slate' | 'emerald' | 'teacher' | 'schoolAdmin' | 'superAdmin' | 'labIncharge';
+  batchColor: 'amber' | 'indigo' | 'teal' | 'sky' | 'slate' | 'emerald' | 'teacher' | 'schoolAdmin' | 'superAdmin' | 'labIncharge';
   userAvatar?: string;
   profileHref?: string;
   rightSlot?: React.ReactNode;
   /** Sheet item #110 — teacher portal has no Profile / Settings page. */
   showProfileLink?: boolean;
+  showStreak?: boolean;
 }
 
 const NO_XP_STRIP_PORTALS = new Set(['teacher', 'emerald', 'schoolAdmin', 'superAdmin', 'labIncharge']);
-const STUDENT_PORTALS = new Set(['amber', 'indigo', 'sky']);
+const STUDENT_PORTALS = new Set(['amber', 'indigo', 'teal', 'sky']);
 
 const ROLE_LABELS: Record<TopBarProps['batchColor'], string> = {
-  amber: 'Student', indigo: 'Student', sky: 'Student', slate: 'Student', emerald: 'Student',
+  amber: 'Student', indigo: 'Student', teal: 'Student', sky: 'Student', slate: 'Student', emerald: 'Student',
   teacher: 'Teacher', schoolAdmin: 'School Admin', superAdmin: 'Super Admin', labIncharge: 'Lab In-charge',
 };
 
@@ -33,8 +34,9 @@ export const TopBar: React.FC<TopBarProps> = ({
   profileHref = '/profile',
   rightSlot,
   showProfileLink = true,
+  showStreak = true,
 }) => {
-  const { studentXP, studentStreak } = useApp();
+  const { currentClass, studentXP, studentStreak } = useApp();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -61,6 +63,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   const themeColors = {
     amber: 'text-amber-600',
     indigo: 'text-indigo-600',
+    teal: 'text-teal-700',
     sky: 'text-sky-500',
     slate: 'text-purple-600',
     emerald: 'text-emerald-600',
@@ -70,6 +73,13 @@ export const TopBar: React.FC<TopBarProps> = ({
     labIncharge: 'text-teal-600'
   };
 
+  const classBadgeColors: Partial<Record<TopBarProps['batchColor'], string>> = {
+    amber: 'border-amber-200 bg-amber-50 text-amber-800',
+    indigo: 'border-indigo-200 bg-indigo-50 text-indigo-800',
+    teal: 'border-teal-200 bg-teal-50 text-teal-800',
+    sky: 'border-sky-200 bg-sky-50 text-sky-800',
+  };
+
   return (
     <header className="min-h-20 border-b border-slate-100 bg-white/80 backdrop-blur-md px-4 py-3 sm:px-6 lg:px-8 flex items-center justify-between gap-3 sticky top-0 z-40">
       {/* Greetings */}
@@ -77,6 +87,11 @@ export const TopBar: React.FC<TopBarProps> = ({
         <h1 className="font-display font-bold text-base sm:text-xl text-slate-800 flex items-center gap-1.5 sm:gap-2 min-w-0">
           <span className={userName ? 'hidden sm:inline' : undefined}>{greeting}</span>
           {userName && <span className={`${themeColors[batchColor]} truncate`}>{userName}!</span>}
+          {STUDENT_PORTALS.has(batchColor) && currentClass > 0 && (
+            <span className={`ml-1 inline-flex shrink-0 items-center rounded-lg border px-2 py-1 font-sans text-[10px] font-extrabold uppercase tracking-wider sm:ml-2 sm:px-2.5 sm:text-[11px] ${classBadgeColors[batchColor] ?? 'border-slate-200 bg-slate-50 text-slate-700'}`}>
+              Class {currentClass}
+            </span>
+          )}
         </h1>
         <p className="hidden sm:block font-sans text-xs text-slate-400 font-medium truncate">{subtitle}</p>
       </div>
@@ -87,11 +102,11 @@ export const TopBar: React.FC<TopBarProps> = ({
         {!NO_XP_STRIP_PORTALS.has(batchColor) && !rightSlot && (
           <div className="hidden lg:flex items-center gap-4 bg-slate-50 border border-slate-100 p-1.5 px-3 rounded-xl select-none">
             {/* Streak */}
-            <div className="flex items-center gap-1.5">
+            {showStreak && <div className="flex items-center gap-1.5">
               <span className="material-symbols-outlined text-amber-500 font-fill text-lg animate-pulse">local_fire_department</span>
               <span className="font-display font-bold text-xs text-slate-700">{studentStreak} Days</span>
-            </div>
-            <div className="w-[1px] h-4 bg-slate-200"></div>
+            </div>}
+            {showStreak && <div className="w-[1px] h-4 bg-slate-200"></div>}
             {/* XP */}
             <div className="flex items-center gap-1.5">
               <span className="material-symbols-outlined text-indigo-500 font-fill text-lg">workspace_premium</span>

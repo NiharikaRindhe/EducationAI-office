@@ -30,7 +30,6 @@ import { Batch2Subjects } from './routes/batch2/Subjects';
 import { Batch2Chat } from './routes/batch2/Chat';
 import { Batch2Exams } from './routes/batch2/Exams';
 import { Batch2Tasks } from './routes/batch2/Tasks';
-import { Batch2Help } from './routes/batch2/Help';
 import { Batch2Activities } from './routes/batch2/Activities';
 import {
   Batch2Notes,
@@ -52,11 +51,6 @@ const ReaderBookPage = lazy(() => import('./routes/shared/reader/routes/ReaderBo
 // Import Batch 3 Pages
 import { Batch3Layout } from './routes/batch3/Layout';
 import { Batch3Home } from './routes/batch3/Home';
-import { Batch3BoardPrep } from './routes/batch3/BoardPrep';
-import { Batch3ConceptMap } from './routes/batch3/ConceptMap';
-import { Batch3Pomodoro } from './routes/batch3/Pomodoro';
-import { Batch3Tasks } from './routes/batch3/Tasks';
-import { Batch3Help } from './routes/batch3/Help';
 import { Batch3ScienceLabs } from './routes/batch3/ScienceLabs';
 /* Class 9-10 science labs — ported from EducationAI-Games-master. They render
    inside Batch3Layout so the dashboard sidebar/topbar stay in place; the
@@ -75,13 +69,9 @@ const PhysicsLab = lazy(() => import('./routes/batch3/labs/Physics/PhysicsLab'))
 const FrictionSimulator = lazy(() => import('./routes/batch3/labs/Physics/FrictionSimulator/FrictionSimulator'));
 const SoundWaveTank = lazy(() => import('./routes/batch3/labs/Physics/SoundWave/SoundWaveTank'));
 import {
-  Batch3Subjects,
   Batch3Chat,
-  Batch3DailyChallenges,
   Batch3Exams,
-  Batch3Notes,
   Batch3Pyq,
-  Batch3Streak,
   Batch3Profile
 } from './routes/batch3/MinorPages';
 
@@ -194,7 +184,6 @@ function App() {
               <Route path="streak" element={<Batch2Streak />} />
               <Route path="badges" element={<Batch2Badges />} />
               <Route path="profile" element={<Batch2Profile />} />
-              <Route path="help" element={<Batch2Help />} />
               {/* PDF Simulator — re-enabled per user request (Aug 26 2026). */}
               <Route path="reader" element={<ReaderLibrary />} />
               <Route path="reader/subject/:subject" element={<ReaderSubjectChapters />} />
@@ -212,19 +201,10 @@ function App() {
             >
               <Route index element={<Navigate to="/batch3/home" replace />} />
               <Route path="home" element={<Batch3Home />} />
-              <Route path="board-prep" element={<Batch3BoardPrep />} />
-              <Route path="concept-map" element={<Batch3ConceptMap />} />
-              <Route path="pomodoro" element={<Batch3Pomodoro />} />
-              <Route path="subjects" element={<Batch3Subjects />} />
               <Route path="chat" element={<Batch3Chat />} />
-              <Route path="daily-challenges" element={<Batch3DailyChallenges />} />
               <Route path="exams" element={<Batch3Exams />} />
-              <Route path="tasks" element={<Batch3Tasks />} />
-              <Route path="notes" element={<Batch3Notes />} />
               <Route path="pyq" element={<Batch3Pyq />} />
-              <Route path="streak" element={<Batch3Streak />} />
               <Route path="profile" element={<Batch3Profile />} />
-              <Route path="help" element={<Batch3Help />} />
               {/* PDF Simulator — re-enabled per user request (Aug 26 2026). */}
               <Route path="reader" element={<ReaderLibrary />} />
               <Route path="reader/subject/:subject" element={<ReaderSubjectChapters />} />

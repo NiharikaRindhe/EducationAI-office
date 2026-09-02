@@ -137,13 +137,15 @@ export const SchoolAdminPromotion: React.FC = () => {
       .then((res) => {
         setPreview(res);
         setSessionStartMonth(res.academicYearStartMonth);
-        // Default every unresolved move to keeping its own label, which means
-        // "create that section in the class above". It's the answer that
-        // preserves the school's existing grouping, and it's always valid —
-        // so the step can be walked past without touching anything.
+        // Default every section to keeping its own label — for a matched
+        // name that means "join the existing section of that name", for an
+        // unmatched one it means "create that section in the class above".
+        // Either way it's always valid, so every step can be walked past
+        // untouched; the admin only needs to act on the ones they want to
+        // actually reshuffle.
         const defaults: Record<string, string> = {};
         for (const row of res.sectionPlan ?? []) {
-          if (row.needsDecision) defaults[moveKey(row.fromClass, row.fromSection)] = row.fromSection;
+          defaults[moveKey(row.fromClass, row.fromSection)] = row.fromSection;
         }
         setSectionChoices(defaults);
       })
@@ -151,20 +153,31 @@ export const SchoolAdminPromotion: React.FC = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  const pendingMoves = useMemo(
-    () => (preview?.sectionPlan ?? []).filter((r) => r.needsDecision),
-    [preview],
+  // Every section move, whether or not it needs input — a matched name
+  // defaults to "join the section of that name" but the admin can still
+  // redirect it, because schools reshuffle sections on promotion too, not
+  // just when a name has nowhere obvious to go.
+  const allSectionMoves = useMemo(() => preview?.sectionPlan ?? [], [preview]);
+  const pendingMoves = useMemo(() => allSectionMoves.filter((r) => r.needsDecision), [allSectionMoves]);
+  // What the confirm step actually needs to call out: sections with no
+  // choice to fall back on, plus any the admin deliberately redirected away
+  // from their default. Sections quietly keeping their own name stay off
+  // this list so a school with no reshuffling doesn't see one anyway.
+  const notableSectionMoves = useMemo(
+    () => allSectionMoves.filter((row) => row.needsDecision || (sectionChoices[moveKey(row.fromClass, row.fromSection)] ?? row.fromSection) !== row.fromSection),
+    [allSectionMoves, sectionChoices],
   );
 
-  // The Sections step exists only when the roster actually forces a choice.
-  // A school whose sections line up all the way to Class 10 never sees it.
+  // The Sections step exists whenever there's a roster to move at all — a
+  // school with one section per class still gets it, just with nothing to
+  // change by default.
   const steps = useMemo(() => {
     const list: { key: StepKey; label: string }[] = [{ key: 'review', label: 'Review' }];
-    if (pendingMoves.length > 0) list.push({ key: 'sections', label: 'Sections' });
+    if (allSectionMoves.length > 0) list.push({ key: 'sections', label: 'Sections' });
     list.push({ key: 'holdbacks', label: 'Student outcomes' });
     list.push({ key: 'confirm', label: 'Confirm' });
     return list;
-  }, [pendingMoves]);
+  }, [allSectionMoves]);
 
   const step = steps[Math.min(stepIdx, steps.length - 1)]?.key ?? 'review';
   const goNext = () => setStepIdx((i) => Math.min(i + 1, steps.length - 1));
@@ -249,7 +262,7 @@ export const SchoolAdminPromotion: React.FC = () => {
     try {
       const res = await api.post<ExecuteResponse>('/school-admin/promotion/execute', {
         holdBackIds: [...holdBack],
-        sectionMap: pendingMoves.map((row) => ({
+        sectionMap: allSectionMoves.map((row) => ({
           fromClass: row.fromClass,
           fromSection: row.fromSection,
           toSection: sectionChoices[moveKey(row.fromClass, row.fromSection)] ?? row.fromSection,
@@ -276,7 +289,7 @@ export const SchoolAdminPromotion: React.FC = () => {
       setSessionStartMonth(refreshed.academicYearStartMonth);
       const defaults: Record<string, string> = {};
       for (const row of refreshed.sectionPlan ?? []) {
-        if (row.needsDecision) defaults[moveKey(row.fromClass, row.fromSection)] = row.fromSection;
+        defaults[moveKey(row.fromClass, row.fromSection)] = row.fromSection;
       }
       setSectionChoices(defaults);
     } catch (err) {
@@ -609,24 +622,32 @@ export const SchoolAdminPromotion: React.FC = () => {
         <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div>
             <span className="font-display font-bold text-sm text-slate-800 flex items-center gap-2">
-              <Split size={15} className="text-indigo-500" /> Where do these sections go?
+              <Split size={15} className="text-indigo-500" /> Where does each section go?
             </span>
             <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-              {pendingMoves.length === 1 ? 'One section has' : `${pendingMoves.length} sections have`} no matching
-              section in the class above. Sections whose names already line up move across on their own and aren't
-              listed here.
+              Every section defaults to keeping its own name in the class above. Change any of them if your
+              school reshuffles or merges sections when students move up — not just the ones listed as needing
+              a decision.
+              {pendingMoves.length > 0 && (
+                <> <span className="font-semibold text-amber-700">
+                  {pendingMoves.length === 1 ? 'One section has' : `${pendingMoves.length} sections have`} no
+                  matching name next year and need an explicit destination.
+                </span></>
+              )}
             </p>
           </div>
 
           <div className="flex flex-col gap-2">
-            {pendingMoves.map((row) => {
+            {allSectionMoves.map((row) => {
               const key = moveKey(row.fromClass, row.fromSection);
               const choice = sectionChoices[key] ?? row.fromSection;
-              const creating = choice === row.fromSection;
+              const sameNameExists = row.availableSections.includes(row.fromSection);
+              const otherSections = row.availableSections.filter((label) => label !== row.fromSection);
+              const isDefault = choice === row.fromSection;
               return (
                 <div
                   key={key}
-                  className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-3 text-[13px]"
+                  className={`flex flex-wrap items-center gap-3 rounded-xl border px-3 py-3 text-[13px] ${row.needsDecision ? 'border-amber-200 bg-amber-50/40' : 'border-slate-100 bg-slate-50/60'}`}
                 >
                   <span className="font-bold text-slate-700 shrink-0">
                     Class {row.fromClass}-{row.fromSection}
@@ -641,17 +662,19 @@ export const SchoolAdminPromotion: React.FC = () => {
                     className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] font-semibold text-slate-700 outline-none focus:border-slate-400 cursor-pointer"
                   >
                     <option value={row.fromSection}>
-                      Create Class {row.toClass}-{row.fromSection}
+                      {sameNameExists ? `Keep in Class ${row.toClass}-${row.fromSection}` : `Create Class ${row.toClass}-${row.fromSection}`}
                     </option>
-                    {row.availableSections.map((label) => (
+                    {otherSections.map((label) => (
                       <option key={label} value={label}>
                         Move into Class {row.toClass}-{label}
                       </option>
                     ))}
                   </select>
                   <span className="text-[11px] text-slate-400">
-                    {creating
-                      ? `Class ${row.toClass}-${row.fromSection} will be created`
+                    {isDefault
+                      ? sameNameExists
+                        ? `stays as Class ${row.toClass}-${row.fromSection}`
+                        : `Class ${row.toClass}-${row.fromSection} will be created`
                       : `joins the existing Class ${row.toClass}-${choice}`}
                   </span>
                 </div>
@@ -820,7 +843,7 @@ export const SchoolAdminPromotion: React.FC = () => {
             <div><span className="font-semibold">{movingUpCount}</span> students move up one class</div>
             {holdBack.size > 0 && <div><span className="font-semibold">{holdBack.size}</span> repeat their current class</div>}
             <div><span className="font-semibold">{passingOutCount}</span> Class 10 students pass out and are deactivated</div>
-            {pendingMoves.map((row) => {
+            {notableSectionMoves.map((row) => {
               const choice = sectionChoices[moveKey(row.fromClass, row.fromSection)] ?? row.fromSection;
               return (
                 <div key={moveKey(row.fromClass, row.fromSection)}>

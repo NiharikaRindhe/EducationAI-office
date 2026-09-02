@@ -36,7 +36,7 @@ export const Features: React.FC = () => {
       icon: '🎯',
       title: 'Board Exam Readiness',
       gradient: 'from-rose-500 to-pink-600',
-      pills: ['Board Countdown', 'PYQ Papers', 'Concept Maps'],
+      pills: ['Board Countdown', 'PYQ Papers', 'Mock Exams'],
       desc: 'Class 9–10 students prepare with past-year papers, chapter concept maps, Pomodoro focus sessions, and a live countdown to boards.'
     },
     {

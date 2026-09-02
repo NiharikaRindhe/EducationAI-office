@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
 import {
   createTicketController,
   listTicketsController,
@@ -10,13 +10,13 @@ import {
   escalateTicketController,
 } from '../controllers/ticket.controller.js';
 
-// Cross-role: every authenticated role can raise and view its own tickets;
-// school_admin/super_admin get broader visibility (enforced in the service).
+// Teachers and school admins can raise issues. Super admins retain access to
+// triage escalated tickets, but students and lab in-charges cannot create one.
 export const ticketRouter = Router();
 
 ticketRouter.use(requireAuth);
 
-ticketRouter.post('/', createTicketController);
+ticketRouter.post('/', requireRole('teacher', 'school_admin'), createTicketController);
 ticketRouter.get('/', listTicketsController);
 // Literal path first — /:id below would otherwise swallow /bulk/status
 // with id='bulk'.

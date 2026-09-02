@@ -2,11 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { Loader2, Zap, Flame, Award, BookOpen, FileText, Star, AlertTriangle, Pencil, Lock } from 'lucide-react';
 import { api } from '../../lib/api';
 
-type Accent = 'amber' | 'indigo' | 'sky';
+type Accent = 'amber' | 'indigo' | 'teal' | 'sky';
 
 const ACCENT = {
   amber:  { fill: 'bg-amber-500',   text: 'text-amber-600',  soft: 'bg-amber-50 border-amber-200',  btn: 'bg-amber-500 hover:bg-amber-600',  ring: 'ring-amber-400' },
   indigo: { fill: 'bg-indigo-600',  text: 'text-indigo-600', soft: 'bg-indigo-50 border-indigo-200', btn: 'bg-indigo-600 hover:bg-indigo-700', ring: 'ring-indigo-400' },
+  teal:   { fill: 'bg-teal-700',    text: 'text-teal-700',   soft: 'bg-teal-50 border-teal-200',     btn: 'bg-teal-700 hover:bg-teal-800',     ring: 'ring-teal-500' },
   sky:    { fill: 'bg-sky-500',     text: 'text-sky-600',    soft: 'bg-sky-50 border-sky-200',       btn: 'bg-sky-500 hover:bg-sky-600',       ring: 'ring-sky-400' },
 } as const;
 

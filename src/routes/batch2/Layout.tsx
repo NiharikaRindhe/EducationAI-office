@@ -15,7 +15,7 @@ const PDF_SIMULATOR_ENABLED = true;
 const ReaderLoading: React.FC = () => (
   <div className="h-full w-full flex items-center justify-center">
     <div className="flex flex-col items-center gap-3">
-      <div className="w-7 h-7 rounded-full border-2 border-indigo-500/40 border-t-indigo-500 animate-spin" />
+      <div className="w-7 h-7 rounded-full border-2 border-sky-500/40 border-t-sky-500 animate-spin" />
       <p className="text-xs font-semibold text-slate-400">Loading…</p>
     </div>
   </div>
@@ -49,7 +49,7 @@ export const Batch2Layout: React.FC = () => {
   const getHeaderDetails = () => {
     const path = location.pathname;
     if (path.includes('/activities')) return { title: 'Activities', sub: 'Practice chapters through focused learning activities.' };
-    if (path.includes('/chat')) return { title: 'AI Doubt Solver', sub: 'Ask questions about mathematics and science formulas!' };
+    if (path.includes('/chat')) return { title: 'AI Doubt Tutor', sub: 'Ask questions from your class textbooks and get source-backed explanations.' };
     if (path.includes('/reader')) return { title: 'PDF Simulator', sub: 'Interactive simulations from your textbooks.' };
     if (path.includes('/exams')) return { title: 'Mock Exams', sub: 'Complete term exams and test your readiness.' };
     if (path.includes('/profile')) return { title: 'Profile & Streak', sub: 'Edit your avatar and review your lab attendance streak.' };
@@ -65,11 +65,11 @@ export const Batch2Layout: React.FC = () => {
   if (currentClass < 5 || currentClass > 8) return null;
 
   return (
-    <div className={`flex bg-slate-50/50 ${isReader ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
+    <div className={`flex bg-[#f4f8fb] ${isReader ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
       {/* Sidebar Navigation */}
       <Sidebar
         navItems={navItems}
-        batchColor="indigo"
+        batchColor="sky"
         logoText="EduAI"
         collapsed={isReader && !readerNavExpanded}
         onCollapsedChange={isReader ? (nextCollapsed) => setReaderNavExpanded(!nextCollapsed) : undefined}
@@ -83,7 +83,7 @@ export const Batch2Layout: React.FC = () => {
             greeting="Welcome back,"
             userName={studentName}
             subtitle={header.sub}
-            batchColor="indigo"
+            batchColor="sky"
             userAvatar={studentAvatar}
             profileHref="/batch2/profile"
           />

@@ -2,10 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Loader2, ChevronDown, ChevronUp, Search, BookOpen } from 'lucide-react';
 import { api } from '../../lib/api';
 
-type Accent = 'indigo' | 'sky';
+type Accent = 'indigo' | 'teal' | 'sky';
 
 const ACCENT = {
   indigo: { pill: 'bg-indigo-600 text-white', soft: 'bg-indigo-50 border-indigo-100', text: 'text-indigo-600', tab: 'bg-indigo-600', btn: 'bg-indigo-600 hover:bg-indigo-700' },
+  teal:   { pill: 'bg-teal-700 text-white',   soft: 'bg-teal-50 border-teal-100',     text: 'text-teal-700',  tab: 'bg-teal-700',   btn: 'bg-teal-700 hover:bg-teal-800' },
   sky:    { pill: 'bg-sky-500 text-white',    soft: 'bg-sky-50 border-sky-100',       text: 'text-sky-600',   tab: 'bg-sky-500',    btn: 'bg-sky-500 hover:bg-sky-600' },
 } as const;
 
@@ -146,7 +147,7 @@ export const PyqBrowser: React.FC<{
       {boardBanner && (
         <div className={`rounded-2xl border p-4 flex items-center gap-3 ${a.soft}`}>
           <BookOpen size={16} className={a.text} />
-          <p className={`text-xs font-bold ${a.text}`}>Board Prep Mode — Questions include examiner rubric points to help you score full marks.</p>
+          <p className={`text-xs font-bold ${a.text}`}>Examiner guidance — questions include rubric points to help you understand the marking scheme.</p>
         </div>
       )}
 

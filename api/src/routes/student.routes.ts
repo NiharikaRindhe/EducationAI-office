@@ -23,7 +23,6 @@ import {
   deleteNoteController,
 } from '../controllers/note.controller.js';
 import { getLeaderboardForStudentController } from '../controllers/leaderboard.controller.js';
-import { downloadOwnAdmitCardController } from '../controllers/admitCard.controller.js';
 import { getItemsController, submitAttemptController, getProgressController } from '../controllers/english.controller.js';
 import {
   listMySubjectsController,
@@ -107,8 +106,6 @@ studentRouter.put('/notes/:id', updateNoteController);
 studentRouter.delete('/notes/:id', deleteNoteController);
 
 studentRouter.get('/leaderboard', requireFeature('leaderboard'), getLeaderboardForStudentController);
-
-studentRouter.get('/exams/:examId/admit-card', downloadOwnAdmitCardController);
 
 studentRouter.get('/english/items', requireFeature('games'), getItemsController);
 studentRouter.post('/english/submit', requireFeature('games'), submitAttemptController);

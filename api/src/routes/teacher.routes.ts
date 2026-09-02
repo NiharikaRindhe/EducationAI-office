@@ -52,7 +52,6 @@ import {
 } from '../controllers/examGenerator.controller.js';
 import { deleteFromBankController } from '../controllers/questionBank.controller.js';
 import { recomputeLeaderboardController } from '../controllers/leaderboard.controller.js';
-import { downloadAllAdmitCardsController } from '../controllers/admitCard.controller.js';
 import {
   getClassPerformanceHeatmapController,
   getEnglishAssessmentReportController,
@@ -133,8 +132,6 @@ teacherRouter.put('/exams/:examId/answers/:answerId/score', finalizeAnswerScoreC
 teacherRouter.get('/exams/:examId/merit-list', getMeritListController);
 
 teacherRouter.post('/leaderboard/recompute', requireFeature('leaderboard'), recomputeLeaderboardController);
-
-teacherRouter.get('/exams/:examId/admit-cards', downloadAllAdmitCardsController);
 
 teacherRouter.get('/reports/performance', requireFeature('reports_analytics'), getClassPerformanceHeatmapController);
 teacherRouter.get('/reports/english', requireFeature('reports_analytics'), getEnglishAssessmentReportController);

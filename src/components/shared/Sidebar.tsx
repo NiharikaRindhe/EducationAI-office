@@ -16,10 +16,11 @@ export interface NavItem {
 
 interface SidebarProps {
   navItems: NavItem[];
-  batchColor: 'amber' | 'indigo' | 'sky' | 'slate' | 'emerald' | 'teacher' | 'schoolAdmin' | 'superAdmin' | 'labIncharge';
+  batchColor: 'amber' | 'indigo' | 'teal' | 'sky' | 'slate' | 'emerald' | 'teacher' | 'schoolAdmin' | 'superAdmin' | 'labIncharge';
   logoText: string;
   collapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
+  showStreak?: boolean;
 }
 
 const REAL_AUTH_PORTALS = new Set(['teacher', 'schoolAdmin', 'superAdmin', 'labIncharge']);
@@ -30,6 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   logoText,
   collapsed = false,
   onCollapsedChange,
+  showStreak = true,
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -75,6 +77,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       textColor: 'text-indigo-900',
       logoBg: 'bg-indigo-600 text-white',
       accentColor: 'text-indigo-600'
+    },
+    teal: {
+      sidebarBg: 'bg-white border-r border-slate-200 shadow-sm',
+      activeItem: 'bg-teal-700 text-white shadow-md shadow-teal-700/15',
+      hoverItem: 'hover:bg-teal-50 text-slate-700',
+      textColor: 'text-slate-700',
+      logoBg: 'bg-slate-900 text-white',
+      accentColor: 'text-teal-700'
     },
     sky: {
       sidebarBg: 'bg-gradient-to-b from-sky-50 to-cyan-50 border-r border-sky-100',
@@ -281,10 +291,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="text-[10px] text-slate-400 block font-label-caps tracking-wider">{studentXP} XP</span>
               </div>
             </div>
-            <div className={`items-center gap-0.5 text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded-lg border border-amber-100 ${collapsed ? 'hidden' : 'hidden md:flex'}`}>
+            {showStreak && <div className={`items-center gap-0.5 text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded-lg border border-amber-100 ${collapsed ? 'hidden' : 'hidden md:flex'}`}>
               <span className="material-symbols-outlined text-xs font-fill">local_fire_department</span>
               <span className="text-[10px] font-bold">{studentStreak}d</span>
-            </div>
+            </div>}
           </div>
         )}
 

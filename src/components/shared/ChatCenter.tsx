@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Send, Loader2, AlertCircle, Plus, BookOpen, Image as ImageIcon, Camera, X, Pencil, Trash2, Info } from 'lucide-react';
+import { Send, Loader2, AlertCircle, Plus, BookOpen, Image as ImageIcon, Camera, X, Pencil, Trash2, Info, ShieldCheck, MessageSquareText } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -11,10 +11,11 @@ import { useAuth } from '../../context/AuthContext';
 // changes. Real RAG chat: session per subject, history persisted, sources
 // cited from the actual NCERT chunks the backend retrieved.
 
-type Accent = 'indigo' | 'sky';
+type Accent = 'indigo' | 'teal' | 'sky';
 
 const ACCENT = {
   indigo: { bg: 'bg-indigo-600 hover:bg-indigo-700', bubble: 'bg-indigo-600', soft: 'bg-indigo-50', text: 'text-indigo-600', ring: 'focus:border-indigo-500 focus:ring-indigo-500/10', spinner: 'text-indigo-400' },
+  teal: { bg: 'bg-teal-700 hover:bg-teal-800', bubble: 'bg-teal-700', soft: 'bg-teal-50', text: 'text-teal-700', ring: 'focus:border-teal-600 focus:ring-teal-600/10', spinner: 'text-teal-500' },
   sky: { bg: 'bg-sky-500 hover:bg-sky-600', bubble: 'bg-sky-500', soft: 'bg-sky-50', text: 'text-sky-600', ring: 'focus:border-sky-500 focus:ring-sky-500/10', spinner: 'text-sky-400' },
 } as const;
 
@@ -316,12 +317,21 @@ export const ChatCenter: React.FC<{ accent: Accent }> = ({ accent }) => {
     }
   };
 
+  const activeSession = sessions.find((session) => session.id === activeSessionId) ?? null;
+
   return (
-    <div className="grid grid-cols-12 gap-4 h-[calc(100vh-160px)]">
+    <div className={`flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-900/5 lg:grid lg:grid-cols-[280px_minmax(0,1fr)] ${activeSessionId ? 'h-[calc(100vh-160px)] min-h-[560px]' : 'min-h-[460px]'}`}>
       {/* Sidebar: subjects + past sessions */}
-      <div className="col-span-12 md:col-span-3 bg-white border border-slate-100 rounded-3xl p-4 flex flex-col gap-4 overflow-y-auto">
+      <aside className="no-scrollbar flex max-h-56 flex-col gap-5 overflow-y-auto border-b border-slate-200 bg-slate-50/70 p-4 lg:max-h-none lg:border-b-0 lg:border-r lg:p-5">
+        <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white"><MessageSquareText size={18} /></span>
+          <div className="min-w-0">
+            <h2 className="font-display text-sm font-bold text-slate-900">Doubt Tutor</h2>
+            <p className="mt-0.5 text-[10px] font-medium text-slate-500">Class {classNum} academic workspace</p>
+          </div>
+        </div>
         <div>
-          <span className="text-[9px] font-label-caps text-slate-400 tracking-wider block mb-2">NEW CHAT</span>
+          <span className="mb-2 block text-[9px] font-extrabold uppercase tracking-[0.16em] text-slate-400">Start a conversation</span>
           <div className="flex flex-col gap-1.5">
             {subjects === null ? (
               <Loader2 size={14} className={`animate-spin ${a.spinner}`} />
@@ -330,8 +340,8 @@ export const ChatCenter: React.FC<{ accent: Accent }> = ({ accent }) => {
             ) : (
               subjects.map((subject) => (
                 <button key={subject} onClick={() => void startSession(subject)}
-                  className="flex items-center gap-2 text-left text-xs font-semibold text-slate-600 hover:bg-slate-50 px-3 py-2 rounded-xl transition-all cursor-pointer">
-                  <Plus size={12} className={a.text} /> {subject}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-left text-xs font-bold text-slate-700 shadow-xs transition hover:border-slate-300 hover:bg-slate-50 cursor-pointer">
+                  {subject} <Plus size={13} className={a.text} />
                 </button>
               ))
             )}
@@ -340,12 +350,12 @@ export const ChatCenter: React.FC<{ accent: Accent }> = ({ accent }) => {
 
         {sessions.length > 0 && (
           <div>
-            <span className="text-[9px] font-label-caps text-slate-400 tracking-wider block mb-2">HISTORY</span>
+            <span className="mb-2 block text-[9px] font-extrabold uppercase tracking-[0.16em] text-slate-400">Recent conversations</span>
             <div className="flex flex-col gap-1">
               {sessions.map((s) => (
                 <div key={s.id}
-                  className={`group relative flex items-center rounded-xl transition-all ${
-                    activeSessionId === s.id ? `${a.soft}` : 'hover:bg-slate-50'
+                  className={`group relative flex items-center rounded-lg border transition-all ${
+                    activeSessionId === s.id ? `${a.soft} border-current/10` : 'border-transparent hover:border-slate-200 hover:bg-white'
                   }`}>
                   {renamingSessionId === s.id ? (
                     <input
@@ -388,23 +398,70 @@ export const ChatCenter: React.FC<{ accent: Accent }> = ({ accent }) => {
             </div>
           </div>
         )}
-      </div>
+      </aside>
 
       {/* Chat panel */}
-      <div className="col-span-12 md:col-span-9 bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-sm flex flex-col">
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white">
         {!activeSessionId ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center p-8">
-            <BookOpen size={28} className="text-slate-300" />
-            <p className="text-sm font-bold text-slate-500">Pick a subject to start asking questions</p>
-            <p className="text-xs text-slate-400">Answers are grounded in your NCERT textbook — with page citations.</p>
+          <div className="flex flex-1 items-center justify-center bg-slate-50/30 p-6 sm:p-10">
+            <div className="w-full max-w-xl text-center">
+              <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm"><BookOpen size={21} /></span>
+              <h2 className="mt-4 font-display text-xl font-bold text-slate-900">Ask from your textbooks</h2>
+              <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-slate-500">Choose a subject and ask a question. You can also attach a photo from your Class {classNum} book.</p>
+              <div className="mt-6 flex flex-wrap justify-center gap-2">
+                {(subjects ?? []).map((subject) => (
+                  <button
+                    key={subject}
+                    type="button"
+                    onClick={() => void startSession(subject)}
+                    className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-xs transition hover:border-slate-400 hover:text-slate-950 cursor-pointer"
+                  >
+                    {subject}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-5 inline-flex items-center gap-1.5 text-[10px] font-medium text-slate-400"><ShieldCheck size={12} className={a.text} /> Answers include textbook references when available</p>
+            </div>
           </div>
         ) : (
           <>
-            <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
+            <header className="flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 py-3.5">
+              <div className="min-w-0">
+                <h2 className="truncate font-display text-sm font-bold text-slate-900">{activeSession?.subject ?? 'Subject'} Tutor</h2>
+                <p className="mt-0.5 text-[10px] text-slate-500">Answers checked against your Class {classNum} learning material</p>
+              </div>
+              <span className="hidden items-center gap-1.5 text-[10px] font-semibold text-slate-500 sm:inline-flex"><ShieldCheck size={13} className={a.text} /> Source-grounded tutor</span>
+            </header>
+            <div className="flex flex-1 flex-col gap-5 overflow-y-auto bg-slate-50/40 p-4 sm:p-6">
+              {messages.length === 0 && (
+                <div className="m-auto w-full max-w-2xl py-8 text-center">
+                  <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm"><BookOpen size={21} /></span>
+                  <h3 className="mt-4 font-display text-lg font-bold text-slate-900">Ask your {activeSession?.subject ?? 'subject'} question</h3>
+                  <p className="mx-auto mt-2 max-w-lg text-xs leading-5 text-slate-500">Type a question or attach a clear photo from your textbook. The tutor will explain the method and cite the relevant learning material.</p>
+                  <div className="mt-6 grid gap-2 text-left sm:grid-cols-3">
+                    {[
+                      'Explain a concept step by step',
+                      'Help me solve a textbook question',
+                      'Check my answer and show corrections',
+                    ].map((prompt) => (
+                      <button
+                        key={prompt}
+                        type="button"
+                        onClick={() => setInput(prompt)}
+                        className="rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-[11px] font-semibold leading-4 text-slate-600 shadow-xs transition hover:border-slate-300 hover:text-slate-900 cursor-pointer"
+                      >
+                        {prompt}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-5 inline-flex items-center gap-1.5 text-[10px] font-medium text-slate-400"><ShieldCheck size={12} className={a.text} /> Responses are grounded in your school’s uploaded books</div>
+                </div>
+              )}
               {messages.map((msg) => {
                 const isUser = msg.role === 'user';
                 return (
-                  <div key={msg.id} className={`flex flex-col gap-1.5 max-w-[80%] ${isUser ? 'self-end items-end' : 'self-start items-start'}`}>
+                  <div key={msg.id} className={`flex max-w-[88%] flex-col gap-1.5 sm:max-w-[78%] ${isUser ? 'self-end items-end' : 'self-start items-start'}`}>
+                    <span className="px-1 text-[9px] font-extrabold uppercase tracking-[0.12em] text-slate-400">{isUser ? 'You' : 'EduAI Tutor'}</span>
                     {isUser && msg.image_url && (
                       <img src={msg.image_url} alt="Question you shared" loading="lazy"
                         className="max-w-[220px] max-h-56 object-contain rounded-2xl rounded-tr-sm border border-slate-100" />
@@ -415,19 +472,19 @@ export const ChatCenter: React.FC<{ accent: Accent }> = ({ accent }) => {
                       </div>
                     )}
                     {msg.content && (
-                      <div className={`p-4 rounded-2xl text-xs leading-relaxed ${
+                      <div className={`rounded-2xl px-4 py-3.5 text-xs leading-relaxed shadow-sm ${
                         isUser
-                          ? `${a.bubble} text-white rounded-tr-sm whitespace-pre-line`
-                          : 'bg-slate-50 border border-slate-100 text-slate-700 rounded-tl-sm'
+                          ? 'rounded-tr-sm bg-slate-900 text-white whitespace-pre-line'
+                          : 'rounded-tl-sm border border-slate-200 bg-white text-slate-700'
                       }`}>
                         {isUser ? msg.content : <MarkdownAnswer content={msg.content} />}
                       </div>
                     )}
                     {!isUser && msg.sources && msg.sources.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="mt-1 flex flex-wrap gap-1.5 border-t border-slate-200/80 pt-2">
                         {msg.sources.map((src, i) => (
-                          <span key={i} title={src.excerpt} className={`text-[9px] font-bold px-2 py-1 rounded-lg ${a.soft} ${a.text}`}>
-                            📖 {src.bookTitle}{src.chapter ? `, ${src.chapter}` : ''}{src.page ? `, Pg${src.page}` : ''}
+                          <span key={i} title={src.excerpt} className={`inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[9px] font-bold ${a.text}`}>
+                            <BookOpen size={10} /> {src.bookTitle}{src.chapter ? `, ${src.chapter}` : ''}{src.page ? `, p. ${src.page}` : ''}
                           </span>
                         ))}
                       </div>
@@ -471,7 +528,7 @@ export const ChatCenter: React.FC<{ accent: Accent }> = ({ accent }) => {
               </div>
             )}
 
-            <div className="bg-slate-50 border-t border-slate-100">
+            <div className="border-t border-slate-200 bg-white">
               {pendingImage && (
                 <div className="px-4 pt-3 flex items-center gap-2">
                   <div className="relative">
@@ -484,11 +541,11 @@ export const ChatCenter: React.FC<{ accent: Accent }> = ({ accent }) => {
                   <span className="text-[10px] text-slate-400 font-semibold">Photo attached — describe it or just send</span>
                 </div>
               )}
-              <form onSubmit={handleSend} className="p-4 flex gap-2">
+              <form onSubmit={handleSend} className="flex gap-2 p-4">
                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChosen} className="hidden" />
                 <button type="button" title="Attach a photo of your question" onClick={() => fileInputRef.current?.click()}
                   disabled={isSending}
-                  className="w-11 h-11 shrink-0 bg-white border border-slate-200 disabled:opacity-50 text-slate-500 rounded-xl flex items-center justify-center transition-all hover:border-slate-300 cursor-pointer">
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-400 hover:text-slate-800 disabled:opacity-50 cursor-pointer">
                   <Camera size={16} />
                 </button>
                 <input
@@ -497,17 +554,17 @@ export const ChatCenter: React.FC<{ accent: Accent }> = ({ accent }) => {
                   onPaste={handlePaste}
                   placeholder={pendingImage ? 'Add a note (optional)…' : 'Ask a question, or paste/attach a photo of it…'}
                   disabled={isSending}
-                  className={`flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs outline-none transition-all ${a.ring}`}
+                  className={`min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-4 py-3 text-xs text-slate-800 outline-none transition placeholder:text-slate-400 ${a.ring}`}
                 />
                 <button type="submit" disabled={isSending || (!input.trim() && !pendingImage)}
-                  className={`w-11 h-11 shrink-0 ${a.bg} disabled:opacity-50 text-white rounded-xl flex items-center justify-center transition-all cursor-pointer`}>
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${a.bg} text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer`}>
                   <Send size={16} />
                 </button>
               </form>
             </div>
           </>
         )}
-      </div>
+      </section>
     </div>
   );
 };

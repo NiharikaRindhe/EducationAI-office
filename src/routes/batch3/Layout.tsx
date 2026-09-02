@@ -16,7 +16,7 @@ const PDF_SIMULATOR_ENABLED = true;
 const LabLoading: React.FC = () => (
   <div className="h-full w-full flex items-center justify-center">
     <div className="flex flex-col items-center gap-3">
-      <div className="w-7 h-7 rounded-full border-2 border-sky-500/40 border-t-sky-500 animate-spin" />
+      <div className="w-7 h-7 rounded-full border-2 border-teal-600/40 border-t-teal-600 animate-spin" />
       <p className="text-xs font-semibold text-slate-400">Loading…</p>
     </div>
   </div>
@@ -41,23 +41,14 @@ export const Batch3Layout: React.FC = () => {
   // This is presentation only; each route's API is gated independently.
   const navItems: NavItem[] = ([
     { href: '/batch3/home', label: 'Home', iconName: 'home' },
-    { href: '/batch3/subjects', label: 'Subjects', iconName: 'library_books' },
-    { href: '/batch3/concept-map', label: 'Concept Map', iconName: 'schema' },
     { href: '/batch3/labs', label: 'Science Labs', iconName: 'science', feature: 'virtual_labs' },
     ...(PDF_SIMULATOR_ENABLED
       ? [{ href: '/batch3/reader', label: 'PDF Simulator', iconName: 'auto_stories', feature: 'pdf_simulator' as const }]
       : []),
-    { href: '/batch3/board-prep', label: 'Board Prep', iconName: 'event_upcoming' },
     { href: '/batch3/chat', label: 'AI Doubt Tutor', iconName: 'chat', feature: 'ai_tutor' },
-    { href: '/batch3/daily-challenges', label: 'Daily Challenges', iconName: 'electric_bolt' },
     { href: '/batch3/exams', label: 'Exams & Mocks', iconName: 'edit_document' },
-    { href: '/batch3/tasks', label: 'My Tasks', iconName: 'assignment_turned_in' },
-    { href: '/batch3/notes', label: 'Study Notes', iconName: 'sticky_note_2' },
     { href: '/batch3/pyq', label: 'Board PYQ Hub', iconName: 'bookmark', feature: 'pyq_hub' },
-    { href: '/batch3/pomodoro', label: 'Pomodoro Timer', iconName: 'timer' },
-    { href: '/batch3/streak', label: 'Streak', iconName: 'local_fire_department' },
-    { href: '/batch3/profile', label: 'Profile', iconName: 'person' },
-    { href: '/batch3/help', label: 'Report an Issue', iconName: 'confirmation_number' }
+    { href: '/batch3/profile', label: 'Profile', iconName: 'person' }
   ] as (NavItem & { feature?: FeatureKey })[])
     .filter((item) => !item.feature || hasFeature(item.feature));
 
@@ -70,19 +61,11 @@ export const Batch3Layout: React.FC = () => {
     if (path.includes('/labs/chemistry')) return { title: 'Chemistry Lab', sub: 'Balance reactions, craft compounds, and run the free lab.' };
     if (path.includes('/labs/biology')) return { title: 'Biology Lab', sub: 'NCERT diagram hub, cell sandbox, and spatial recall quizzes.' };
     if (path.includes('/reader')) return { title: 'PDF Simulator', sub: 'Interactive simulations from your textbooks.' };
-    if (path.includes('/subjects')) return { title: 'Subjects & Units', sub: 'NCERT CBSE syllabus checklist with Board tags.' };
-    if (path.includes('/concept-map')) return { title: 'Interactive Concept Maps', sub: 'Visualize logical connections between chapter topics.' };
-    if (path.includes('/board-prep')) return { title: 'CBSE Board Prep Zone', sub: 'Syllabus weightage trends, past papers, and answer tips.' };
-    if (path.includes('/chat')) return { title: 'AI Doubt Solver', sub: 'Step-by-step problem solver with LaTeX support.' };
-    if (path.includes('/daily-challenges')) return { title: 'CBSE Daily Challenges', sub: 'Practice HOTS, Case Study, and Assertion & Reason questions.' };
+    if (path.includes('/chat')) return { title: 'AI Doubt Tutor', sub: 'Ask questions from your class textbooks and get source-backed explanations.' };
     if (path.includes('/exams')) return { title: 'Practice Exams', sub: 'CBSE Board exam pattern mock tests.' };
-    if (path.includes('/tasks')) return { title: 'My Tasks', sub: 'Complete work your teacher has assigned to earn XP.' };
-    if (path.includes('/notes')) return { title: 'Board Study Notes', sub: 'Create notes and tag board topics.' };
     if (path.includes('/pyq')) return { title: 'Board PYQ Papers', sub: 'CBSE past year papers with examiner schemes.' };
-    if (path.includes('/pomodoro')) return { title: 'Pomodoro Focus Timer', sub: 'Utilize 25/5 or 50/10 focus intervals to track study times.' };
-    if (path.includes('/streak')) return { title: 'Streak tracker', sub: 'Streak calendar tied to board prep milestones.' };
     if (path.includes('/profile')) return { title: 'Syllabus Profile', sub: 'View board readiness progress levels.' };
-    return { title: 'Board prep dashboard', sub: 'Ready to prepare for Class 10 Board Exams?' };
+    return { title: 'Exam dashboard', sub: 'Your focused workspace for Class 9–10.' };
   };
 
   const header = getHeaderDetails();
@@ -108,13 +91,14 @@ export const Batch3Layout: React.FC = () => {
   if (currentClass < 9 || currentClass > 10) return null;
 
   return (
-    <div className={`flex bg-slate-50/50 ${isImmersive ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
+    <div className={`flex bg-[#f5f7f6] ${isImmersive ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
       {/* Sidebar Navigation */}
       {!labFocusMode && (
         <Sidebar
           navItems={navItems}
-          batchColor="sky"
+          batchColor="teal"
           logoText="EduAI"
+          showStreak={false}
           collapsed={(isLabRoute || isReaderRoute) && navCollapsed}
           onCollapsedChange={(isLabRoute || isReaderRoute) ? setNavCollapsed : undefined}
         />
@@ -128,9 +112,10 @@ export const Batch3Layout: React.FC = () => {
             greeting="Study Workspace,"
             userName={studentName}
             subtitle={header.sub}
-            batchColor="sky"
+            batchColor="teal"
             userAvatar={studentAvatar}
             profileHref="/batch3/profile"
+            showStreak={false}
             rightSlot={isImmersive ? (
               <div className="hidden items-center gap-2 lg:flex">
                 <button
@@ -162,7 +147,7 @@ export const Batch3Layout: React.FC = () => {
             </Suspense>
           </main>
         ) : (
-          <main className="flex-1 p-8 overflow-y-auto max-w-7xl w-full mx-auto">
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-7xl w-full mx-auto">
             <Outlet />
           </main>
         )}

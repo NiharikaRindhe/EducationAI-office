@@ -45,10 +45,10 @@ const quickLabs = [
 export const Batch3ScienceLabs: React.FC = () => (
   <div className="flex flex-col gap-6">
     <section className="relative overflow-hidden rounded-[28px] bg-slate-950 px-6 py-8 text-white shadow-xl shadow-slate-900/10 md:px-9">
-      <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl" />
-      <div className="absolute bottom-0 right-1/3 h-32 w-32 rounded-full bg-violet-500/20 blur-2xl" />
+      <div className="absolute inset-y-0 right-0 hidden w-1/3 border-l border-white/10 bg-teal-500/10 md:block" />
+      <div className="absolute -right-12 -top-16 h-44 w-44 rounded-full border-[24px] border-teal-400/15" />
       <div className="relative z-10 max-w-2xl">
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-cyan-200">
+        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-teal-300">
           <Sparkles size={13} /> Class 9–10 Science Studio
         </div>
         <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Learn science by doing it.</h1>
@@ -56,9 +56,9 @@ export const Batch3ScienceLabs: React.FC = () => (
           Run safe virtual experiments, change one variable at a time and connect every observation to the NCERT concept behind it.
         </p>
         <div className="mt-6 flex flex-wrap gap-3 text-xs font-semibold text-slate-300">
-          <span className="inline-flex items-center gap-1.5"><BrainCircuit size={15} className="text-cyan-300" /> Interactive simulations</span>
-          <span className="inline-flex items-center gap-1.5"><BookOpenCheck size={15} className="text-cyan-300" /> NCERT aligned</span>
-          <span className="inline-flex items-center gap-1.5"><Beaker size={15} className="text-cyan-300" /> Instant observations</span>
+          <span className="inline-flex items-center gap-1.5"><BrainCircuit size={15} className="text-teal-300" /> Interactive simulations</span>
+          <span className="inline-flex items-center gap-1.5"><BookOpenCheck size={15} className="text-teal-300" /> NCERT aligned</span>
+          <span className="inline-flex items-center gap-1.5"><Beaker size={15} className="text-teal-300" /> Instant observations</span>
         </div>
       </div>
     </section>
@@ -89,12 +89,12 @@ export const Batch3ScienceLabs: React.FC = () => (
       <div className="grid grid-cols-1 divide-y divide-slate-100 sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4 lg:divide-x">
         {quickLabs.map((lab) => (
           <Link key={lab.label} to={lab.href} className="group flex items-center gap-3 p-4 transition hover:bg-slate-50">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600">{lab.icon}</div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 text-teal-700">{lab.icon}</div>
             <div>
               <p className="text-[13px] font-bold text-slate-800">{lab.label}</p>
               <p className="mt-0.5 text-[11px] text-slate-400">{lab.meta}</p>
             </div>
-            <ArrowRight size={14} className="ml-auto text-slate-300 transition group-hover:translate-x-1 group-hover:text-sky-500" />
+            <ArrowRight size={14} className="ml-auto text-slate-300 transition group-hover:translate-x-1 group-hover:text-teal-600" />
           </Link>
         ))}
       </div>

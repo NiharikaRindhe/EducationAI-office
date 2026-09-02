@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Users, BarChart3, Activity, Plus, Loader2, PenLine, CalendarClock, Ban, FlaskConical, ArrowRight, AlertTriangle, Radio, ClipboardCheck, Sparkles } from 'lucide-react';
+import { Users, BarChart3, Activity, Plus, Loader2, PenLine, CalendarClock, Ban, FlaskConical, ArrowRight, AlertTriangle, Radio, ClipboardCheck } from 'lucide-react';
 import { api, ApiClientError } from '../../lib/api';
 
 interface TeachingSection {
@@ -95,28 +95,26 @@ export const TeacherDashboard: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-5 select-none anim-fade-up">
-      <section className="relative overflow-hidden rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-600 via-indigo-600 to-violet-600 px-6 py-5 text-white shadow-lg shadow-indigo-900/10">
-        <div className="absolute -right-16 -top-20 h-52 w-52 rounded-full border-[28px] border-white/10" aria-hidden="true" />
-        <div className="relative flex items-center justify-between gap-6">
+      <section className="relative overflow-hidden rounded-[24px] border border-slate-800 bg-slate-900 px-5 py-6 text-white shadow-xl shadow-slate-900/10 sm:px-7">
+        <div className="absolute inset-y-0 right-0 hidden w-1/3 border-l border-white/10 bg-indigo-500/10 lg:block" aria-hidden="true" />
+        <div className="relative flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-100">
-              <Sparkles size={13} /> Classroom command centre
-            </div>
-            <h2 className="font-display text-xl font-bold">Plan, teach and follow up from one place.</h2>
+            <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-300">Today’s overview</div>
+            <h2 className="font-display text-xl font-bold sm:text-2xl">Plan, teach and follow up.</h2>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-indigo-100">See today’s sessions, review student progress and take the next teaching action without leaving the dashboard.</p>
           </div>
-          <div className="relative flex shrink-0 items-center gap-2">
-            <Link to="/teacher/timetable" className="rounded-xl border border-white/25 bg-white/10 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-white/20">
+          <div className="relative flex shrink-0 flex-wrap items-center gap-2">
+            <Link to="/teacher/timetable" className="rounded-xl border border-white/20 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-white/10">
               View timetable
             </Link>
-            <Link to="/teacher/create-exam" className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-indigo-700 shadow-sm transition-transform hover:-translate-y-0.5">
+            <Link to="/teacher/create-exam" className="inline-flex items-center gap-2 rounded-xl bg-indigo-400 px-4 py-2.5 text-xs font-bold text-slate-950 shadow-sm transition-colors hover:bg-indigo-300">
               <Plus size={14} /> Create exam
             </Link>
           </div>
         </div>
       </section>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {statCards.map((card) => (
           <div key={card.label} className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
             <span className={`absolute inset-x-0 top-0 h-1 ${card.accent}`} aria-hidden="true" />
@@ -134,8 +132,8 @@ export const TeacherDashboard: React.FC = () => {
         ))}
       </div>
 
-      <div className="grid grid-cols-12 items-start gap-5">
-        <div className="col-span-8 flex flex-col gap-5">
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-12">
+        <div className="flex flex-col gap-5 xl:col-span-8">
           <ClassSignInCard />
           <TodayLabPeriodsStrip />
 
@@ -194,7 +192,7 @@ export const TeacherDashboard: React.FC = () => {
         </div>
         </div>
 
-        <aside className="col-span-4 flex flex-col gap-5">
+        <aside className="flex flex-col gap-5 xl:col-span-4">
         <NeedsGradingCard />
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-5 text-left shadow-sm">

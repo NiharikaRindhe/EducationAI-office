@@ -8,11 +8,12 @@ import { api, ApiClientError } from '../../lib/api';
 // all), plus a preview of pending tasks and open exams. Sits at the top of
 // every batch's Home page.
 
-type Accent = 'amber' | 'indigo' | 'sky';
+type Accent = 'amber' | 'indigo' | 'teal' | 'sky';
 
 const ACCENT = {
   amber: { bg: 'bg-amber-500 hover:bg-amber-600', soft: 'bg-amber-50 border-amber-200 text-amber-700', ring: 'text-amber-500', spinner: 'text-amber-400' },
   indigo: { bg: 'bg-indigo-600 hover:bg-indigo-700', soft: 'bg-indigo-50 border-indigo-200 text-indigo-700', ring: 'text-indigo-500', spinner: 'text-indigo-400' },
+  teal: { bg: 'bg-teal-700 hover:bg-teal-800', soft: 'bg-teal-50 border-teal-200 text-teal-800', ring: 'text-teal-700', spinner: 'text-teal-500' },
   sky: { bg: 'bg-sky-500 hover:bg-sky-600', soft: 'bg-sky-50 border-sky-200 text-sky-700', ring: 'text-sky-500', spinner: 'text-sky-400' },
 } as const;
 

@@ -223,9 +223,11 @@ export async function getExamDetail(teacherId: string, examId: string) {
 
   // Summarize who it's published to, grouped by section, with each
   // section's window — this is what the teacher's detail view shows.
+  // Also pulls each student's name here so the tracker below doesn't need a
+  // second round trip to resolve who's who.
   const { data: assignments } = await supabaseAdmin
     .from('exam_assignments')
-    .select('class_section_id, starts_at, ends_at, class_sections(class_num, section_label)')
+    .select('student_id, class_section_id, starts_at, ends_at, class_sections(class_num, section_label), student_profiles(user_profiles(full_name))')
     .eq('exam_id', examId);
 
   const bySection = new Map<
@@ -249,10 +251,42 @@ export async function getExamDetail(teacherId: string, examId: string) {
     }
   }
 
+  // Per-student attempt tracker: every assigned student against whether they
+  // have started, submitted, or not touched the exam yet. `exam_submissions`
+  // gets a row the moment a student opens the exam (started_at defaults to
+  // now()) and `submitted_at` stays null until they finish, so presence/
+  // absence of that row plus submitted_at is enough to tell the three states
+  // apart without a separate "attendance" concept.
+  const { data: submissions } = await supabaseAdmin
+    .from('exam_submissions')
+    .select('student_id, submitted_at, total_score, max_score, is_reviewed, auto_submitted')
+    .eq('exam_id', examId);
+  const submissionByStudent = new Map((submissions ?? []).map((s) => [s.student_id, s]));
+
+  const studentTracker = (assignments ?? [])
+    .map((a) => {
+      const sp = Array.isArray(a.student_profiles) ? a.student_profiles[0] : a.student_profiles;
+      const up = sp ? (Array.isArray(sp.user_profiles) ? sp.user_profiles[0] : sp.user_profiles) : null;
+      const cs = Array.isArray(a.class_sections) ? a.class_sections[0] : a.class_sections;
+      const sub = submissionByStudent.get(a.student_id);
+      return {
+        studentId: a.student_id,
+        fullName: up?.full_name ?? 'Student',
+        sectionLabel: cs ? `${cs.class_num}-${cs.section_label}` : 'Individually assigned',
+        status: !sub ? 'not_started' : sub.submitted_at ? 'submitted' : 'in_progress',
+        submittedAt: sub?.submitted_at ?? null,
+        totalScore: sub?.total_score ?? null,
+        maxScore: sub?.max_score ?? null,
+        isReviewed: sub?.is_reviewed ?? false,
+        autoSubmitted: sub?.auto_submitted ?? false,
+      };
+    })
+    .sort((a, b) => a.sectionLabel.localeCompare(b.sectionLabel) || a.fullName.localeCompare(b.fullName));
+
   const questions = (data.questions as { order_index: number }[] | null) ?? [];
   questions.sort((a, b) => a.order_index - b.order_index);
 
-  return { ...data, questions, assignedSections: [...bySection.values()] };
+  return { ...data, questions, assignedSections: [...bySection.values()], studentTracker };
 }
 
 export async function listExamsForTeacher(teacherId: string) {
@@ -262,7 +296,22 @@ export async function listExamsForTeacher(teacherId: string) {
     .eq('created_by', teacherId)
     .order('created_at', { ascending: false });
   if (error) throw new ApiError('INTERNAL_ERROR', 'Failed to list exams', error.message);
-  return data;
+
+  // One assigned-student count per exam, so the list view can show reach
+  // (how many students got this exam) without a per-exam round trip. A
+  // draft always reads 0 here — assignments only exist after publish.
+  const examIds = (data ?? []).map((e) => e.id);
+  const studentCounts = new Map<string, number>();
+  if (examIds.length > 0) {
+    const { data: assignments, error: countError } = await supabaseAdmin
+      .from('exam_assignments')
+      .select('exam_id')
+      .in('exam_id', examIds);
+    if (countError) throw new ApiError('INTERNAL_ERROR', 'Failed to count assigned students', countError.message);
+    for (const a of assignments ?? []) studentCounts.set(a.exam_id, (studentCounts.get(a.exam_id) ?? 0) + 1);
+  }
+
+  return (data ?? []).map((exam) => ({ ...exam, assignedStudentCount: studentCounts.get(exam.id) ?? 0 }));
 }
 
 interface AssignmentRow {

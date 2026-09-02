@@ -181,7 +181,7 @@ export const Batch2Activities: React.FC = () => {
               setSearchParams({ subject: s });
             }}
             className={`py-2 px-4 rounded-full text-xs font-bold transition-all ${
-              subject === s ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' : 'text-slate-400 hover:text-slate-700'
+              subject === s ? 'bg-sky-500 text-white shadow-md shadow-sky-500/10' : 'text-slate-400 hover:text-slate-700'
             }`}
           >
             {s}
@@ -203,11 +203,11 @@ export const Batch2Activities: React.FC = () => {
               key={ch.chapterNum}
               id={`practice-ch-${ch.chapterNum}`}
               className={`bg-white rounded-2xl shadow-xs p-4 border ${
-                focusChapter === ch.chapterNum ? 'border-indigo-300 ring-2 ring-indigo-100' : 'border-slate-100'
+                focusChapter === ch.chapterNum ? 'border-sky-300 ring-2 ring-sky-100' : 'border-slate-100'
               }`}
             >
               <div className="flex items-center gap-3 mb-3">
-                <span className="shrink-0 w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center font-display font-black text-[11px] text-indigo-600">
+                <span className="shrink-0 w-8 h-8 rounded-lg bg-sky-50 flex items-center justify-center font-display font-black text-[11px] text-sky-600">
                   {ch.chapterNum}
                 </span>
                 <span className="font-display font-bold text-sm text-slate-800">{ch.title}</span>
@@ -223,7 +223,7 @@ export const Batch2Activities: React.FC = () => {
                         setActive(a);
                         setSearchParams({ game: a.gameId });
                       }}
-                      className="w-full flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5 text-left hover:border-indigo-200 hover:bg-indigo-50/40"
+                      className="w-full flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5 text-left hover:border-sky-200 hover:bg-sky-50/40"
                     >
                       <span className="flex items-center gap-2 min-w-0">
                         <span className="text-lg">{a.icon}</span>

@@ -191,9 +191,9 @@ export const api = {
   put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
-  /** For endpoints returning a binary blob (admit card PDF/zip, CSV export)
-   *  rather than JSON. Takes a query so an export can carry the same filters
-   *  the on-screen table is using. */
+  /** For endpoints returning a binary blob (CSV export, etc.) rather than
+   *  JSON. Takes a query so an export can carry the same filters the
+   *  on-screen table is using. */
   async download(path: string, query?: RequestOptions['query']): Promise<Blob> {
     const headers: Record<string, string> = {};
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
